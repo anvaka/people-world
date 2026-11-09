@@ -38,6 +38,15 @@ python3 -m http.server 8080
 and open http://localhost:8080. (Opening `index.html` straight from disk does not work: the page
 loads ES modules and a module worker.) The same works on GitHub Pages.
 
+## Previews
+
+GitHub Actions publish `main` to the `gh-pages` branch, which GitHub Pages serves. Every pull
+request from a branch of this repository is published next to it, at
+`https://anvaka.github.io/people-world/pr-preview/pr-<number>/`, and a comment on the pull request
+links to it with a QR code, so a change can be tried on a phone before it is merged. Pushing to the
+branch updates the preview; closing or merging the pull request removes it. Pull requests from
+forks get no preview.
+
 ## How a world is made
 
 1. **Layout.** Each country is a disc of its size. Neighbours are pulled together and other
