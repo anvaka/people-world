@@ -221,7 +221,11 @@ export function createEngine(makeCanvas) {
     if (layer === 'land' && !anyCell(sv, v.x0, v.y0, v.x1, v.y1, id => id !== -1)) return null;
     if (layer === 'sea' && !anyCell(sv, v.x0, v.y0, v.x1, v.y1, id => id === -1)) return null;
     let N = Math.round(TILE_PX * res), canvas = makeCanvas(N, N);
-    ctx = canvas.getContext('2d');
+    // drawn in memory, not on the GPU: the page shows a tile as an image taken from this canvas,
+    // and an image backed by a GPU texture of the worker's could come out without its alpha (black
+    // where the tile is clear) or be lost with the worker's GPU context on a phone. An image in
+    // memory is uploaded by the page's own compositor like any other picture.
+    ctx = canvas.getContext('2d', {willReadFrequently: true});
     v.S = (x, y) => [(x - v.x0) * kb, (v.y1 - y) * kb];
     v.toPx = () => ctx.setTransform(res, 0, 0, res, 0, 0);
     v.toWorld = () => ctx.setTransform(res * kb, 0, 0, res * kb, -res * kb * v.x0, res * kb * v.y1);   // svg coords (y down)
