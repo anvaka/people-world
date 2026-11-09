@@ -2560,17 +2560,26 @@ function openStyles() {
   styleBox.querySelector('[aria-checked="true"]').focus({preventScroll: true});
 }
 function closeStyles() {
+  // (the focus goes back to the Style button only from inside the picker: a pick that finishes
+  // while you type elsewhere leaves you there)
+  let inside = styleBox.contains(document.activeElement) || document.activeElement === styleButton || document.activeElement === document.body;
   styleBox.hidden = true;
   styleButton.setAttribute('aria-expanded', 'false');
-  styleButton.focus({preventScroll: true});
+  if (inside) styleButton.focus({preventScroll: true});
 }
-function pickStyle(name) {
-  setStyle(name).then(done => { if (done && done.ms) announce(`The map is drawn in ${styleTitle[name]}.`); }, failed);
+// A click (or Enter) on a style picks it and folds the picker once the map is drawn in it (until
+// then the picker says what it is drawing); the arrow keys only move the pick, as in any radio group
+function pickStyle(name, fold) {
+  setStyle(name).then(done => {
+    if (!done) return;           // another pick came after this one
+    if (done.ms) announce(`The map is drawn in ${styleTitle[name]}.`);
+    if (fold && !styleBox.hidden) closeStyles();
+  }, failed);
 }
 styleButton.addEventListener('click', () => { if (styleBox.hidden) openStyles(); else closeStyles(); });
 $('style-close').addEventListener('click', closeStyles);
 styleBox.querySelectorAll('[data-pick-style]').forEach(button => {
-  button.addEventListener('click', () => pickStyle(button.dataset.pickStyle));
+  button.addEventListener('click', () => pickStyle(button.dataset.pickStyle, true));
   button.addEventListener('keydown', e => {
     let step = {ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1}[e.key];
     if (!step) return;

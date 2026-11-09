@@ -29,7 +29,8 @@ up, so each world number gives a different map of the same graph.
 - **Style** draws the map as Ink (a book's endpapers: pen, parchment, hatched coasts, mountains and
   woods), Realm (a painted game world: terrain, shallows and rivers under the countries) or
   Kinpeki (a gold-leaf folding screen: flat mineral colours on a sea of gold waves). Switching
-  doesn't build the world again. The browser remembers the choice.
+  doesn't build the world again, and the picker folds away once the map is drawn in the new style.
+  The browser remembers the choice.
 - **Share a map.** The address holds the world number and the edits, so a link opens the same
   map. `#world-1-cut-FR-ES-add-JP-KR` is world 1 without the France–Spain border and with a
   Japan–South Korea one. Countries are named by their two-letter codes. Past four edits the link
