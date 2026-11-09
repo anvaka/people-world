@@ -12,7 +12,7 @@
 // tiles drawn separately meet without a seam in their content.
 import {hash, makeTerrain, smoothstep} from './ink-noise.js';
 import {drawIds} from './ink-raster.js';
-import {survey} from './ink-survey.js';
+import {survey, RIDGE_CELLS} from './ink-survey.js';
 
 export const K_REF = 6;        // px per world unit of a whole-world view on a laptop
 export const TILE_PX = 480;    // a tile's side in css px at its band's zoom
@@ -126,7 +126,26 @@ function segmentGrid(lines, box) {
     }
   });
   segs = new Float64Array(segs);
-  return function near(x, y, r) {
+  // a segment within r of (x, y), running within 30 degrees of the direction (dx, dy): along it
+  near.along = function (x, y, r, dx, dy) {
+    let cx0 = Math.floor((x - r - x0) / G), cx1 = Math.floor((x + r - x0) / G);
+    let cy0 = Math.floor((y - r - y0) / G), cy1 = Math.floor((y + r - y0) / G), r2 = r * r, dl = Math.hypot(dx, dy) || 1;
+    for (let cy = cy0; cy <= cy1; ++cy) for (let cx = cx0; cx <= cx1; ++cx) {
+      let list = cells.get(cy * w + cx);
+      if (!list) continue;
+      for (let s of list) {
+        let ax = segs[s], ay = segs[s + 1], sx = segs[s + 2] - ax, sy = segs[s + 3] - ay;
+        let len = sx * sx + sy * sy, t = len ? ((x - ax) * sx + (y - ay) * sy) / len : 0;
+        t = t < 0 ? 0 : t > 1 ? 1 : t;
+        let ex = ax + t * sx - x, ey = ay + t * sy - y;
+        if (ex * ex + ey * ey >= r2 || !len) continue;
+        if (Math.abs(sx * dy - sy * dx) / (Math.sqrt(len) * dl) < 0.5) return true;
+      }
+    }
+    return false;
+  };
+  return near;
+  function near(x, y, r) {
     let cx0 = Math.floor((x - r - x0) / G), cx1 = Math.floor((x + r - x0) / G);
     let cy0 = Math.floor((y - r - y0) / G), cy1 = Math.floor((y + r - y0) / G), r2 = r * r;
     for (let cy = cy0; cy <= cy1; ++cy) for (let cx = cx0; cx <= cx1; ++cx) {
@@ -298,9 +317,10 @@ export function createEngine(makeCanvas) {
     }
   }
 
-  // Rivers: blue, unbroken, swelling downstream; they keep off the borders (where a river comes
-  // within a few pixels of one it is not drawn, so it can never run along a border or be taken for
-  // one). The same rivers at every zoom.
+  // Rivers: blue, unbroken, swelling downstream, and across a border unbroken too. The survey keeps
+  // them off the borders (each border stands on a low ridge they cross square on); where one still
+  // runs along a border, within a few pixels and nearly parallel, that stretch is not drawn, so a
+  // river is never taken for a border. The same rivers at every zoom.
   function rivers(v) {
     let {st, kb} = v, m = 4 / kb;
     let list = st.rivers.filter(r => meets(r.box, v.x0, v.y0, v.x1, v.y1, m));
@@ -316,7 +336,10 @@ export function createEngine(makeCanvas) {
     ctx.lineCap = ctx.lineJoin = 'round';
     let gap = 3.5 / kb, width = a => Math.min(2.6, 0.7 + 0.45 * Math.log2(1 + a / RIVER_MIN));
     for (let r of list) {
-      let line = r.pts, ok = line.map(([x, y]) => !st.nearBorder(x, y, gap));
+      let line = r.pts, ok = line.map(([x, y], q) => {
+        let a = line[Math.max(0, q - 1)], b = line[Math.min(line.length - 1, q + 1)];
+        return !st.nearBorder.along(x, y, gap, b[0] - a[0], b[1] - a[1]);
+      });
       let i = 0;
       while (i < line.length - 1) {
         if (!ok[i] || !ok[i + 1]) { ++i; continue; }
@@ -600,8 +623,27 @@ function riverLines(st) {
   let heads = [...recv.keys()].filter(c => !up.has(c)).sort((a, b) => a - b);
   let seen = new Set(), lines = [];
   let pos = c => { let cx = c % sv.w, cy = (c - cx) / sv.w; return [sv.x0 + (cx + 0.5) * sv.cell, sv.y0 - (cy + 0.5) * sv.cell]; };
+  // A river whose rain reaches the threshold by a border (gathered over a border's saddle) would
+  // begin on the border, as if cut off by it: it begins upstream instead, up its largest stream (of
+  // the cells the survey kept), at the first cell clear of every border (or, if the stream keeps
+  // close to borders, the one furthest from them), so it is seen to cross
+  let upBest = new Map();
+  for (let i = 0; i < sv.river.cell.length; ++i) {
+    let c = sv.river.cell[i], r = sv.river.recv[i], b = upBest.get(r);
+    if (r >= 0 && (b === undefined || acc[c] > acc[b])) upBest.set(r, c);
+  }
   for (let head of heads) {
-    let pts = [], c = head;
+    let source = [], tb = sv.toBorder;
+    if (tb[head] < RIDGE_CELLS) {
+      let walk = [], best = -1;
+      for (let u = upBest.get(head); u !== undefined && !seen.has(u) && walk.length < 4 * RIDGE_CELLS; u = upBest.get(u)) {
+        walk.push(u);
+        if (best < 0 || tb[u] > tb[walk[best]]) best = walk.length - 1;
+        if (tb[u] >= RIDGE_CELLS) break;
+      }
+      if (best >= 0 && tb[walk[best]] > tb[head]) source = walk.slice(0, best + 1).reverse();
+    }
+    let pts = source.map(c => { seen.add(c); return [...pos(c), acc[c]]; }), c = head;
     while (true) {
       pts.push([...pos(c), acc[c] || RIVER_MIN]);
       if (seen.has(c)) break;

@@ -70,8 +70,31 @@ function heap(key) {
   };
 }
 
+export const RIDGE_CELLS = 4, RIDGE_HEIGHT = 2.5;   // the borders' ridges: cells to either side, height (world units)
+// A few cells of no country inside the land, where borders meet (a cell whose centre fell in a sliver
+// between two shapes): taken for sea, they would be lakes where rivers end, at a border. Pockets of
+// up to 'most' cells not joined to the open sea become border cells (-2); inland seas are far larger
+export function fillPockets(ids, w, h, most = 8, fill = () => -2) {
+  const seen = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; ++i) {
+    if (ids[i] !== -1 || seen[i]) continue;
+    let stack = [i], cells = [], open = false;
+    seen[i] = 1;
+    while (stack.length) {
+      let j = stack.pop(), x = j % w, y = (j - x) / w;
+      cells.push(j);
+      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) open = true;
+      for (let k of [x > 0 ? j - 1 : -1, x < w - 1 ? j + 1 : -1, y > 0 ? j - w : -1, y < h - 1 ? j + w : -1]) {
+        if (k >= 0 && ids[k] === -1 && !seen[k]) { seen[k] = 1; stack.push(k); }
+      }
+    }
+    if (!open && cells.length <= most) { let v = fill(cells); for (let j of cells) ids[j] = v; }
+  }
+  return ids;
+}
 export function survey({w, h, ids, cell, x0, y0, seed, box}) {
   const N = w * h;
+  fillPockets(ids, w, h);
   const land = new Uint8Array(N), sea = new Uint8Array(N), edge = new Uint8Array(N);
   for (let i = 0; i < N; ++i) { land[i] = ids[i] !== -1 ? 1 : 0; sea[i] = 1 - land[i]; }
   for (let y = 0; y < h; ++y) for (let x = 0; x < w; ++x) {
@@ -82,9 +105,44 @@ export function survey({w, h, ids, cell, x0, y0, seed, box}) {
   const toSea = distance(sea, w, h);     // for land cells: how far inland
   const toLand = distance(land, w, h);   // for sea cells: how far out to sea
   const toEdge = distance(edge, w, h);   // to the nearest coast or border
+  // the borders alone: a land cell beside another country's, or a blend of two countries' colours
+  const border = new Uint8Array(N);
+  for (let y = 1; y < h - 1; ++y) for (let x = 1; x < w - 1; ++x) {
+    let i = y * w + x, id = ids[i];
+    if (id === -1) continue;
+    if (id >= 0) {
+      for (let j of [i - 1, i + 1, i - w, i + w]) if (ids[j] >= 0 && ids[j] !== id) { border[i] = 1; break; }
+    } else {
+      let a = -1;
+      for (let dy = -1; dy <= 1 && !border[i]; ++dy) for (let dx = -1; dx <= 1; ++dx) {
+        let o = ids[i + dy * w + dx];
+        if (o < 0) continue;
+        if (a < 0) a = o; else if (o !== a) { border[i] = 1; break; }
+      }
+    }
+  }
+  const toBorder = distance(border, w, h);
+  // and where three meet (or a border meets the coast): a river going through there would cut a
+  // country's corner, crossing two borders at once, or meet the sea at the end of a border
+  const junction = new Uint8Array(N);
+  for (let y = 2; y < h - 2; ++y) for (let x = 2; x < w - 2; ++x) {
+    let i = y * w + x;
+    if (!border[i]) continue;
+    let a = -3, b = -3, c = -3;
+    for (let dy = -2; dy <= 2; ++dy) for (let dx = -2; dx <= 2; ++dx) {
+      let o = ids[i + dy * w + dx];
+      if (o === -2 || o === a || o === b) continue;
+      if (a === -3) a = o; else if (b === -3) b = o; else { c = o; break; }
+    }
+    if (c !== -3) junction[i] = 1;
+  }
+  const toJunction = distance(junction, w, h);
 
   // The relief: rising inland, with ridges where the mountain field says so, and a little noise.
-  // Rivers find their way down it to the sea.
+  // Rivers find their way down it to the sea. Every border stands on a low ridge of its own, a few
+  // cells wide, higher where three borders meet: a river keeps off a border and crosses one at a
+  // saddle, square on and away from the corners, instead of running along it (where it would be
+  // taken for the border, or hidden as too near one)
   const T = makeTerrain(seed), fbm = T.fbm;
   const elev = new Float32Array(N);
   // the terrain fields, sampled once per cell over the land (the page reads them back, smoothly
@@ -100,6 +158,9 @@ export function survey({w, h, ids, cell, x0, y0, seed, box}) {
     fields.dry[i] = T.dry(wx, wy); fields.wet[i] = T.wet(wx, wy);
     if (!land[i]) { elev[i] = 0; continue; }
     elev[i] = toSea[i] * cell + 9 * m + 2.2 * fbm(wx / 9, wy / 9, 2) + 0.6 * fbm(wx / 2.5, wy / 2.5, 2);
+    let t = 1 - toBorder[i] / RIDGE_CELLS, u = 1 - toJunction[i] / (2 * RIDGE_CELLS);
+    if (t > 0) elev[i] += RIDGE_HEIGHT * t * t;
+    if (u > 0) elev[i] += RIDGE_HEIGHT * u * u;
   }
   // priority flood from the coast: every land cell drains to the neighbour it was reached from
   const recv = new Int32Array(N).fill(-1), done = new Uint8Array(N), level = new Float32Array(N);
@@ -142,7 +203,7 @@ export function survey({w, h, ids, cell, x0, y0, seed, box}) {
   let cells = [];
   for (let i = 0; i < N; ++i) if (land[i] && acc[i] >= MIN) cells.push(i);
   const river = {cell: new Int32Array(cells), recv: new Int32Array(cells.map(i => recv[i])), acc: new Float32Array(cells.map(i => acc[i]))};
-  return {toSea, toLand, toEdge, river, ids, fields, thr: thresholds(ids, fields, toSea, cell), spots: seaSpots({w, h, ids, cell, x0, y0, toLand, box})};
+  return {toSea, toLand, toEdge, toBorder, river, ids, fields, thr: thresholds(ids, fields, toSea, cell), spots: seaSpots({w, h, ids, cell, x0, y0, toLand, box})};
 }
 
 // How much of each realm its terrain may take. The fields alone gave a big realm whole fields of
