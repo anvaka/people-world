@@ -465,10 +465,18 @@ function paint(world, selected) {
   let near = new Set(selected ? world.neighbours[selected.index] : []);
   let key = [v.x, v.y, v.k, world.level, dark, selected ? selected.index : -1, innerWidth, innerHeight, devicePixelRatio].join(',');
   if (world.realm.key === key) return;
+  // The terrain keeps what it prepared for two worlds only (GPU memory). A world shown again after it
+  // was let go (Undo or Back to an earlier map, Show before) gets it back from its build result,
+  // where the preparation stays: unpainted, the canvas would go on showing its last picture, of
+  // another world at another zoom, under this one
+  let prep = world.result && world.result.realmPrep;
+  if (!terrain.has(world) && prep) terrain.addWorld(world, prep.prep, prep.seed);
   let t = performance.now(), result;
   try {
     result = terrain.draw(world, v, {night: dark, pal: dark ? PAL_NIGHT : PAL_DAY, slots: world.realm.slots, selected: selected ? selected.index : null, near});
   } catch (e) { console.warn('realm: terrain failed', e); goFlat(); return; }
+  // (and while it cannot paint this view, no picture at all rather than one of something else)
+  terrain.canvas.style.visibility = result ? '' : 'hidden';
   if (!result) return;           // not prepared yet: painted when it is
   world.realm.key = key;
   stats.draws++;
