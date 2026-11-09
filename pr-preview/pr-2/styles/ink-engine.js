@@ -292,12 +292,12 @@ export function createEngine(makeCanvas) {
 
   // ------------------------------------------------------------------------------- land layer
   // The ribbon: a thin stripe in a deeper shade of the realm's own paper just inside its land
-  // borders, a hair of paper between it and the inked border (outline colouring)
-  // (by day only, and fine: at night a pale ribbon by a pale border read as a glow, a doubled line)
+  // borders, a hair of paper between it and the inked border (outline colouring). By night too: the
+  // night papers' ribbons are deeper still, never paler (a pale ribbon by a pale border read as a
+  // glow, a doubled line)
   const RIBBON_GAP = 2.2, RIBBON_W = 1.0;
   function ribbons(v) {
     let {st, kb} = v;
-    if (P.dark) return;
     v.toWorld();
     ctx.lineJoin = 'round';
     ctx.lineCap = 'butt';

@@ -256,7 +256,8 @@ void main() {
       w = mix(w, vec3(0.93, 0.98, 0.97), max(edge * 0.85, surf));
     }
     w *= 1.06 - 0.16 * smoothstep(0.0, 0.9, length(P - vec2(-0.35, -0.3)));
-    if (u_night > 0.5) w = w * vec3(0.32, 0.4, 0.55) + vec3(0.0, 0.01, 0.03);
+    // by night a deep navy, darker than the land, its colour mostly gone
+    if (u_night > 0.5) w = mix(vec3(lum(w)), w, 0.55) * vec3(0.27, 0.34, 0.5) + vec3(0.0, 0.006, 0.02);
     o = vec4(w + (h1(fc, 90) - 0.5) / 255.0, 1.0);
     return;
   }
@@ -423,9 +424,12 @@ void main() {
   outc *= 1.06 - 0.16 * smoothstep(0.0, 0.9, length(P - vec2(-0.35, -0.3)));
 
   if (u_night > 0.5) {
-    // night: moonlight, cool and dim; the sea dark; the people's lights on the land
+    // night: under the moon. The land keeps its values, spread wider than by day (dark woods, pale
+    // sand, the lit slopes and the snow silver) and a little of its colour, gone cool and dim, so
+    // the people's lights stand out on it; the rivers catch the sky
     float l = lum(outc);
-    vec3 moon = mix(vec3(l), outc, 0.35) * vec3(0.42, 0.5, 0.68) * 0.9;
+    vec3 moon = mix(vec3(l), outc, 0.4) * vec3(0.26, 0.31, 0.43) * (0.7 + 0.6 * l) + vec3(0.016, 0.02, 0.03);
+    if (E.b > 0.0) moon = mix(moon, vec3(0.23, 0.32, 0.42), smoothstep(0.08, 0.42, E.b) * 0.85);
     {
       // the people's lights: gathered into towns (a mid-scale noise), along the coasts and the
       // rivers, thin on the heights; a few burn bright, most are hamlets; a warm haze over the towns
@@ -433,27 +437,31 @@ void main() {
       float shore = land && E.g > 0.0 ? smoothstep(0.2, 0.9, E.g) : 0.0;
       float keep = (0.1 + 0.62 * town + 0.35 * shore + 0.45 * smoothstep(0.0, 0.3, E.b)) * (1.0 - 0.8 * snow) * (1.0 - 0.5 * rock);
       keep = min(keep, 0.8);
-      moon += vec3(0.11, 0.07, 0.03) * town * (0.6 + 0.4 * m1.x);
+      moon += vec3(0.045, 0.03, 0.012) * town * (0.6 + 0.4 * m1.x);
       // every level of lights the zoom shows: the finest are villages, fading in; the coarser are
       // towns, a little larger and brighter the further the zoom has come since they first showed.
       // They gather at every scale: each level has patches some four of its cells across (a noise on
       // the level two coarser), and its lights keep to its own patches and to those of the two levels
-      // above, so villages crowd round towns and towns round cities. (What a light keeps to depends
-      // on its level, never on the zoom: no zoom puts one out)
+      // above, so villages crowd round towns and towns round cities. The finer the level, the
+      // tighter its patches: towns are found all over the peopled land, villages huddle, and the
+      // country between them is dark. (What a light keeps to depends on its level, never on the
+      // zoom: no zoom puts one out)
       float spot[${LIGHT_N + 2}];
       float f = u_lights[0].z;
-      for (int i = 0; i < ${LIGHT_N + 2}; ++i, f *= 0.5)
-        spot[i] = 0.3 + 1.9 * smoothstep(0.35, 0.75, noised(u_lightP[i] + local * (f * 0.25), 80 + ((u_lightL[0] - i) & 31)).x);
+      for (int i = 0; i < ${LIGHT_N + 2}; ++i, f *= 0.5) {
+        float n = noised(u_lightP[i] + local * (f * 0.25), 80 + ((u_lightL[0] - i) & 31)).x;
+        float tight = smoothstep(6.0, 10.0, float(u_lightL[0] - i));
+        spot[i] = mix(0.3 + 1.9 * smoothstep(0.35, 0.75, n), 0.15 + 2.1 * smoothstep(0.4, 0.8, n), tight);
+      }
       float glow = 0.0;
       for (int i = 0; i < ${LIGHT_N}; ++i) {
         vec4 lv = u_lights[i];
         if (lv.w <= 0.0) continue;
         float j = u_lightJ[i];
         float crowd = spot[i] * spot[i + 1] * spot[i + 2];
-        glow += lv.w * (0.55 + 0.15 * j) * lights(lv.xy + local * lv.z, keep * crowd, 60 + (u_lightL[i] & 31), 1.0 / (lv.z * u_invK), j);
+        glow += lv.w * (0.55 + 0.15 * j) * (0.55 + 0.25 * min(crowd, 2.0)) * lights(lv.xy + local * lv.z, keep * crowd, 60 + (u_lightL[i] & 31), 1.0 / (lv.z * u_invK), j);
       }
       moon += vec3(1.0, 0.74, 0.4) * glow;
-      moon += vec3(0.05, 0.034, 0.014);
     }
     outc = moon;
   }
@@ -466,12 +474,12 @@ void main() {
     float s = (0.62 * (1.0 - smoothstep(0.22 * u_bandPx, 0.42 * u_bandPx, d)) + 0.38 * exp(-d / (0.45 * u_bandPx))) * (state == 2 ? 1.0 : 0.9);
     vec3 pc = state == 2 ? vec3(0.95, 0.72, 0.2) : u_pal[slot];
     // by day the ribbon takes the ground's light; by night it glows a little of its own
-    float shade = u_night > 0.5 ? 0.3 + 1.2 * lum(col2) : 0.42 + 0.85 * lum(col2);
-    col2 = mix(col2, pc * shade, s * (u_night > 0.5 ? 0.7 : 0.85));
+    float shade = u_night > 0.5 ? 0.2 + 1.0 * lum(col2) : 0.42 + 0.85 * lum(col2);
+    col2 = mix(col2, pc * shade, s * (u_night > 0.5 ? 0.62 : 0.85));
     float casing = 1.0 - smoothstep(0.8 * u_pr, 2.2 * u_pr, d);
-    col2 = mix(col2, u_night > 0.5 ? vec3(0.75, 0.78, 0.85) : vec3(1.0, 0.97, 0.9), casing * (u_night > 0.5 ? 0.25 : 0.45));
+    col2 = mix(col2, u_night > 0.5 ? vec3(0.75, 0.78, 0.85) : vec3(1.0, 0.97, 0.9), casing * (u_night > 0.5 ? 0.12 : 0.45));
   }
-  if (state == 0) col2 = mix(col2, vec3(lum(col2)) * 0.6 + (u_night > 0.5 ? 0.12 : 0.36), 0.72);   // other countries under a mist
+  if (state == 0) col2 = mix(col2, vec3(lum(col2)) * 0.6 + (u_night > 0.5 ? 0.05 : 0.36), 0.72);   // other countries under a mist
   outc = col2;
   // dither: no banding in the gradients
   outc += (h1(fc, 90) - 0.5) / 255.0;
