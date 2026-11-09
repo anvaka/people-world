@@ -14,19 +14,33 @@ up, so each world number gives a different map of the same graph.
 
 ## Using the map
 
-- Drag, pinch, scroll or double-click to move around. Tap a country to see its neighbours.
+- Drag, pinch, scroll or double-click to move around; the buttons at the right edge zoom in, out
+  and back to the whole world. Tap a country to see its neighbours. **Find a country** takes a
+  name, the start of one or a two-letter code.
 - **Another world** draws the same graph again with the next world number.
-- **Change borders.** In a country's panel, × removes a border and the field below adds one.
-  The map is then redrawn starting from the world as it was, so the countries an edit doesn't
-  touch stay where they were. **Show before** flips between the two maps; each edit can be undone.
+- **Change borders.** In a country's panel, **Remove** takes a border away and the field below (or
+  "pick it on the map") adds one. The map is then redrawn starting from the world as it was, so the
+  countries an edit doesn't touch stay where they were. While it is redrawn the old map stays in
+  use, and a note at the bottom right says what is being drawn and can cancel it. Afterwards the
+  map lights the countries you edited and fades those that kept their shape.
+- **Show before** switches between the map before your changes and after; holding it (or the B
+  key) shows the map before only while held. Every change can be undone on its own; Undo, Ctrl+Z
+  and the browser's Back are instant for the last few maps drawn.
+- **Style** draws the map as Ink (a book's endpapers: pen, parchment, hatched coasts, mountains and
+  woods), Realm (a painted game world: terrain, shallows and rivers under the countries) or
+  Kinpeki (a gold-leaf folding screen: flat mineral colours on a sea of gold waves). Switching
+  doesn't build the world again. The browser remembers the choice.
 - **Share a map.** The address holds the world number and the edits, so a link opens the same
   map. `#world-1-cut-FR-ES-add-JP-KR` is world 1 without the France–Spain border and with a
   Japan–South Korea one. Countries are named by their two-letter codes. Past four edits the link
   switches to a compact code of four letters or digits per edit (`#world-1-e-0PLu1pIL…`), so a
-  long editing session still fits in a link you can paste.
+  long editing session still fits in a link you can paste. A style other than Ink ends the link
+  (`#world-1-cut-FR-ES-realm`). **Share** copies the link, or opens a phone's share sheet.
+- Keys: `/` finds, arrows move the map, `+` `−` zoom, `0` shows the whole world, Enter picks the
+  country under the ring in the middle, B shows before, Ctrl+Z undoes, Escape closes.
 
-A world takes 10–15 seconds to build on a laptop, longer on a phone. A link with edits first builds
-the world without them, so it takes about twice as long.
+A world takes about 5 seconds to build on a laptop, longer on a phone; an edit about 4. A link with
+edits first builds the world without them, so it takes about twice as long.
 
 ## Running it
 
@@ -77,6 +91,37 @@ shift a little everywhere. An edit too big for this, such as a border across an 
 rule or takes too long; the page then draws the edited graph from scratch and says that countries
 moved.
 
+## Styles
+
+Each style is three files in `styles/`: `<name>.css`, with every rule under
+`html[data-style="<name>"]`; `<name>.js`, a module that registers `window.mapStyles[<name>]`; and
+`<name>.fonts`, the Google Fonts address it needs. Only the chosen style loads with the page; the
+others load the first time they are picked. The page calls a style's hooks: `render(world)` once
+for each world drawn, `view(world, state, selected)` after each redraw, `settled(world)` before it
+calls the map ready, and `unmount()` when another style is picked. A style's canvases sit in
+`#plate` with the map, so a gesture moves them together. The comment above `skin()` in
+`index.html` lists the hooks.
+
+Switching styles draws the worlds on hand (and the map before your edits, when there is one)
+again from what the generator returned, at the same view and with the same country picked.
+
+The heavy work of each style runs off the page's thread: Ink draws its terrain and seas in a
+worker, in tiles kept per zoom level (one worker on a phone, two elsewhere); Kinpeki traces its
+waves in a worker and draws them with WebGL; Realm prepares its terrain in a worker and paints it
+with WebGL 2. On a software renderer (no GPU) Realm keeps its flat colours, which is what headless
+test browsers show; `?realm-gl` in the address paints anyway.
+
+## What makes it fast
+
+- The generator: a faster `Math.hypot`, grids and bucket queues instead of searches over
+  everything, typed arrays, and an area fit that leaves alone countries already within tolerance.
+  World 1 went from about 13 to about 5 seconds, an edit from about 12 to about 4.
+- Drawing a world is cut into slices of about 12 ms, so a phone keeps answering while it happens;
+  the outlines, name positions and simplified lines are worked out once per world and kept.
+- During a pan, pinch or wheel turn the picture already drawn (`#plate`) is moved as one bitmap
+  and drawn properly when the gesture rests. Only lines on screen get a new level of detail.
+- Lines, ripples and rings don't answer the pointer, so taps and hovers don't hit-test them.
+
 ## Checking the rules
 
 ```
@@ -92,6 +137,9 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 - Some worlds have long, thin water channels where wide seas would look better.
 - In the most crowded regions (the Balkans, the Caucasus, Central Africa) a few countries come out
   stretched, and there are 14–18 exclaves per world.
+- An edit reshapes many countries, not only the ones edited: the warm start is not local.
+- On a phone held upright the whole world is a band across the middle of the screen: it is about
+  twice as wide as it is tall.
 - At whole-world zoom many countries are smaller than a pixel. That is rule 3: populations range
   from a few dozen people to 1.4 billion. A small ring marks each country too small to see.
 
@@ -99,7 +147,8 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 
 | file | what it does |
 | --- | --- |
-| `index.html` | the page: drawing, pan and zoom, border editing |
+| `index.html` | the page: drawing, pan and zoom, border editing, the style picker |
+| `styles/` | the three styles: `ink`, `realm`, `kinpeki` (`.css`, `.js`, `.fonts` and helpers) |
 | `worker.js` | runs the generator off the main thread |
 | `world.js` | the pipeline, `buildWorld(graph, {seed, base})` |
 | `layout.js` | country discs: stress majorization and constraint projection |
@@ -111,7 +160,7 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 | `islands.js` | island countries |
 | `util.js` | seeded random numbers, noise, polygon helpers |
 | `countries.json` | the graph |
-| `vendor/` | Delaunator and the `orient2d` predicate from robust-predicates |
+| `vendor/` | Delaunator, the `orient2d` predicate from robust-predicates, earcut (Realm's triangles) |
 | `tools/check.mjs` | builds worlds and checks the rules |
 
 ## Credits
@@ -121,6 +170,10 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 - [Delaunator](https://github.com/mapbox/delaunator) by Mapbox, ISC license.
 - [robust-predicates](https://github.com/mourner/robust-predicates) by Vladimir Agafonkin, after
   Jonathan Shewchuk's predicates, public domain (Unlicense).
+- [earcut](https://github.com/mapbox/earcut) by Mapbox, ISC license (`vendor/LICENSE-earcut`).
+- Fonts from [Google Fonts](https://fonts.google.com/), SIL Open Font License: Eagle Lake,
+  Fondamento and Sorts Mill Goudy (Ink), Alegreya and Alegreya SC (Realm), Shippori Mincho B1
+  (Kinpeki).
 
 ## License
 

@@ -1,16 +1,19 @@
 // Steps on the boundary graph. Each vertex move goes through Geo.tryMove, so none of them can
 // create a crossing or close a gap between labels that must stay apart.
-import {fbm2, segmentsIntersect, segSegDist2} from './util.js';
+import {fbm2, segmentsIntersect, segSegDist2, hypot} from './util.js';
 
 function isClosed(c) { return c.v[0] === c.v[c.v.length - 1]; }
 
 // Taubin smoothing of chains (a shrinking Laplacian step, then an inflating one, so small
 // blobs keep their size); junctions follow more slowly
-export function smooth(geo, iterations, lambda0 = 0.5, skip = () => false, taubin = true) {
+export function smooth(geo, iterations, lambda0 = 0.5, skip = null, taubin = true) {
   const {vx, vy, chains} = geo;
+  const skipsAny = !!skip;
+  if (!skip) skip = () => false;
   for (let it = 0; it < (taubin ? 2 : 1) * iterations; ++it) {
     const lambda = !taubin || it % 2 === 0 ? lambda0 : -1.06 * lambda0;
-    if (it % 4 === 0) geo.budgets(v => 1.5 * geo.localLen(v));
+    // (with a skip, only the chains not skipped move: only their budgets matter)
+    if (it % 4 === 0) geo.budgets(v => 1.5 * geo.localLen(v), skipsAny ? c => !skip(c) : null);
     for (const c of chains) {
       if (skip(c)) continue;
       const v = c.v, n = v.length;
@@ -56,7 +59,7 @@ export function subdivide(geo, maxLen) {
     const out = [c.v[0]];
     for (let i = 0; i + 1 < c.v.length; ++i) {
       const a = c.v[i], b = c.v[i + 1];
-      const L = Math.hypot(vx[b] - vx[a], vy[b] - vy[a]);
+      const L = hypot(vx[b] - vx[a], vy[b] - vy[a]);
       const m = maxLen(c, (vx[a] + vx[b]) / 2, (vy[a] + vy[b]) / 2);
       const k = Math.min(64, Math.ceil(L / m));
       for (let j = 1; j < k; ++j) {
@@ -83,7 +86,7 @@ export function simplify(geo, tol, maxLen) {
       const p = c.v[i], q = c.v[i + 1];
       // distance of p from the line last -> q
       const dx = vx[q] - vx[last], dy = vy[q] - vy[last];
-      const L = Math.hypot(dx, dy) || 1e-30;
+      const L = hypot(dx, dy) || 1e-30;
       const dev = Math.abs((vx[p] - vx[last]) * dy - (vy[p] - vy[last]) * dx) / L;
       if (dev > tol(c) || L > maxLen(c)) { out.push(p); last = p; }
     }
@@ -123,7 +126,7 @@ export function roughen(geo, amp, seed) {
     for (const sg of geo.vSegs[p]) if (isCoast(chains[geo.segC[sg]])) coastSegs++;
     if (coastSegs !== 2) continue;
     const a0 = coastAmp[p] / coastCnt[p];
-    const nl = Math.hypot(coastNx[p], coastNy[p]);
+    const nl = hypot(coastNx[p], coastNy[p]);
     if (!nl) continue;
     const wl = a0 * 9;
     const d = a0 * fbm2(base[p] / wl, baseY[p] / wl, seed, 3, 0.5);
@@ -138,7 +141,7 @@ export function roughen(geo, amp, seed) {
     if (n < 3) return;
     const closed = isClosed(c);
     const s = [0];
-    for (let i = 1; i < n; ++i) s.push(s[i - 1] + Math.hypot(vx[v[i]] - vx[v[i - 1]], vy[v[i]] - vy[v[i - 1]]));
+    for (let i = 1; i < n; ++i) s.push(s[i - 1] + hypot(vx[v[i]] - vx[v[i - 1]], vy[v[i]] - vy[v[i - 1]]));
     const total = s[n - 1];
     const wl = a0 * 9;
     const pts = [];
@@ -147,7 +150,7 @@ export function roughen(geo, amp, seed) {
       const p = v[i];
       const a = pts[i === 0 ? n - 2 : i - 1], b = pts[i + 1];
       let nx = b[1] - a[1], ny = -(b[0] - a[0]);
-      const nl = Math.hypot(nx, ny) || 1;
+      const nl = hypot(nx, ny) || 1;
       nx /= nl; ny /= nl;
       const taper = closed ? 1 : Math.min(1, Math.min(s[i], total - s[i]) / (1.5 * a0 + 1e-30));
       const d = a0 * taper * fbm2(s[i] / wl, ci * 0.37 + 0.5, seed, 3, 0.5);
@@ -171,8 +174,13 @@ export function fitAreas(geo, target, opts = {}) {
     if (frozen(c.L) || frozen(c.R)) for (const p of c.v) fixed[p] = 1;
   });
   if (opts.pinJunctions) for (let p = 0; p < vx.length; ++p) if (geo.vSegs[p].length >= 3) fixed[p] = 1;
-  // moves too small to matter are skipped
-  const gain = new Map(), lastErr = new Map();
+  // per label (arrays indexed by label): gain, last error, push, area, perimeter
+  const labs = [...rings.keys()];
+  const NLab = labs.reduce((m, l) => Math.max(m, l + 1), 0);
+  const gain = new Float64Array(NLab).fill(1), lastErr = new Float64Array(NLab).fill(NaN);
+  const delta = new Float64Array(NLab), areaOf = new Float64Array(NLab), perimOf = new Float64Array(NLab);
+  const tgt = new Float64Array(NLab), frz = new Uint8Array(NLab);
+  for (const l of labs) { tgt[l] = target(l); frz[l] = frozen(l) ? 1 : 0; }
   // junctions where a border meets the sea: [junction, coast neighbour, coast neighbour]
   const coastJunctions = [];
   for (let p = 0; p < vx.length; ++p) {
@@ -196,37 +204,58 @@ export function fitAreas(geo, target, opts = {}) {
   for (let p = 0; p < vx.length; ++p) minMove[p] = 1e-4 * geo.localLen(p);
   for (let it = 0; it < iterations; ++it) {
     if (it % 8 === 0) geo.budgets(v => Math.max(2 * geo.localLen(v), capOf[v]));
-    const {areas, perims} = geo.labelAreas(rings);
-    const delta = new Map();
+    geo.labelAreasInto(rings, areaOf, perimOf);
+    delta.fill(0);
     worst = 0;
-    for (const [l, A] of areas) {
-      const T = target(l);
+    for (const l of labs) {
+      const A = areaOf[l], T = tgt[l];
       if (!(T > 0)) continue;
       const err = A / T - 1;
-      if (!frozen(l)) worst = Math.max(worst, Math.abs(err));
+      if (!frz[l]) worst = Math.max(worst, Math.abs(err));
       // adaptive gain: keep pushing harder while the error keeps its sign and shrinks slowly
-      let g = gain.get(l) || 1;
-      const prev = lastErr.get(l);
-      if (prev !== undefined) {
+      let g = gain[l];
+      const prev = lastErr[l];
+      if (prev === prev) {
         if (Math.sign(prev) !== Math.sign(err)) g = Math.max(0.5, g * 0.5);
         else if (Math.abs(err) > 0.5 * Math.abs(prev)) g = Math.min(2.5, g * 1.3);
       }
-      gain.set(l, g);
-      lastErr.set(l, err);
-      delta.set(l, g * (T - A) / perims.get(l));
+      gain[l] = g;
+      lastErr[l] = err;
+      delta[l] = g * (T - A) / perimOf[l];
     }
-    if (globalThis.FITLOG && it % 10 === 0) { let wl = null, we = 0; for (const [l, A] of areas) { const T = target(l); if (T > 0 && !frozen(l) && Math.abs(A / T - 1) > we) { we = Math.abs(A / T - 1); wl = l; } } console.log('fit it', it, 'worst', we.toFixed(5), 'label', wl, Date.now()); }
+    if (globalThis.FITLOG) { const e = []; for (const l of labs) { const T = tgt[l]; if (T > 0 && !frz[l]) e.push([Math.abs(areaOf[l] / T - 1), l]); } e.sort((a, b) => b[0] - a[0]); console.log('fit it', it, 'worst', e.slice(0, 4).map(([x, l]) => l + ':' + x.toFixed(4)).join(' '), 'over tol', e.filter(([x]) => x > tol).length, 'over 1%', e.filter(([x]) => x > 0.01).length, 'tol', tol); }
     if (worst < tol) break;
+    // opts.active: labels already within active * tol of their target are left alone this
+    // round (their chains stay put unless a neighbour moves them), so the late rounds, where a
+    // few labels are still off, cost little
+    const still = opts.active ? new Uint8Array(chains.length) : null;
+    if (still) {
+      // (a label left alone pushes nowhere: else its whole correction would go into the few
+      // chains it shares with labels still moving)
+      const done = new Uint8Array(NLab);
+      for (const l of labs) { const T = tgt[l]; if (T > 0 && Math.abs(areaOf[l] / T - 1) <= opts.active * tol) { done[l] = 1; delta[l] = 0; } }
+      for (let ci = 0; ci < chains.length; ++ci) { const c = chains[ci]; if ((c.L < 0 || done[c.L]) && (c.R < 0 || done[c.R])) still[ci] = 1; }
+    }
     accX.fill(0); accY.fill(0); accW.fill(0);
     // only chains of labels still off target move (the others are done)
-    for (const c of chains) {
-      const dL = c.L >= 0 ? (delta.get(c.L) || 0) : 0, dR = c.R >= 0 ? (delta.get(c.R) || 0) : 0;
-      const f = c.L >= 0 && c.R >= 0 ? (dL - dR) / 2 : c.L >= 0 ? dL : -dR;
+    for (let ci = 0; ci < chains.length; ++ci) {
+      const c = chains[ci];
       const v = c.v;
+      if (still && still[ci]) {
+        // a chain left alone still weighs in, with no push, at the junctions it ends in
+        const n = v.length;
+        if (n >= 2) {
+          accW[v[0]] += hypot(vx[v[1]] - vx[v[0]], vy[v[1]] - vy[v[0]]) / 2;
+          accW[v[n - 1]] += hypot(vx[v[n - 1]] - vx[v[n - 2]], vy[v[n - 1]] - vy[v[n - 2]]) / 2;
+        }
+        continue;
+      }
+      const dL = c.L >= 0 && c.L < NLab ? delta[c.L] : 0, dR = c.R >= 0 && c.R < NLab ? delta[c.R] : 0;
+      const f = c.L >= 0 && c.R >= 0 ? (dL - dR) / 2 : c.L >= 0 ? dL : -dR;
       for (let i = 0; i + 1 < v.length; ++i) {
         const a = v[i], b = v[i + 1];
         const dx = vx[b] - vx[a], dy = vy[b] - vy[a];
-        const len = Math.hypot(dx, dy);
+        const len = hypot(dx, dy);
         if (len === 0) continue;
         // right-hand normal: toward R
         const nx = dy / len, ny = -dx / len;
@@ -243,8 +272,9 @@ export function fitAreas(geo, target, opts = {}) {
         accX[p] = 0.25 * accX[a] + 0.5 * accX[p] + 0.25 * accX[b];
         accY[p] = 0.25 * accY[a] + 0.5 * accY[p] + 0.25 * accY[b];
       }
-      for (const c of chains) {
-        const v = c.v, n = v.length;
+      for (let ci = 0; ci < chains.length; ++ci) {
+        if (still && still[ci]) continue;
+        const v = chains[ci].v, n = v.length;
         if (n < 3) continue;
         let px = accX[v[0]], py = accY[v[0]];
         for (let i = 1; i < n - 1; ++i) {
@@ -302,7 +332,7 @@ export function collapse(geo, label, factor) {
     let worst = Infinity;
     for (let i = 0, j = ids.length - 1; i < ids.length; j = i++) {
       const a = ids[j], b = ids[i];
-      const L = Math.hypot(vx[b] - vx[a], vy[b] - vy[a]);
+      const L = hypot(vx[b] - vx[a], vy[b] - vy[a]);
       if (L === 0) continue;
       const o = ((vx[a] - x) * (vy[b] - y) - (vy[a] - y) * (vx[b] - x)) / L;
       if (o < worst) worst = o;
@@ -364,10 +394,12 @@ export function collapse(geo, label, factor) {
 // clearance (moves still may not cross anything)
 export function openGaps(geo, iterations = 6, fixed = () => false, thick = null) {
   let left = 0;
-  const pinned = new Set();
-  for (const c of geo.chains) if (fixed(c.L) || fixed(c.R)) for (const p of c.v) pinned.add(p);
+  const pinned = new Uint8Array(geo.vx.length);
+  for (const c of geo.chains) if (fixed(c.L) || fixed(c.R)) for (const p of c.v) pinned[p] = 1;
+  // the pushes are worked out again each round only where something moved
+  const cache = {};
   for (let it = 0; it < iterations; ++it) {
-    const push = geo.gapPushes();
+    const push = geo.gapPushes(1.05, cache);
     if (thick) geo.thickPushes(thick, push);
     left = push.size;
     if (!push.size) break;
@@ -375,10 +407,13 @@ export function openGaps(geo, iterations = 6, fixed = () => false, thick = null)
     // spread the pushes along each chain into gentle bulges (a single pushed vertex is a spike)
     const n = geo.vx.length;
     const px = new Float64Array(n), py = new Float64Array(n);
-    for (const [p, [dx, dy]] of push) { px[p] = dx; py[p] = dy; }
+    // (only chains with a pushed vertex change: elsewhere everything stays zero)
+    const live = new Uint8Array(geo.chains.length);
+    for (const [p, [dx, dy]] of push) { px[p] = dx; py[p] = dy; for (const sg of geo.vSegs[p]) live[geo.segC[sg]] = 1; }
     for (let pass = 0; pass < 4; ++pass) {
-      for (const c of geo.chains) {
-        const v = c.v, m = v.length;
+      for (let ci = 0; ci < geo.chains.length; ++ci) {
+        if (!live[ci]) continue;
+        const v = geo.chains[ci].v, m = v.length;
         if (m < 3) continue;
         let ox = px[v[0]], oy = py[v[0]];
         for (let i = 1; i < m - 1; ++i) {
@@ -391,10 +426,11 @@ export function openGaps(geo, iterations = 6, fixed = () => false, thick = null)
       }
     }
     for (let p = 0; p < n; ++p) {
-      if (pinned.has(p) || (px[p] === 0 && py[p] === 0)) continue;
+      if (pinned[p] || (px[p] === 0 && py[p] === 0)) continue;
       if (!geo.tryMove(p, geo.vx[p] + px[p], geo.vy[p] + py[p])) geo.tryMove(p, geo.vx[p] + px[p] * 0.4, geo.vy[p] + py[p] * 0.4);
     }
   }
+  geo.stopTracking();
   return left;
 }
 
@@ -415,7 +451,7 @@ export function despike(geo, maxDeg = 35, passes = 6, fixed = () => false) {
       for (let i = closed ? 0 : 1; i < m - 1; ++i) {
         const a = v[i === 0 ? m - 2 : i - 1], p = v[i], b = v[i + 1];
         const ux = vx[a] - vx[p], uy = vy[a] - vy[p], wx = vx[b] - vx[p], wy = vy[b] - vy[p];
-        const nu = Math.hypot(ux, uy), nw = Math.hypot(wx, wy);
+        const nu = hypot(ux, uy), nw = hypot(wx, wy);
         if (!nu || !nw) continue;
         if ((ux * wx + uy * wy) / (nu * nw) < cmax) continue;
         left++;
@@ -443,12 +479,12 @@ export function cutSpurs(geo, maxLen, fixed = () => false) {
       changed = false;
       const n = v.length;
       const s = [0];
-      for (let i = 1; i < n; ++i) s.push(s[i - 1] + Math.hypot(vx[v[i]] - vx[v[i - 1]], vy[v[i]] - vy[v[i - 1]]));
+      for (let i = 1; i < n; ++i) s.push(s[i - 1] + hypot(vx[v[i]] - vx[v[i - 1]], vy[v[i]] - vy[v[i - 1]]));
       outer: for (let i = 0; i < n - 3; ++i) {
         for (let j = i + 3; j < n && s[j] - s[i] <= maxLen; ++j) {
           if (closed && i === 0 && j === n - 1) break;
           const arc = s[j] - s[i];
-          const d = Math.hypot(vx[v[j]] - vx[v[i]], vy[v[j]] - vy[v[i]]);
+          const d = hypot(vx[v[j]] - vx[v[i]], vy[v[j]] - vy[v[i]]);
           if (d > 0.06 * arc || d > 0.05) continue;
           // thin loop: small area for its length
           let A = 0;
@@ -507,7 +543,7 @@ export function straightenJunctions(geo, deltaOf, fixed = () => false, strength 
       let arc = 0, end = null;
       for (let i = 1; i < seq.length; ++i) {
         const a = seq[i - 1], b = seq[i];
-        const L = Math.hypot(vx[b] - vx[a], vy[b] - vy[a]);
+        const L = hypot(vx[b] - vx[a], vy[b] - vy[a]);
         if (arc + L >= delta) {
           const t = (delta - arc) / (L || 1);
           end = [vx[a] + t * (vx[b] - vx[a]), vy[a] + t * (vy[b] - vy[a])];

@@ -1,7 +1,7 @@
 // Countries map, fantasy-generator style: size-aware seed layout, graded cell mesh, constrained
 // Potts annealing of cell labels, then continuous boundary work for exact areas and a hand-drawn
 // look. See REPORT.md.
-import {mulberry32, fbm2, pause, hash2} from './util.js';
+import {mulberry32, fbm2, pause, hash2, hypot} from './util.js';
 import {layoutComponent, linkGeometry} from './layout.js';
 import {buildMesh} from './mesh.js';
 import {extractBoundary, Geo} from './geom.js';
@@ -16,6 +16,9 @@ export async function buildWorld(doc, options = {}) {
   const seed = options.seed || 1;
   const onProgress = options.onProgress || (() => {});
   const debug = options.debug || null;
+  // stage timings, when asked for: options.timings receives [stage, ms since the start]
+  const timings = options.timings || null, now = () => (globalThis.performance ? performance.now() : Date.now()), tStart = now();
+  const stage = name => { if (timings) timings.push([name, now() - tStart]); };
   const rng = mulberry32(seed * 7919 + 13);
   const t0 = Date.now();
   const n = doc.nodes.length;
@@ -69,7 +72,7 @@ export async function buildWorld(doc, options = {}) {
       let x = 0, y = 0, d = 0;
       for (const j of near) { x += at.get(j)[0]; y += at.get(j)[1]; d = Math.max(d, rad[i] + rad[j]); }
       x /= near.length; y /= near.length;
-      const ox = x - cx, oy = y - cy, ol = Math.hypot(ox, oy) || 1;
+      const ox = x - cx, oy = y - cy, ol = hypot(ox, oy) || 1;
       at.set(i, [x + ox / ol * d, y + oy / ol * d]);
     }
     return comp.map(i => at.get(i));
@@ -81,6 +84,7 @@ export async function buildWorld(doc, options = {}) {
     pass1.set(comp, P);
     comp.forEach((i, k) => geoPos.set(i, P[k]));
   }
+  stage('layout1');
   // links that cannot all be borders of a flat map become exclaves; among the fewest such sets,
   // drop the links the natural arrangement finds hardest (crossing others, stretched)
   const geoEdges = edges.filter(([a, b]) => geoPos.has(a) && geoPos.has(b));
@@ -97,6 +101,7 @@ export async function buildWorld(doc, options = {}) {
     return before * Math.sqrt(Math.min(pop[a], pop[b]) / UNIT + 0.1) / (1 + h);
   }});
   if (debug) debug.log(`planar subgraph: optimal ${ps.optimal}, weightOptimal ${ps.weightOptimal}, ${ps.stats && ps.stats.ms} ms`);
+  stage('planar');
   let planned = globalThis.NOPLAN ? [] : ps.removed.map(e => edges[e]);
   if (base) {
     // a warm start keeps the earlier world's exclaves: its other links stay borders (a subset of a
@@ -112,6 +117,7 @@ export async function buildWorld(doc, options = {}) {
   const keptLinked = (a, b) => !plannedSet.has(a + ',' + b) && !plannedSet.has(b + ',' + a) && nb[a].includes(b);
   if (debug) debug.log(`planned exclaves: ${planned.map(([a, b]) => doc.nodes[a][0] + '-' + doc.nodes[b][0]).join(' ')}`);
   onProgress({done: 0.08});
+  stage('exclaveChoice');
 
   // ---- layout pass 2 with the kept links, then the components on the world
   const pos = new Array(n).fill(null);
@@ -141,7 +147,7 @@ export async function buildWorld(doc, options = {}) {
     ids.forEach((i, k) => {
       const x = P[k][0] - cx, y = P[k][1] - cy;
       pos[i] = [(x * c - y * s) * mirX, (x * s + y * c) * mirY];
-      R = Math.max(R, Math.hypot(pos[i][0], pos[i][1]) + rad[i]);
+      R = Math.max(R, hypot(pos[i][0], pos[i][1]) + rad[i]);
       bx0 = Math.min(bx0, pos[i][0] - rad[i]); bx1 = Math.max(bx1, pos[i][0] + rad[i]);
       by0 = Math.min(by0, pos[i][1] - rad[i]); by1 = Math.max(by1, pos[i][1] + rad[i]);
     });
@@ -171,6 +177,7 @@ export async function buildWorld(doc, options = {}) {
     placed.push({x: ox, y: oy, R: cb.R, bx0: cb.bx0 + ox, bx1: cb.bx1 + ox, by0: cb.by0 + oy, by1: cb.by1 + oy});
   });
   onProgress({done: 0.15});
+  stage('layout2');
   await pause();
 
   // ---- mesh over all multi-country land
@@ -179,6 +186,7 @@ export async function buildWorld(doc, options = {}) {
   const mesh = buildMesh(disks, rng, {h0, hmin, seed});
   if (debug) debug.log(`mesh ${mesh.N} cells, ${mesh.T} triangles, ${Date.now() - t0} ms`);
   onProgress({done: 0.25});
+  stage('mesh');
   await pause();
 
   // ---- labels: countries are labels 0..n-1, exclave pieces come after
@@ -196,7 +204,10 @@ export async function buildWorld(doc, options = {}) {
   // initial assignment: power diagram of the seeds, clipped to (noisy) disks
   const alpha = globalThis.ALPHA || 1.12;
   const cellOf = new Int32Array(n).fill(-1), cellD = new Float64Array(n).fill(Infinity);
-  for (let u = 0; u < mesh.N; ++u) {
+  // (capped growth below starts from scratch: then only each country's nearest cell is needed)
+  const powerInit = globalThis.POWERINIT || globalThis.SEAQ;
+  if (!powerInit) for (const i of meshIds) cellOf[i] = nearestCell(mesh, pos[i][0], pos[i][1], u => mesh.frozen[u]);
+  if (powerInit) for (let u = 0; u < mesh.N; ++u) {
     if (mesh.frozen[u]) continue;
     const x = mesh.coords[2 * u], y = mesh.coords[2 * u + 1];
     let best = -1, bestP = Infinity;
@@ -213,7 +224,7 @@ export async function buildWorld(doc, options = {}) {
     S.lab[u] = best;
   }
   // inland seas where the large-scale noise peaks inside the land
-  {
+  if (powerInit) {
     const vals = [];
     for (let u = 0; u < mesh.N; ++u) if (S.lab[u] >= 0) vals.push(S.noise[u]);
     vals.sort((a, b) => a - b);
@@ -230,13 +241,7 @@ export async function buildWorld(doc, options = {}) {
       let c = cellOf[i];
       if (used.has(c) || mesh.frozen[c]) {
         // nearest free cell
-        let best = -1, bd = Infinity;
-        for (let u = 0; u < mesh.N; ++u) {
-          if (used.has(u) || mesh.frozen[u]) continue;
-          const d = (mesh.coords[2 * u] - pos[i][0]) ** 2 + (mesh.coords[2 * u + 1] - pos[i][1]) ** 2;
-          if (d < bd) { bd = d; best = u; }
-        }
-        c = best;
+        c = nearestCell(mesh, pos[i][0], pos[i][1], u => used.has(u) || mesh.frozen[u], true);
       }
       used.add(c);
       seeds.push([i, c]);
@@ -245,13 +250,16 @@ export async function buildWorld(doc, options = {}) {
     const speed = new Float64Array(NL);
     for (const i of meshIds) speed[i] = rad[i];
     const gn = globalThis.GROWNOISE ?? 0.8;
-    growFromSeeds(S, seeds, speed, u => mesh.hloc[u] * Math.exp(gn * S.noise[u] / 4));
+    const cost = new Float64Array(mesh.N);
+    for (let u = 0; u < mesh.N; ++u) cost[u] = mesh.hloc[u] * Math.exp(gn * S.noise[u] / 4);
+    growFromSeeds(S, seeds, speed, u => cost[u]);
   }
   const strength = (u, a) => {
     const dx = mesh.coords[2 * u] - pos[a][0], dy = mesh.coords[2 * u + 1] - pos[a][1];
-    return rad[a] / (Math.hypot(dx, dy) + 1e-9);
+    return rad[a] / (hypot(dx, dy) + 1e-9);
   };
   enforce(S, strength);
+  stage('growth');
   const keptPairs = edges.filter(([a, b]) => keptLinked(a, b));
   // labels and the labels linked to them: the neighbourhood a local repair anneals
   const around = labels => {
@@ -262,6 +270,7 @@ export async function buildWorld(doc, options = {}) {
   if (debug) debug.log(`initial: missing ${missingPairs(S, keptPairs).length}, false ${falseContacts(S).length}, ${Date.now() - t0} ms`);
   anneal(S, rng, options.sweeps ?? 30, 0.6, 0.02);
   recount(S);
+  stage('anneal');
   // missing borders: grow arms toward each other, then let annealing fatten them
   for (let round = 0; round < 3; ++round) {
     const miss = missingPairs(S, keptPairs).filter(([a, b, len]) => len <= 0);
@@ -274,6 +283,7 @@ export async function buildWorld(doc, options = {}) {
     anneal(S, rng, globalThis.BSWEEPS ?? 12, 0.3, 0.02, {near: around(miss.flatMap(([a, b]) => [a, b])), tag: round + 1});
     recount(S);
   }
+  stage('bridges');
   // still missing: move the smaller country to where all its neighbours are closest
   const bridgeAll = X => {
     const lists = cellsByLabel(S);
@@ -302,6 +312,7 @@ export async function buildWorld(doc, options = {}) {
       }
     }
   }
+  stage('reinsert');
   // ribbons: small countries stretched into long arms by bridging get re-inserted where they can
   // be round, when that loses no border
   {
@@ -334,6 +345,7 @@ export async function buildWorld(doc, options = {}) {
       else shape = fresh;
     }
   }
+  stage('reshape');
   // arms: what still reaches far from its country's centre is cut back; borders lost that way
   // become exclaves (a few more exclaves are better than snakes)
   if ((globalThis.ARM ?? 1.45) > 0) {
@@ -391,6 +403,7 @@ export async function buildWorld(doc, options = {}) {
       }
     }
   }
+  stage('armsRibbons');
   recount(S);
   // whatever still has no border becomes an exclave: a piece of the smaller country inside the
   // other one (planned ones first)
@@ -465,6 +478,7 @@ export async function buildWorld(doc, options = {}) {
     }
     if (!done) throw new Error(`no room for an exclave between ${doc.nodes[a][1]} and ${doc.nodes[b][1]}`);
   }
+  stage('exclaves');
   // long channels between countries that may not touch become broad seas with ragged shores
   const makeSeas = () => {
     const r = broadenChannels(S, {
@@ -488,6 +502,7 @@ export async function buildWorld(doc, options = {}) {
     S.opts.contactBonus = 3;
     recount(S);
   }
+  stage('seasAnneal');
   {
     let nf = fillFingers(S) + fillThinWater(S, globalThis.THINW ?? 1.5);
     recount(S);
@@ -500,6 +515,7 @@ export async function buildWorld(doc, options = {}) {
     }
     if (debug) debug.log(`filled ${nf} finger cells`);
   }
+  stage('fill');
   const finalPairs = keptPairs.filter(([a, b]) => S.linked[a * NL + b]).concat(pieces.map(p => [p.label, p.host]), pieces.filter(p => p.host2 >= 0).map(p => [p.label, p.host2]));
   if (debug) {
     const miss = missingPairs(S, finalPairs);
@@ -521,6 +537,7 @@ export async function buildWorld(doc, options = {}) {
     debug.state = {S, mesh, pos, rad, meshIds};
   }
   onProgress({done: 0.55});
+  stage('labelDone');
   await pause();
 
   // ================= continuous phase =================
@@ -536,6 +553,7 @@ export async function buildWorld(doc, options = {}) {
     clearance: (a, b) => Math.min(0.5, clearK * Math.min(sizeOf(a), sizeOf(b))),
     maxClearance: 0.5,
   });
+  stage('boundary');
   const tg = Date.now();
   const areaReport = tag => {
     if (!debug) return;
@@ -547,15 +565,19 @@ export async function buildWorld(doc, options = {}) {
   };
   areaReport('start');
   smooth(geo, 6, 0.5);
+  stage('smooth');
   areaReport('smoothed');
-  fitAreas(geo, l => S.target[l], {iterations: 20, tol: 0.01});
+  // (each fit leaves labels already close to their target alone: see fitAreas' `active`)
+  const ACTIVE = globalThis.FITACTIVE ?? 0.4;
+  fitAreas(geo, l => S.target[l], {iterations: 20, tol: 0.01, active: ACTIVE});
+  stage('prefit');
   areaReport('prefit');
   // hand-drawn character: coasts get capes and coves finer than the mesh, borders a gentle wobble
   {
     const meanLen = new Map();
     geo.chains.forEach((c, ci) => {
       let t = 0;
-      for (let i = 0; i + 1 < c.v.length; ++i) t += Math.hypot(geo.vx[c.v[i + 1]] - geo.vx[c.v[i]], geo.vy[c.v[i + 1]] - geo.vy[c.v[i]]);
+      for (let i = 0; i + 1 < c.v.length; ++i) t += hypot(geo.vx[c.v[i + 1]] - geo.vx[c.v[i]], geo.vy[c.v[i + 1]] - geo.vy[c.v[i]]);
       meanLen.set(c, t / Math.max(1, c.v.length - 1));
     });
     const isCoast = c => c.L < 0 || c.R < 0;
@@ -564,6 +586,7 @@ export async function buildWorld(doc, options = {}) {
     if (!globalThis.SKIPROUGH) roughen(geo, c => meanLen.get(c) * (isCoast(c) ? RC : RB), seed * 17 + 5);
     smooth(geo, 1, 0.3);
   }
+  stage('roughen');
   areaReport('roughened');
   if (debug) debug.log(`geometry: ${geo.chains.length} chains, ${geo.vx.length} vertices; smoothed in ${Date.now() - tg} ms`);
   let worst;
@@ -586,26 +609,34 @@ export async function buildWorld(doc, options = {}) {
       else throw new Error(`could not shrink ${doc.nodes[i][1]} to its size`);
     }
   }
+  stage('tiny');
   areaReport('collapsed');
   const gapsLeft = globalThis.SKIPGAPS ? 0 : openGaps(geo, 8, l => tiny.has(l), l => (tiny.has(l) ? 0 : Math.min(0.8, (globalThis.THICK ?? 0) * Math.sqrt(S.target[l]))));
+  stage('gaps');
   areaReport('gaps');
 
   if (debug) debug.log(`gaps: ${gapsLeft} vertices still short of clearance, ${Date.now() - t0} ms`);
   despike(geo, 35, 6, l => tiny.has(l));
   if (globalThis.STRAIGHT ?? true) for (let k = 0; k < 2; ++k)
     straightenJunctions(geo, (a, b) => Math.min(1.5, (globalThis.SJD ?? 0.09) * Math.sqrt(Math.min(trueTarget[a], trueTarget[b]))), l => tiny.has(l));
-  worst = fitAreas(geo, l => trueTarget[l], {iterations: 200, tol: 1e-3, frozen: l => tiny.has(l), smoothPasses: globalThis.FITSMOOTH ?? 2});
+  stage('despikeStraighten');
+  worst = fitAreas(geo, l => trueTarget[l], {iterations: 200, tol: 1e-3, frozen: l => tiny.has(l), smoothPasses: globalThis.FITSMOOTH ?? 2, active: ACTIVE});
+  stage('fit');
   const spikes = despike(geo, 35, 6, l => tiny.has(l));
+  stage('c:despike');
   const nCut = cutSpurs(geo, 1.5, l => tiny.has(l));
+  stage('c:spurs');
   // the last moves may have brought countries that must not touch too close: open again, refit
   const gaps2 = openGaps(geo, 10, l => tiny.has(l));
-  if (nCut || gaps2) worst = fitAreas(geo, l => trueTarget[l], {iterations: 60, tol: 1e-3, frozen: l => tiny.has(l)});
+  stage('c:gaps');
+  if (nCut || gaps2) worst = fitAreas(geo, l => trueTarget[l], {iterations: 60, tol: 1e-3, frozen: l => tiny.has(l), active: ACTIVE});
+  stage('c:refit');
   // the refit can fold a few vertices again: a last clearance-safe despike (moves are tiny)
   if (despike(geo, 30, 4, l => tiny.has(l)) >= 0) {
     const {areas} = geo.labelAreas(geo.rings());
     worst = 0;
     for (const [l, A] of areas) if (trueTarget[l] > 0 && !tiny.has(l)) worst = Math.max(worst, Math.abs(A / trueTarget[l] - 1));
-    if (worst > 2e-3) worst = fitAreas(geo, l => trueTarget[l], {iterations: 30, tol: 1e-3, frozen: l => tiny.has(l)});
+    if (worst > 2e-3) worst = fitAreas(geo, l => trueTarget[l], {iterations: 30, tol: 1e-3, frozen: l => tiny.has(l), active: ACTIVE});
   }
   // last: the coast runs straight on through border ends (clearance-limited moves), then a short
   // fit that may only move vertices away from junctions
@@ -619,6 +650,7 @@ export async function buildWorld(doc, options = {}) {
     for (const [l, A] of areas) if (trueTarget[l] > 0 && !tiny.has(l)) worst = Math.max(worst, Math.abs(A / trueTarget[l] - 1));
   }
   if (debug) debug.log(`fit (true targets): worst ${(worst * 100).toFixed(3)}%, tiny ${tiny.size}, ${Date.now() - t0} ms`);
+  stage('cleanup');
   onProgress({done: 0.9});
 
   // ---- output
@@ -631,7 +663,7 @@ export async function buildWorld(doc, options = {}) {
   const lines = geo.chains.map(c => {
     const pts = c.v.map(p => [geo.vx[p], geo.vy[p]]);
     let len = 0;
-    for (let i = 1; i < pts.length; ++i) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    for (let i = 1; i < pts.length; ++i) len += hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
     const a = c.L >= 0 ? ownerOf(c.L) : -1, b = c.R >= 0 ? ownerOf(c.R) : -1;
     return {a: a >= 0 ? a : b, b: a >= 0 ? b : -1, points: pts, length: len, kind: a >= 0 && b >= 0 ? 'border' : 'coast'};
   });
@@ -649,7 +681,7 @@ export async function buildWorld(doc, options = {}) {
       for (let i = i0; i <= i1; ++i) for (let j = j0; j <= j1; ++j) {
         if (!occ.has(i * 100003 + j)) continue;
         const cx = (i + 0.5) * cellG, cy = (j + 0.5) * cellG;
-        if (Math.hypot(cx - x, cy - y) < r + cellG) return true;
+        if (hypot(cx - x, cy - y) < r + cellG) return true;
       }
       return false;
     };
@@ -660,8 +692,9 @@ export async function buildWorld(doc, options = {}) {
       w[0] += pos[i][0] * meshArea[i]; w[1] += pos[i][1] * meshArea[i]; w[2] += meshArea[i];
       contW.set(c, w);
     }
-    let minY = Infinity, sumX = 0, cnt = 0;
-    for (const i of meshIds) { minY = Math.min(minY, pos[i][1] - rad[i]); sumX += pos[i][0]; cnt++; }
+    // the southernmost country on the land (the bottom of its disc)
+    let south = meshIds[0];
+    for (const i of meshIds) if (pos[i][1] - rad[i] < pos[south][1] - rad[south]) south = i;
     const anchorOf = it => {
       // a warm start puts an island back where it was (or, for a country that lost its last
       // neighbour, where it stood on the land), or as near as is free
@@ -670,7 +703,10 @@ export async function buildWorld(doc, options = {}) {
       const w = contW.get(it.continent);
       if (w) return [w[0] / w[2], w[1] / w[2]];
       if (it.continent === 'Oceania') { const a = contW.get('Asia'); return [a[0] / a[2] + 25, a[1] / a[2] - 30]; }
-      return [sumX / cnt, minY - 10];
+      // a continent with no land on the map (the islands of the Antarctic): off the coast of the
+      // southernmost country, as near as is free. (Ten units out to sea below the middle of the
+      // world, the ring that marks them read as a stray dot.)
+      return [pos[south][0], pos[south][1] - rad[south]];
     };
     const list = [];
     for (let i = 0; i < n; ++i) if (pop[i] > 0 && !meshIds.includes(i)) list.push({index: i, id: ids[i], area: pop[i] / UNIT, continent: doc.nodes[i][3]});
@@ -679,7 +715,7 @@ export async function buildWorld(doc, options = {}) {
       const ring = islandRing(p.x, p.y, p.area, seed * 1000 + p.index);
       countries[p.index].rings.push(ring);
       let len = 0;
-      for (let k = 0; k < ring.length; ++k) { const a = ring[k], b = ring[(k + 1) % ring.length]; len += Math.hypot(b[0] - a[0], b[1] - a[1]); }
+      for (let k = 0; k < ring.length; ++k) { const a = ring[k], b = ring[(k + 1) % ring.length]; len += hypot(b[0] - a[0], b[1] - a[1]); }
       lines.push({a: p.index, b: -1, points: ring.concat([ring[0]]), length: len, kind: 'coast'});
     }
     if (debug) debug.log(`islands placed ${placedIs.length} of ${list.length}`);
@@ -691,6 +727,7 @@ export async function buildWorld(doc, options = {}) {
   });
   if (debug) debug.state.geo = geo;
   onProgress({done: 1});
+  stage('output');
   // what a warm start from this world needs
   const layout = {pos: {}, islands: {}, removed: planned.map(([a, b]) => [ids[a], ids[b]]), links: edges.map(([a, b]) => [ids[a], ids[b]])};
   for (const i of meshIds) layout.pos[ids[i]] = pos[i].slice();
@@ -701,4 +738,26 @@ export async function buildWorld(doc, options = {}) {
     layout.islands[c.id] = [x / r.length, y / r.length];
   }
   return {countries, lakes: [], lines, exclaves, links: edges.map(([a, b]) => [a, b]), layout};
+}
+
+// The cell nearest to (x, y) that is not skipped (the lowest-numbered of equally near ones), as a
+// scan of every cell would find it, with the squared distance worked out as that scan did (`pow`:
+// with ** 2, else as dx * dx). The cells are numbered by y (then x), so the search runs outward
+// from y in both directions until the rows are farther than the best found.
+function nearestCell(mesh, x, y, skip, pow = false) {
+  const {N, coords} = mesh;
+  let lo = 0, hi = N;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (coords[2 * mid + 1] < y) lo = mid + 1; else hi = mid; }
+  let best = -1, bd = Infinity;
+  const sq = pow ? t => t ** 2 : t => t * t;
+  for (let u = lo, v = lo - 1; u < N || v >= 0;) {
+    const du = u < N ? sq(coords[2 * u + 1] - y) : Infinity, dv = v >= 0 ? sq(coords[2 * v + 1] - y) : Infinity;
+    const w = du <= dv ? u++ : v--;
+    const dyy = du <= dv ? du : dv;
+    if (dyy > bd) break;
+    if (skip(w)) continue;
+    const d = pow ? sq(coords[2 * w] - x) + dyy : sq(coords[2 * w] - x) + dyy;
+    if (d < bd || (d === bd && w < best)) { bd = d; best = w; }
+  }
+  return best;
 }
