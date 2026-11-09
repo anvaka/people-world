@@ -27,8 +27,7 @@ up, so each world number gives a different map of the same graph.
   key) shows the map before only while held. Every change can be undone on its own; Undo, Ctrl+Z
   and the browser's Back are instant for the last few maps drawn.
 - **Style** draws the map as Ink (a book's endpapers: pen, parchment, hatched coasts, mountains and
-  woods), Realm (a painted game world: terrain, shallows and rivers under the countries) or
-  Kinpeki (a gold-leaf folding screen: flat mineral colours on a sea of gold waves). Switching
+  woods) or Realm (a painted game world: terrain, shallows and rivers under the countries). Switching
   doesn't build the world again, and the picker folds away once the map is drawn in the new style.
   The browser remembers the choice.
 - **Share a map.** The address holds the world number and the edits, so a link opens the same
@@ -107,9 +106,8 @@ Switching styles draws the worlds on hand (and the map before your edits, when t
 again from what the generator returned, at the same view and with the same country picked.
 
 The heavy work of each style runs off the page's thread: Ink draws its terrain and seas in a
-worker, in tiles kept per zoom level (one worker on a phone, two elsewhere); Kinpeki traces its
-waves in a worker and draws them with WebGL; Realm prepares its terrain in a worker and paints it
-with WebGL 2. On a software renderer (no GPU) Realm keeps its flat colours, which is what headless
+worker, in tiles kept per zoom level (one worker on a phone, two elsewhere); Realm prepares its
+terrain in a worker and paints it with WebGL 2. On a software renderer (no GPU) Realm keeps its flat colours, which is what headless
 test browsers show; `?realm-gl` in the address paints anyway.
 
 ## What makes it fast
@@ -149,7 +147,7 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 | file | what it does |
 | --- | --- |
 | `index.html` | the page: drawing, pan and zoom, border editing, the style picker |
-| `styles/` | the three styles: `ink`, `realm`, `kinpeki` (`.css`, `.js`, `.fonts` and helpers) |
+| `styles/` | the two styles: `ink` and `realm` (`.css`, `.js`, `.fonts` and helpers) |
 | `worker.js` | runs the generator off the main thread |
 | `world.js` | the pipeline, `buildWorld(graph, {seed, base})` |
 | `layout.js` | country discs: stress majorization and constraint projection |
@@ -173,8 +171,7 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
   Jonathan Shewchuk's predicates, public domain (Unlicense).
 - [earcut](https://github.com/mapbox/earcut) by Mapbox, ISC license (`vendor/LICENSE-earcut`).
 - Fonts from [Google Fonts](https://fonts.google.com/), SIL Open Font License: Eagle Lake,
-  Fondamento and Sorts Mill Goudy (Ink), Alegreya and Alegreya SC (Realm), Shippori Mincho B1
-  (Kinpeki).
+  Fondamento and Sorts Mill Goudy (Ink), Alegreya and Alegreya SC (Realm).
 
 ## License
 

@@ -339,10 +339,10 @@
   /* a style's script is running for the first time: the map waits for it out of sight */
   html.restyling #plate { visibility: hidden; }
 
-  /* the style picker: a row of three in the title card, under the tools */
+  /* the style picker: a row of choices in the title card, under the tools */
   #style-box { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--ink-soft); font-size: 14px; }
   #style-box .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  #style-box .choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+  #style-box .choices { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
   #style-box button.choice { height: auto; padding: 7px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 5px;
     text-align: center; line-height: 1.15; min-width: 0; }
   #style-box button.choice .nm { font-size: 15px; }
@@ -352,7 +352,6 @@
   .swatch { display: block; width: 44px; height: 24px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
   .swatch.ink { background: linear-gradient(135deg, #efe4c8 0 48%, #2b2118 48% 56%, #efe4c8 56% 70%, #9b2d20 70% 78%, #d9e2df 78%); }
   .swatch.realm { background: linear-gradient(135deg, #f3efe2 0 18%, #6f8f42 18% 52%, #b9a35f 52% 62%, #2f6f9a 62%); }
-  .swatch.kinpeki { background: linear-gradient(135deg, #1d3046 0 34%, #d4ae55 34% 46%, #1d3046 46% 60%, #c8442c 60% 74%, #e9dfc4 74%); }
   #style-note { min-height: 0; }
   #style-button .ico { display: none; }
 
@@ -389,8 +388,9 @@
 // first paint: a style named at the end of the link (#world-1-realm), else the one this browser
 // chose last time, else ink. Only that style's files load now; the others when first picked.
 (function () {
-  var names = ['ink', 'realm', 'kinpeki'], name = 'ink', html = document.documentElement;
-  var m = /-(ink|realm|kinpeki)$/.exec(decodeURIComponent(location.hash));
+  // (a style that was retired, named in an old link or kept as a choice, gives way to ink)
+  var names = ['ink', 'realm'], name = 'ink', html = document.documentElement;
+  var m = /-(ink|realm)$/.exec(decodeURIComponent(location.hash));
   var saved = null;
   try { saved = localStorage.getItem('peopled-style'); } catch (e) { /* no storage: the default */ }
   if (m) name = m[1];
@@ -412,8 +412,7 @@
   window.peopledFonts = function (name) {
     var known = {   // (until a style ships its .fonts file)
       ink: 'https://fonts.googleapis.com/css2?family=Eagle+Lake&family=Fondamento:ital@0;1&family=Sorts+Mill+Goudy:ital@0;1&display=swap',
-      realm: 'https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&family=Alegreya:ital,wght@0,400;0,500;1,500&display=swap',
-      kinpeki: 'https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;600;700&display=swap'
+      realm: 'https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&family=Alegreya:ital,wght@0,400;0,500;1,500&display=swap'
     };
     if (document.querySelector('link[data-style-fonts="' + name + '"]')) return;
     var add = function (url) {
@@ -456,7 +455,6 @@
     <div class="choices" role="radiogroup" aria-labelledby="style-head">
       <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="ink"><span class="swatch ink" aria-hidden="true"></span><span class="nm">Ink</span><span class="ds">a book's endpapers</span></button>
       <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="realm"><span class="swatch realm" aria-hidden="true"></span><span class="nm">Realm</span><span class="ds">a painted game world</span></button>
-      <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="kinpeki"><span class="swatch kinpeki" aria-hidden="true"></span><span class="nm">Kinpeki</span><span class="ds">a gold-leaf screen</span></button>
     </div>
     <div id="style-note" class="note" role="status" hidden></div>
   </div>
@@ -567,12 +565,15 @@ function unpackEdit(text) {
   return {add, a: codeOf(Math.floor(v / 676)), b: codeOf(v % 676)};
 }
 const packable = e => /^[A-Z]{2}$/.test(e.a) && /^[A-Z]{2}$/.test(e.b);
-const STYLES = ['ink', 'realm', 'kinpeki'], DEFAULT_STYLE = 'ink';
-const styleSuffix = new RegExp('-(' + STYLES.join('|') + ')$');
+const STYLES = ['ink', 'realm'], DEFAULT_STYLE = 'ink';
+// styles there were once: an old link that names one keeps its world and edits and shows them in ink
+const RETIRED_STYLES = ['kinpeki'];
+const styleSuffix = new RegExp('-(' + STYLES.concat(RETIRED_STYLES).join('|') + ')$');
 function readHash() {
   let hash = decodeURIComponent(location.hash);
   let style = (styleSuffix.exec(hash) || [])[1] || null;
   if (style) hash = hash.slice(0, -style.length - 1);
+  if (RETIRED_STYLES.includes(style)) style = DEFAULT_STYLE;
   let list = [];
   let match = /^#world-(\d+)((?:-(?:cut|add)-[A-Za-z0-9]+-[A-Za-z0-9]+)*)$/.exec(hash);
   if (match) {
@@ -2538,9 +2539,9 @@ async function setStyle(name, how = {}) {
   }
 }
 
-// The picker: three choices in the title card, a radio group (arrow keys move between them)
+// The picker: a choice for each style in the title card, a radio group (arrow keys move between them)
 const styleBox = $('style-box'), styleButton = $('style-button');
-const styleTitle = {ink: 'Ink', realm: 'Realm', kinpeki: 'Kinpeki'};
+const styleTitle = {ink: 'Ink', realm: 'Realm'};
 function syncPicker(pending) {
   styleBox.querySelectorAll('[data-pick-style]').forEach(button => {
     let on = button.dataset.pickStyle === (pending || currentStyle);
