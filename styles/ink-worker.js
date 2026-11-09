@@ -5,8 +5,8 @@
 //   {type: 'palette', palette}                   the colours of a theme
 //   {type: 'decor', id, decor}                   where the rose, the ship and the serpent go
 //   {type: 'tiles', list}                        the tiles wanted now, most wanted first (replaces the
-//                                                list before); answers each {type: 'tile', key, bitmap}
-//                                                (an ImageBitmap, transferred; null for an empty tile)
+//                                                list before); answers each {type: 'tile', key, blob}
+//                                                (a PNG; null for an empty tile)
 //   {type: 'drop', id}                           a world no longer shown
 // A worker that cannot draw answers {type: 'nodraw'} and the page draws the tiles itself.
 import {createEngine} from './ink-engine.js';
@@ -33,24 +33,24 @@ async function drain() {
     let t = queue.shift();
     try {
       if (t.ahead && kept.has(t.key)) continue;
+      // a tile goes to the page as a PNG, shown there as a plain svg image: no GPU texture of this
+      // worker's is ever shown, so a tile can't come out black on a phone
       if (kept.has(t.key)) {
         let blob = kept.get(t.key);
         keep(t.key, blob);
-        let bitmap = blob ? await createImageBitmap(blob) : null;
-        self.postMessage({type: 'tile', key: t.key, id: t.id, bitmap}, bitmap ? [bitmap] : []);
+        self.postMessage({type: 'tile', key: t.key, id: t.id, blob});
       } else {
         let canvas = engine.tile(t.id, t);
-        if (!canvas) { keep(t.key, null); self.postMessage({type: 'tile', key: t.key, id: t.id, bitmap: null}); }
-        else if (t.ahead) keep(t.key, await canvas.convertToBlob({type: 'image/png'}));   // drawn ahead: kept, not sent
+        if (!canvas) { keep(t.key, null); self.postMessage({type: 'tile', key: t.key, id: t.id, blob: null}); }
         else {
-          let bitmap = await createImageBitmap(canvas);
-          self.postMessage({type: 'tile', key: t.key, id: t.id, bitmap}, [bitmap]);
-          keep(t.key, await canvas.convertToBlob({type: 'image/png'}));
+          let blob = await canvas.convertToBlob({type: 'image/png'});
+          keep(t.key, blob);
+          if (!t.ahead) self.postMessage({type: 'tile', key: t.key, id: t.id, blob});   // drawn ahead: kept, not sent
         }
       }
     } catch (e) {
       if (!e.unknown) self.postMessage({type: 'error', message: e.message});
-      self.postMessage({type: 'tile', key: t.key, id: t.id, bitmap: null, failed: true, unknown: !!e.unknown});
+      self.postMessage({type: 'tile', key: t.key, id: t.id, blob: null, failed: true, unknown: !!e.unknown});
       if (e.unknown) queue = queue.filter(q => q.id !== t.id);
     }
     // let a newer list of wanted tiles arrive between two tiles

@@ -128,14 +128,14 @@ html[data-style="ink"] #compass { display: none; }
 html[data-style="ink"] #plate { background-color: var(--sea); }
 html[data-style="ink"] .sea-fill { fill: transparent; }
 
-/* coasts in a firm line, borders dash-and-dot, both drawn over the ink layer's ribbons */
-html[data-style="ink"] .coast { stroke: var(--ink); stroke-width: 1.15; stroke-linecap: round; }
+/* coasts in a firm line, borders in a finer solid one (a dash-and-dot read as soft on a phone),
+   both drawn over the ink layer's ribbons */
+html[data-style="ink"] .coast { stroke: var(--ink); stroke-width: 1.35; stroke-linecap: round; }
 html[data-style="ink"] .border {
-  stroke: var(--ink); stroke-width: 1.1; opacity: 0.9;
-  stroke-dasharray: 4.2 1.9 0.4 1.9; stroke-linecap: round;
+  stroke: var(--ink); stroke-width: 1; opacity: 1; stroke-linecap: round; stroke-dasharray: none;
 }
-html[data-style="ink"] .coast.ink-fine { stroke-width: 0.8; }
-html[data-style="ink"] .border.ink-fine { stroke-width: 0.7; stroke-dasharray: 3 1.6 0.3 1.6; }
+html[data-style="ink"] .coast.ink-fine { stroke-width: 0.9; }
+html[data-style="ink"] .border.ink-fine { stroke-width: 0.7; }
 html[data-style="ink"] .border.lit { stroke: var(--accent); stroke-width: 2.2; stroke-dasharray: none; opacity: 1; }
 html[data-style="ink"] .marker { stroke: var(--ink); stroke-opacity: 0.7; stroke-width: 0.9; }
 html[data-style="ink"] .marker.lit { stroke: var(--accent); stroke-opacity: 1; stroke-width: 1.6; }

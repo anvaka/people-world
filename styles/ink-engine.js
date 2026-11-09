@@ -489,7 +489,7 @@ export function createEngine(makeCanvas) {
     let z = v.z;
     for (let i = Math.floor(v.x0 / h) - 1; i <= Math.ceil(v.x1 / h); ++i) for (let j = Math.floor(v.y0 / h) - 1; j <= Math.ceil(v.y1 / h); ++j) {
       let r1 = hash(i, j, z, st.seed + 9), r2 = hash(j, i, z, st.seed + 10);
-      if (r1 < 0.55) continue;
+      if (r1 < 0.72) continue;   // a sparse scatter: the sea is a quiet ground
       let x = (i + r1) * h, y = (j + r2) * h, c = cellAt(sv, x, y);
       if (c >= 0 && (sv.ids[c] !== -1 || sv.toLand[c] * sv.cell * kb < 22)) continue;
       if (st.decor && st.decor.clear.some(([cx, cy, r]) => Math.hypot(cx - x, cy - y) < r / kb + 14 / kb)) continue;
@@ -514,30 +514,30 @@ export function createEngine(makeCanvas) {
     let d = v.st.decor;
     if (!d || !d.rose) return;
     let [cx, cy] = v.S(d.rose.x, d.rose.y), r = roseRadius(d.rose, v.kb), far = 4000;
-    let main = new Path2D(), minor = new Path2D();
-    for (let i = 0; i < 32; ++i) {
-      let a = i * Math.PI / 16, p = i % 4 === 0 ? main : minor;
+    // the eight winds only: thirty-two lines across the whole sea made the map busy
+    let main = new Path2D();
+    for (let i = 0; i < 8; ++i) {
+      let a = i * Math.PI / 4;
       // (from inside the rose's disc: the rose, an image over the sea tiles, covers their start)
-      p.moveTo(cx + Math.cos(a) * r * 0.6, cy + Math.sin(a) * r * 0.6);
-      p.lineTo(cx + Math.cos(a) * far, cy + Math.sin(a) * far);
+      main.moveTo(cx + Math.cos(a) * r * 0.6, cy + Math.sin(a) * r * 0.6);
+      main.lineTo(cx + Math.cos(a) * far, cy + Math.sin(a) * far);
     }
     v.toPx();
     ctx.strokeStyle = P.rhumb;
-    ctx.lineWidth = 0.6;
-    ctx.stroke(minor);
-    ctx.lineWidth = 0.9;
+    ctx.lineWidth = 0.7;
     ctx.stroke(main);
     v.inked = true;
   }
 
   // The shore: short strokes standing out from the coast into the sea, longer where the coast is
   // long and open. Each is drawn across the coast; the land, drawn over the layer, hides the inner half.
+  // Only round land big enough on screen: around a small island the strokes made a burr, not a coast.
   function shore(v) {
     let {st, kb} = v, path = new Path2D(), any = false, m = 10 / kb;
     st.lines.forEach((line, i) => {
-      if (line.kind !== 'coast' || line.size * kb < 6 || !meets(line.box, v.x0, v.y0, v.x1, v.y1, m)) return;
-      let pts = linePoints(v, i), step = 1.9, carry = 0;
-      let L = Math.min(6.5, 2.2 + 0.05 * line.size * kb);
+      if (line.kind !== 'coast' || line.size * kb < 40 || !meets(line.box, v.x0, v.y0, v.x1, v.y1, m)) return;
+      let pts = linePoints(v, i), step = 2.4, carry = 0;
+      let L = Math.min(4.5, 1.6 + 0.03 * line.size * kb);
       for (let j = 1; j < pts.length; ++j) {
         let [ax, ay] = v.S(pts[j - 1][0], pts[j - 1][1]), [bx, by] = v.S(pts[j][0], pts[j][1]);
         let dx = bx - ax, dy = by - ay, len = Math.hypot(dx, dy);
