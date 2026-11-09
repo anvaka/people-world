@@ -129,7 +129,7 @@ function onEngine(data, from) {
   if (data.type === 'nodraw') { fallBack(); return; }
   if (data.type === 'error') { console.warn('ink:', data.message); return; }
   let world = byId.get(data.id);
-  if (!world || !world.ink) { if (data.bitmap) data.bitmap.close(); return; }
+  if (!world || !world.ink) return;
   if (data.type === 'init') { if (!world.ink.survey) surveyed(world, data); }
   else if (data.type === 'tile') tileArrived(world, data);
 }
@@ -238,10 +238,11 @@ function paper(state) {
 
 // ---------------------------------------------------------------------------------------------
 // Tiles. Each world shows the tiles of one band per layer; a new band is shown once its tiles for
-// the view are in, fading in over the old one. A tile arrives as an ImageBitmap and is shown on a
-// canvas of its own (a 'bitmaprenderer': no copy, no decoding on the main thread) in the svg,
-// wrapped so its html is laid out at the tile's own pixel size. The worker keeps the tiles it drew,
-// so the page holds only those placed.
+// the view are in, fading in over the old one. A tile arrives as a PNG and is shown as an svg
+// image, once the browser has decoded it (off the main thread), so nothing pops in half drawn.
+// (Tiles used to be shown on canvases in a foreignObject; on phones a tile could then come out
+// black where it should be clear.) The worker keeps the tiles it drew, so the page holds only
+// those placed.
 const empty = new Set();          // keys of tiles with nothing on them
 // (merge) worlds kept surveyed and tiled: the map and the map before the edits. A tile let go gives
 // its pixels back at once (a phone may not wait for the collector).
@@ -271,7 +272,7 @@ function keepWorld(world) {
 }
 function release(g) {
   g.remove();
-  for (let c of g.querySelectorAll('canvas')) { c.width = 0; c.height = 0; }
+  for (let im of g.querySelectorAll('image')) { let url = im.getAttribute('href'); if (url) URL.revokeObjectURL(url); im.removeAttribute('href'); }
 }
 const tileKey = (world, layer, z, ti, tj) => `${world.ink.id}|${pal.theme}|${layer}|${z}|${ti}|${tj}`;
 const hasTile = (band, key) => band.images.has(key) || empty.has(key);
@@ -281,7 +282,7 @@ function tiles(world, state) {
   let cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, want = [], res = tileRes();
   let request = (layer, zz, ti, tj, TWz, names, extra) => {
     let tx0 = ti * TWz, ty0 = tj * TWz;
-    return {key: tileKey(world, layer, zz, ti, tj), id: ink.id, theme: pal.theme, layer, z: zz, ti, tj, res: layer === 'sea' ? Math.min(res, 1.5) : res,
+    return {key: tileKey(world, layer, zz, ti, tj), id: ink.id, theme: pal.theme, layer, z: zz, ti, tj, res,
       dist: Math.hypot(tx0 + TWz / 2 - cx, ty0 + TWz / 2 - cy) + (layer === 'sea' ? TWz * 0.3 : 0),
       names: layer === 'land' ? names.filter(n => n.box[2] > tx0 - TWz * 0.2 && n.box[0] < tx0 + TWz * 1.2 && n.box[3] > ty0 - TWz * 0.2 && n.box[1] < ty0 + TWz * 1.2) : [], ...extra};
   };
@@ -315,23 +316,24 @@ function shownBand(world, layer, z) {
     let g = document.createElementNS(NS, 'g');
     g.setAttribute('class', 'ink-band incoming');
     world.ink[layer].appendChild(g);
-    band = {z, g, images: new Map(), keys: new Set(), shown: false};
+    band = {z, g, images: new Map(), keys: new Set(), loading: new Set(), shown: false};
     bands.set(z, band);
   }
   band.keys = new Set();
   ink.z = z;
   return band;
 }
-function place(world, band, key, el) {
+function place(world, band, key, url) {
   let [, , , z, ti, tj] = key.split('|'), kb = bandK(+z, dev()), TW = TILE_PX / kb;
   let g = document.createElementNS(NS, 'g');
   g.setAttribute('transform', `translate(${+ti * TW} ${-(+tj + 1) * TW}) scale(${1 / kb})`);
-  let fo = document.createElementNS(NS, 'foreignObject');
-  fo.setAttribute('width', TILE_PX);
-  fo.setAttribute('height', TILE_PX);
-  el.setAttribute('class', 'ink-tile' + (band.shown ? ' fresh' : ''));   // a tile added to a band on screen fades in
-  fo.appendChild(el);
-  g.appendChild(fo);
+  let im = document.createElementNS(NS, 'image');
+  im.setAttribute('width', TILE_PX);
+  im.setAttribute('height', TILE_PX);
+  im.setAttribute('preserveAspectRatio', 'none');
+  im.setAttribute('class', 'ink-tile' + (band.shown ? ' fresh' : ''));   // a tile added to a band on screen fades in
+  im.setAttribute('href', url);
+  g.appendChild(im);
   band.g.appendChild(g);
   band.images.set(key, g);
 }
@@ -345,18 +347,24 @@ function tileArrived(world, data) {
     if (!ink.resurvey) { ink.resurvey = true; ink.survey = ink.known.survey = null; startSurvey(world); }
     return;
   }
-  if (!data.bitmap && !data.canvas) { if (!data.failed) empty.add(key); }
-  else if (theme !== pal.theme || !band || !band.keys.has(key) || band.images.has(key)) { if (data.bitmap) data.bitmap.close(); }
-  else {
-    let el = data.canvas;
-    if (!el) {
-      el = document.createElement('canvas');
-      el.width = data.bitmap.width; el.height = data.bitmap.height;
-      let r = el.getContext('bitmaprenderer');
-      if (r) r.transferFromImageBitmap(data.bitmap);
-      else { el.getContext('2d').drawImage(data.bitmap, 0, 0); data.bitmap.close(); }
-    }
-    place(world, band, key, el);
+  if (!data.blob && !data.canvas) { if (!data.failed) empty.add(key); }
+  else if (theme === pal.theme && band && band.keys.has(key) && !band.images.has(key) && !band.loading.has(key)) {
+    // decoded before it is placed; the band is shown once every tile of the view is placed
+    band.loading.add(key);
+    let still = () => active() && ink.band[layer] && ink.band[layer].get(+z) === band && band.keys.has(key) && !band.images.has(key);
+    (data.blob ? Promise.resolve(data.blob) : new Promise(r => data.canvas.toBlob(r, 'image/png'))).then(blob => {
+      if (!blob || !still()) return null;
+      let url = URL.createObjectURL(blob), probe = new Image();
+      probe.src = url;
+      return probe.decode().catch(() => {}).then(() => url);
+    }).then(url => {
+      band.loading.delete(key);
+      if (!url) return;
+      if (!still()) { URL.revokeObjectURL(url); return; }
+      place(world, band, key, url);
+      settleBand(world, layer);
+      checkReady(world);
+    });
   }
   if (empty.size > 20000) empty.clear();
   settleBand(world, layer);
@@ -498,8 +506,10 @@ function placeFurniture(world, state) {
   };
   let used = new Set(), pick = r => cand.find(s => !used.has(s) && free(s, r(s)) && used.add(s));
   let rose = pick(s => roseRadius(s, k) * 1.35);
-  let shipS = pick(s => vignetteSize(s, k) * 2);
-  let serp = pick(s => vignetteSize(s, k) * 2.2);
+  // on a phone the rose alone: a ship and a serpent too crowd a small screen
+  let roomy = screen.w >= 600;
+  let shipS = roomy && pick(s => vignetteSize(s, k) * 2);
+  let serp = roomy && pick(s => vignetteSize(s, k) * 2.2);
   let seed = seedOf();
   let decor = {rose, ship: shipS && {...shipS, dir: seed % 2 ? 1 : -1}, serpent: serp && {...serp, dir: seed % 3 ? -1 : 1}, clear: []};
   if (rose) decor.clear.push([rose.x, rose.y, roseRadius(rose, k) * 1.4]);
