@@ -1002,9 +1002,9 @@ export function createTerrain(plate, svg, opts = {}) {
     gl.uniform4f(u.u_ripple, ...cellsOf(ra), rt);
     gl.uniform1i(u.u_rippleL, ra);
     // the people's lights. Level 12 has a cell for every village (some 1,900 people: on this map land
-    // is people). Every level whose cells are at least 8 CSS px shows, the finest fading in, so a
+    // is people). Every level whose cells are at least 6 CSS px shows, the finest fading in, so a
     // zoom spreads the lights it showed and lights the villages between them; past level 12 no more
-    // come. At most five levels, the coarsest fading out as its cells pass 128 px. (From 4 px on, the
+    // come. At most five levels, the coarsest fading out as its cells pass 96 px. (From 4 px on, the
     // lights were a dust over the countries)
     let lv = new Float32Array(LIGHT_N * 4), lp = new Float32Array((LIGHT_N + 2) * 2), lj = new Float32Array(LIGHT_N), ll = new Int32Array(LIGHT_N);
     let finest = Math.min(LIGHT_MAX, Math.floor(Math.log2(K / 6)));
