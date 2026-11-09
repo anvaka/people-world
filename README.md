@@ -21,7 +21,9 @@ up, so each world number gives a different map of the same graph.
   touch stay where they were. **Show before** flips between the two maps; each edit can be undone.
 - **Share a map.** The address holds the world number and the edits, so a link opens the same
   map. `#world-1-cut-FR-ES-add-JP-KR` is world 1 without the France–Spain border and with a
-  Japan–South Korea one. Countries are named by their two-letter codes.
+  Japan–South Korea one. Countries are named by their two-letter codes. Past four edits the link
+  switches to a compact code of four letters or digits per edit (`#world-1-e-0PLu1pIL…`), so a
+  long editing session still fits in a link you can paste.
 
 A world takes 10–15 seconds to build on a laptop, longer on a phone. A link with edits first builds
 the world without them, so it takes about twice as long.
