@@ -1,6 +1,6 @@
 // Island countries (no neighbours): organic blobs of exact area, gathered into archipelagos off
 // the coasts of the continent they belong to.
-import {fbm2, ringArea} from './util.js';
+import {fbm2, ringArea, hypot} from './util.js';
 
 // occupied: function(x, y, r) -> true if land (or another island) lies within r of (x, y)
 // opts.keep: an island goes exactly to its anchor when no land is in the way (a warm start's
@@ -15,7 +15,7 @@ export function placeIslands(list, anchorOf, occupied, rng, opts = {}) {
     for (const it of sorted) {
       const R = Math.sqrt(it.area / Math.PI) * 1.3;
       const [ax, ay] = anchorOf(it);
-      if (occupied(ax, ay, R + 0.3) || placed.some(p => Math.hypot(p.x - ax, p.y - ay) < p.R + R + 0.3)) continue;
+      if (occupied(ax, ay, R + 0.3) || placed.some(p => hypot(p.x - ax, p.y - ay) < p.R + R + 0.3)) continue;
       placed.push({index: it.index, x: ax, y: ay, R, area: it.area});
       kept.add(it);
     }
@@ -33,7 +33,7 @@ export function placeIslands(list, anchorOf, occupied, rng, opts = {}) {
         const ang = ang0 + (k / steps) * Math.PI * 2;
         const x = ax + Math.cos(ang) * d, y = ay + Math.sin(ang) * d;
         if (occupied(x, y, R + gap)) continue;
-        if (placed.some(p => Math.hypot(p.x - x, p.y - y) < p.R + R + Math.max(gap, 0.5 * p.R, 0.6))) continue;
+        if (placed.some(p => hypot(p.x - x, p.y - y) < p.R + R + Math.max(gap, 0.5 * p.R, 0.6))) continue;
         placed.push({index: it.index, x, y, R, area: it.area});
         done = true;
         break;

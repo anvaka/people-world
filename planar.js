@@ -938,6 +938,7 @@ function solveHittingComponent(setsIn, ubIn, wOf, deadline, now, maxPool) {
   const excl = new Uint8Array(E);
   const used = new Uint32Array(W);
   const degBuf = new Int32Array(E);
+  const degCount = new Int32Array(nS + 2);
   const chosen = [];
 
   const ub = ubIn.filter((x) => loc.has(x)).map((x) => loc.get(x));
@@ -1026,20 +1027,22 @@ function solveHittingComponent(setsIn, ubIn, wOf, deadline, now, maxPool) {
       if (pool.length >= maxPool) stopped = true;
       return;
     }
-    // degree bound: fewest elements whose degrees add up to `unhit`
-    let k = 0;
-    for (let x = 0; x < E; x++) if (!excl[x] && deg[x] > 0) degBuf[k++] = deg[x];
+    // degree bound: fewest elements whose degrees add up to `unhit` (largest degrees first, by
+    // counting: degrees are at most nS)
+    let k = 0, maxDeg = 0;
+    for (let x = 0; x < E; x++) if (!excl[x] && deg[x] > 0) { const d = deg[x]; degCount[d]++; if (d > maxDeg) maxDeg = d; k++; }
     if (k === 0) return;
     const room = bestCnt - cnt; // extra elements still allowed
-    const sub = degBuf.subarray(0, k);
-    sub.sort();
-    let need = 0;
-    for (let s = 0, i = k - 1; i >= 0; i--) {
-      s += sub[i];
-      need++;
-      if (s >= unhit) break;
-      if (need >= room) return;
+    let need = 0, cut = false;
+    for (let s = 0, d = maxDeg; d > 0 && !cut; d--) {
+      for (let c = degCount[d]; c > 0; c--) {
+        s += d;
+        need++;
+        if (s >= unhit) { cut = true; break; }
+        if (need >= room) { for (let e = 0; e <= maxDeg; e++) degCount[e] = 0; return; }
+      }
     }
+    for (let e = 0; e <= maxDeg; e++) degCount[e] = 0;
     if (need > room) return;
     // packing bound: pairwise disjoint unhit sets; also pick the branch set
     used.fill(0);

@@ -2,7 +2,7 @@
 // triangulation, and its barycentric dual (cell = the triangle thirds around a point), which is
 // always a valid planar subdivision.
 import Delaunator from './vendor/delaunator.js';
-import {hash2} from './util.js';
+import {hash2, hypot} from './util.js';
 
 // disks: [{x, y, r}] (r = radius of the country's mesh area)
 export function buildMesh(disks, rng, opts) {
@@ -32,7 +32,7 @@ export function buildMesh(disks, rng, opts) {
     let h = 4 * h0, inside = false;
     for (const i of grid[gy * gw + gx]) {
       const d = disks[i];
-      const dist = Math.hypot(x - d.x, y - d.y) - slack;
+      const dist = hypot(x - d.x, y - d.y) - slack;
       if (dist < d.r * domainPad + domainExtra * h0) inside = true;
       const hi = small[i] + grade * Math.max(0, dist - 1.3 * d.r);
       if (hi < h) h = hi;
@@ -136,12 +136,12 @@ function dualOf(coords, del, inDomain) {
     const p = tris[e], q = tris[e % 3 === 2 ? e - 2 : e + 1];
     const mx = (coords[2 * p] + coords[2 * q]) / 2, my = (coords[2 * p + 1] + coords[2 * q + 1]) / 2;
     const t1 = Math.floor(e / 3);
-    let len = Math.hypot(gx[t1] - mx, gy[t1] - my);
-    if (o >= 0) { const t2 = Math.floor(o / 3); len += Math.hypot(gx[t2] - mx, gy[t2] - my); }
+    let len = hypot(gx[t1] - mx, gy[t1] - my);
+    if (o >= 0) { const t2 = Math.floor(o / 3); len += hypot(gx[t2] - mx, gy[t2] - my); }
     ringLen[k] = len;
   }
   for (let p = 0; p < N; ++p) if (!inDomain[p]) frozen[p] = 1;
   const hloc = new Float64Array(N);
   for (let p = 0; p < N; ++p) hloc[p] = Math.sqrt(area[p]);
-  return {N, coords, tris, half, T, gx, gy, area, hloc, start, ringNbr, ringEdge, ringLen, frozen};
+  return {N, coords, tris, half, T, gx, gy, area, hloc, start, ringNbr, ringEdge, ringLen, frozen, _dial: null};
 }
