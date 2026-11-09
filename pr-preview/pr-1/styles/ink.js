@@ -375,14 +375,29 @@ function settleBand(world, layer) {
     band.shown = true;
     band.g.setAttribute('class', 'ink-band');
     world.ink[layer].appendChild(band.g);   // on top of the others
-    let others = [...bands.values()].filter(b => b !== band);
-    clearTimeout(band.timer);
-    band.timer = setTimeout(() => {
-      for (let b of others) if (bands.get(b.z) === b && b !== bands.get(ink.z)) { release(b.g); bands.delete(b.z); }
-    }, reduceMotion() ? 0 : 300);
   }
-  // a band left behind before it was shown is dropped at once
-  for (let b of [...bands.values()]) if (b !== band && !b.shown) { release(b.g); bands.delete(b.z); }
+  for (let b of [...bands.values()]) {
+    if (b === band) continue;
+    // a band left behind before it was shown is dropped at once
+    if (!b.shown) { dropBand(bands, b); continue; }
+    // the old picture stays until this band is in
+    if (!band.shown) continue;
+    // A band drawn over this one goes at once: the view came back to a band still on screen
+    // (a quick pinch in and out), and its ink would lie doubled over this band's. One under this
+    // band goes once this one has faded in, unless the view comes back to it first.
+    let above = band.g.compareDocumentPosition(b.g) & Node.DOCUMENT_POSITION_FOLLOWING;
+    if (above || reduceMotion()) dropBand(bands, b);
+    else if (!b.drop) b.drop = setTimeout(() => {
+      b.drop = 0;
+      if (bands.get(b.z) === b && b !== bands.get(ink.z)) dropBand(bands, b);
+    }, 300);
+  }
+}
+function dropBand(bands, b) {
+  clearTimeout(b.drop);
+  b.drop = 0;
+  release(b.g);
+  if (bands.get(b.z) === b) bands.delete(b.z);
 }
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 function checkReady(world) {
@@ -1025,7 +1040,7 @@ function unmount() {
   send({type: 'tiles', list: []});
   if (local) { clearTimeout(local.timer); local.queue = []; }
   for (let w of byId.values()) if (w.ink) {
-    for (let layer in w.ink.band) for (let b of w.ink.band[layer].values()) clearTimeout(b.timer);
+    for (let layer in w.ink.band) for (let b of w.ink.band[layer].values()) { clearTimeout(b.drop); b.drop = 0; }
     w.ink.waiters.splice(0).forEach(f => f());
   }
   current = null;
