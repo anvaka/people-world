@@ -27,15 +27,15 @@ html[data-style="ink"] {
   --control-hover: rgba(43, 29, 18, 0.07);
   --shadow: rgba(60, 40, 15, 0.16);
   --lit: none;
-  /* the realms' papers (no two neighbours alike) and, for the ribbon inside each border, a deeper
-     shade of the same paper */
-  --land-0: #f1f3d0; --band-0: #a9b07a;
-  --land-1: #d9d9c6; --band-1: #9a9a86;
-  --land-2: #fbece1; --band-2: #cfae99;
-  --land-3: #e6ccbf; --band-3: #b8907f;
-  --land-4: #eac9a8; --band-4: #b98f66;
-  --land-5: #ffe7bd; --band-5: #c9a96c;
-  --land-6: #d6d1aa; --band-6: #9f9867;
+  /* the realms' papers (no two neighbours alike, and as far apart as seven parchments go) and, for
+     the fine ribbon inside each border, a deeper shade of the same paper */
+  --land-0: #dcebd6; --band-0: #a0b597;   /* sage */
+  --land-1: #d6cbc7; --band-1: #a3948e;   /* dove */
+  --land-2: #ffe9d5; --band-2: #cdb093;   /* cream */
+  --land-3: #efc3b5; --band-3: #c48875;   /* rose */
+  --land-4: #f2caa0; --band-4: #c49154;   /* tan */
+  --land-5: #faebb9; --band-5: #c5b36b;   /* straw */
+  --land-6: #d3cfac; --band-6: #9d9a67;   /* khaki */
   color-scheme: light;
 }
 /* ---------------------------------------------------------------- tokens: night */
@@ -61,13 +61,13 @@ html[data-style="ink"] {
     --panel: #18212b;
     --control-hover: rgba(234, 223, 196, 0.08);
     --shadow: rgba(0, 0, 0, 0.55);
-    --land-0: #2c3223; --band-0: #4f5a3c;
-    --land-1: #444b4e; --band-1: #6a7378;
-    --land-2: #423528; --band-2: #6b573f;
-    --land-3: #382d30; --band-3: #5f4a50;
-    --land-4: #4f4b3a; --band-4: #776f53;
-    --land-5: #293535; --band-5: #46595a;
-    --land-6: #554542; --band-6: #7e6763;
+    --land-0: #51626b; --band-0: #51626b;   /* steel */
+    --land-1: #3e3e4a; --band-1: #3e3e4a;   /* slate */
+    --land-2: #765a58; --band-2: #765a58;   /* rosewood */
+    --land-3: #402825; --band-3: #402825;   /* oxblood */
+    --land-4: #544533; --band-4: #544533;   /* umber */
+    --land-5: #5f654f; --band-5: #5f654f;   /* moss */
+    --land-6: #20372e; --band-6: #20372e;   /* bottle green */
     color-scheme: dark;
   }
 }
@@ -92,13 +92,13 @@ html[data-style="ink"][data-theme="dark"] {
   --panel: #18212b;
   --control-hover: rgba(234, 223, 196, 0.08);
   --shadow: rgba(0, 0, 0, 0.55);
-  --land-0: #2c3223; --band-0: #4f5a3c;
-  --land-1: #444b4e; --band-1: #6a7378;
-  --land-2: #423528; --band-2: #6b573f;
-  --land-3: #382d30; --band-3: #5f4a50;
-  --land-4: #4f4b3a; --band-4: #776f53;
-  --land-5: #293535; --band-5: #46595a;
-  --land-6: #554542; --band-6: #7e6763;
+  --land-0: #51626b; --band-0: #51626b;   /* steel */
+  --land-1: #3e3e4a; --band-1: #3e3e4a;   /* slate */
+  --land-2: #765a58; --band-2: #765a58;   /* rosewood */
+  --land-3: #402825; --band-3: #402825;   /* oxblood */
+  --land-4: #544533; --band-4: #544533;   /* umber */
+  --land-5: #5f654f; --band-5: #5f654f;   /* moss */
+  --land-6: #20372e; --band-6: #20372e;   /* bottle green */
   color-scheme: dark;
 }
 

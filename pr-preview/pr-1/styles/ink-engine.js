@@ -274,9 +274,11 @@ export function createEngine(makeCanvas) {
   // ------------------------------------------------------------------------------- land layer
   // The ribbon: a thin stripe in a deeper shade of the realm's own paper just inside its land
   // borders, a hair of paper between it and the inked border (outline colouring)
-  const RIBBON_GAP = 2.1, RIBBON_W = 1.4;
+  // (by day only, and fine: at night a pale ribbon by a pale border read as a glow, a doubled line)
+  const RIBBON_GAP = 2.2, RIBBON_W = 1.0;
   function ribbons(v) {
     let {st, kb} = v;
+    if (P.dark) return;
     v.toWorld();
     ctx.lineJoin = 'round';
     ctx.lineCap = 'butt';
@@ -336,7 +338,8 @@ export function createEngine(makeCanvas) {
   // into clearings, so a small realm seen close is not carpeted
   const TILE = 36;
   const CLEAR_PX = 5.5;
-  const KINDS = {mountain: {px: 10.5, size: 1.6, thin: 0.15}, hill: {px: 12, size: 1.1, thin: 0.3}, tree: {px: 5.2, size: 1.05, thin: 0.32}, marsh: {px: 10, size: 1, thin: 0.3}, dune: {px: 8, size: 1, thin: 0.3}};
+  // (spaced a little more than the marks are wide: at reading zoom on a phone less is more)
+  const KINDS = {mountain: {px: 12, size: 1.55, thin: 0.15}, hill: {px: 14, size: 1.05, thin: 0.3}, tree: {px: 6.2, size: 1.05, thin: 0.32}, marsh: {px: 12, size: 1, thin: 0.3}, dune: {px: 10, size: 1, thin: 0.3}};
   // (and at a whole-world view the woods are a little sparser too, so they read as woods, not smudges)
   const spread = (spec, b) => Math.min(2.4, 1 + spec.thin * Math.max(0, b - 1)) * (b <= 0 && spec === KINDS.tree ? 1.22 : 1);
   const grow = b => Math.min(1.45, 1 + 0.1 * Math.max(0, b - 1));
@@ -357,17 +360,21 @@ export function createEngine(makeCanvas) {
       let c = cellAt(sv, x, my);
       if (c < 0 || sv.ids[c] === -1) continue;
       let inland = sv.toSea[c] * sv.cell, s = 1, at = f => fieldAt(sv, f, x, y);
+      // the realm's own thresholds (see thresholds() in ink-survey.js)
+      let rid = sv.ids[c] >= 0 ? sv.ids[c] : sv.ids[c - 1] >= 0 ? sv.ids[c - 1] : sv.ids[c + 1] >= 0 ? sv.ids[c + 1] : sv.ids[c - sv.w] >= 0 ? sv.ids[c - sv.w] : sv.ids[c + sv.w];
+      if (!(rid >= 0)) continue;
+      let tM = sv.thr.mountain[rid], tH = sv.thr.hill[rid], tF = sv.thr.forest[rid];
       if (kind === 'mountain') {
         if (inland < 1) continue;
         let M = at(F.mountain) * smoothstep(1.0, 3.5, inland);
-        if (M < 0.6) continue;
-        s = 0.7 + 0.65 * smoothstep(0.6, 0.97, M);
+        if (M < tM) continue;
+        s = 0.7 + 0.6 * smoothstep(tM, tM + 0.3, M);
       } else if (kind === 'hill') {
-        if (at(F.hill) * smoothstep(0.6, 2, inland) < 0.36) continue;
-        if (at(F.mountain) * smoothstep(1.0, 3.5, inland) >= 0.6) continue;
+        if (at(F.hill) * smoothstep(0.6, 2, inland) < tH) continue;
+        if (at(F.mountain) * smoothstep(1.0, 3.5, inland) >= Math.min(0.6, tM)) continue;
         s = 0.8 + 0.3 * r1;
       } else if (kind === 'tree') {
-        if (at(F.forest) < 0.04 || at(F.dry) > 0.2 || at(F.hill) > 0.36) continue;
+        if (at(F.forest) < tF || at(F.dry) > 0.2 || at(F.hill) > 0.36) continue;
         if (at(F.mountain) * smoothstep(1.0, 3.5, inland) > 0.3) continue;
         // clearings at the scale of the screen, deeper in
         if (b >= 2 && T.noise(x * kb / 70 + 7.7, y * kb / 70 - 3.1) < -0.12) continue;
@@ -439,7 +446,7 @@ export function createEngine(makeCanvas) {
     };
     v.toPx();
     let dark = P.dark;
-    if (dark) ctx.globalAlpha = 0.82;
+    if (dark) ctx.globalAlpha = 0.68;   // pale ink on dark paper reads louder than dark on pale
     let trees = null, treeY = -Infinity;
     let flushTrees = () => {
       if (!trees || !trees.n) return;
@@ -570,6 +577,7 @@ export function createEngine(makeCanvas) {
     init, tile,
     palette(p) { pals[p.theme] = p; },
     decor(id, d) { let st = worlds.get(id); if (st) st.decor = d; },
+    slots(id, slots) { let st = worlds.get(id); if (st) { for (let item of st.items.values()) item.slot = slots[item.index]; st.marks.clear(); } },
     drop(id) { worlds.delete(id); },
   };
 }

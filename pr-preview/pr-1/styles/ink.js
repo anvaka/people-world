@@ -47,18 +47,49 @@ function readPalette() {
   return pal;
 }
 
-// Neighbours never share a colour slot: greedy, most constrained first, each country starting
-// from a slot of its own (by its code), so colours stay put when an edit leaves a country alone
-function colourSlots(world) {
+// The realms' papers. Neighbours never share one, and they differ as much as the seven papers
+// allow, by value above all (at night, two dark papers of different hue blur together on a phone):
+// most constrained first, each realm takes the paper farthest from its neighbours' (ties go to a
+// paper of its own, by its code, so colours stay put when an edit leaves a realm alone), then two
+// passes improve the worst pairs. Worked out per theme, since the two sets of papers differ.
+function labOf(hex) {
+  let m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
+  if (!m) return [50, 0, 0];
+  let c = [m[1], m[2], m[3]].map(x => { let v = parseInt(x, 16) / 255; return v > 0.04045 ? ((v + 0.055) / 1.055) ** 2.4 : v / 12.92; });
+  let X = (0.4124 * c[0] + 0.3576 * c[1] + 0.1805 * c[2]) / 0.95047, Y = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2], Z = (0.0193 * c[0] + 0.1192 * c[1] + 0.9505 * c[2]) / 1.08883;
+  let f = t => t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116;
+  return [116 * f(Y) - 16, 500 * (f(X) - f(Y)), 200 * (f(Y) - f(Z))];
+}
+function colourSlots(world, known) {
+  let theme = pal.theme;
+  if (known && known.slots && known.slots[theme]) return known.slots[theme];
+  let labs = pal.land.map(labOf);
+  let gap = (a, b) => Math.hypot(2 * (labs[a][0] - labs[b][0]), labs[a][1] - labs[b][1], labs[a][2] - labs[b][2]);
   let slot = new Int8Array(world.result.countries.length).fill(-1);
   let order = world.items.map(it => it.index).sort((a, b) => world.neighbours[b].length - world.neighbours[a].length || a - b);
-  for (let i of order) {
-    let used = new Set(world.neighbours[i].map(j => slot[j]));
-    let id = world.result.countries[i].id, start = (id.charCodeAt(0) * 3 + id.charCodeAt(1) * 5) % SLOTS;
-    for (let k = 0; k < SLOTS; ++k) { let s = (start + k) % SLOTS; if (!used.has(s)) { slot[i] = s; break; } }
-    if (slot[i] < 0) slot[i] = start;
-  }
+  let pick = i => {
+    let id = world.result.countries[i].id, start = (id.charCodeAt(0) * 3 + id.charCodeAt(1) * 5) % SLOTS, best = -1, bestScore = -1;
+    for (let k = 0; k < SLOTS; ++k) {
+      let s = (start + k) % SLOTS, score = Infinity;
+      for (let j of world.neighbours[i]) if (slot[j] >= 0) score = Math.min(score, slot[j] === s ? -1 : gap(s, slot[j]));
+      if (score > bestScore + 1e-9) { bestScore = score; best = s; }
+    }
+    return best;
+  };
+  for (let i of order) slot[i] = pick(i);
+  for (let pass = 0; pass < 2; ++pass) for (let i of order) slot[i] = pick(i);
+  if (known) (known.slots || (known.slots = {}))[theme] = slot;
   return slot;
+}
+// The papers given to a world's realms (again when the theme changes)
+function applySlots(world) {
+  let slots = colourSlots(world, world.ink.known);
+  world.ink.slots = slots;
+  world.items.forEach(item => {
+    item.inkSlot = slots[item.index];
+    item.path.setAttribute('class', item.path.getAttribute('class').replace(/\bland-\d\b/, 'land-' + item.inkSlot));
+    if (item.label.classList.contains('ink-name')) item.label.setAttribute('class', item.label.getAttribute('class').replace(/\bink-halo-\d\b/, 'ink-halo-' + item.inkSlot));
+  });
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -109,6 +140,7 @@ function send(msg, transfer) {
   if (msg.type === 'init') setTimeout(() => { let r = e.init(msg.id, msg); onEngine({type: 'init', id: msg.id, spots: r.spots, sea: r.sea}); }, 0);
   else if (msg.type === 'palette') e.palette(msg.palette);
   else if (msg.type === 'decor') e.decor(msg.id, msg.decor);
+  else if (msg.type === 'slots') e.slots(msg.id, msg.slots);
   else if (msg.type === 'drop') e.drop(msg.id);
   else if (msg.type === 'tiles') {
     local.queue = msg.list;
@@ -144,7 +176,7 @@ function render(world) {
   // result (a style switch back to this one, an undo) reuses its survey, furniture and tiles
   let known = ofResult.get(world.result);
   if (!known) { known = {id: ++worlds}; ofResult.set(world.result, known); }
-  let slots = colourSlots(world), id = known.id;
+  let slots = colourSlots(world, known), id = known.id;
   world.ink = {id, known, slots, survey: known.survey || null, spots: known.spots, decor: known.decor, nameSpots: known.nameSpots,
     band: {}, ready: false, waiters: []};
   let was = byId.get(id);
@@ -962,29 +994,50 @@ function markerNames(world, state, selected) {
   if (onScreen.length > 12) rings = rings.filter(item => item === selected);
   let free = r => r[0] >= 12 && r[1] >= 12 && r[2] <= W - 12 && r[3] <= H - 12 &&
     !taken.some(t => r[0] < t[2] && r[2] > t[0] && r[1] < t[3] && r[3] > t[1]);
-  let shown = new Set();
+  // a callout lies on open water, clear of the coast by a few pixels: lettered across a neighbour's
+  // land it read as that land's name and cluttered it. Only the chosen realm's may go on land.
+  let sv = world.ink.survey;
+  let wet = r => {
+    if (!sv) return false;
+    for (let py = r[1] - 2; py <= r[3] + 2; py += 3) for (let px = r[0] - 2; px <= r[2] + 2; px += 4) {
+      let wx = (px - state.x) / k, wy = (state.y - py) / k;
+      let cx = Math.floor((wx - sv.x0) / sv.cell), cy = Math.floor((sv.y0 - wy) / sv.cell);
+      if (cx < 0 || cy < 0 || cx >= sv.w || cy >= sv.h) continue;
+      let c = cy * sv.w + cx;
+      if (sv.ids[c] !== -1 || sv.toLand[c] * sv.cell * k < 3) return false;
+    }
+    return true;
+  };
+  let shown = new Set(), count = 0;
   for (let item of rings) {
     let [x, y] = at(item);
     if (x < 0 || y < 0 || x > W || y > H) continue;
-    let name = item.country.name.trim();
-    let w = advance(name, true) * MARK_PX + 2, h = MARK_PX * 0.9, g = 8;
-    let options = [
-      ['start', x + g, y, [x + g, y - h / 2, x + g + w, y + h / 2]],
-      ['end', x - g, y, [x - g - w, y - h / 2, x - g, y + h / 2]],
-      ['middle', x, y - g - h / 2, [x - w / 2, y - g - h, x + w / 2, y - g]],
-      ['middle', x, y + g + h / 2, [x - w / 2, y + g, x + w / 2, y + g + h]],
-    ];
-    let pick = options.find(o => free(o[3]));
+    // a few at a time: the biggest first, and the chosen one always
+    if (item !== selected && count >= 6) continue;
+    let pick = null, name = null;
+    for (let text of [item.country.name.trim(), shortOf(item)]) {
+      if (!text || pick) continue;
+      let w = advance(text, true) * MARK_PX + 2, h = MARK_PX * 0.9, g = 8;
+      let options = [
+        ['start', x + g, y, [x + g, y - h / 2, x + g + w, y + h / 2]],
+        ['end', x - g, y, [x - g - w, y - h / 2, x - g, y + h / 2]],
+        ['middle', x, y - g - h / 2, [x - w / 2, y - g - h, x + w / 2, y - g]],
+        ['middle', x, y + g + h / 2, [x - w / 2, y + g, x + w / 2, y + g + h]],
+      ];
+      pick = options.find(o => free(o[3]) && wet(o[3])) || (item === selected ? options.find(o => free(o[3])) : null);
+      name = text;
+    }
     if (!pick) continue;
+    if (item !== selected) count++;
     taken.push(pick[3]);
     shown.add(item);
     let t = item.inkMark;
     if (!t) {
       t = item.inkMark = document.createElementNS(NS, 'text');
       t.setAttribute('class', 'label ink-mark');
-      t.textContent = name;
       world.ink.marks.appendChild(t);
     }
+    if (t.textContent !== name) t.textContent = name;
     t.setAttribute('x', (pick[1] - state.x) / k);
     t.setAttribute('y', (pick[2] - state.y) / k);
     t.setAttribute('font-size', MARK_PX / k);
@@ -1030,7 +1083,13 @@ function mount() {
     if (!active()) return;
     readPalette();
     send({type: 'palette', palette: pal});
-    for (let w of byId.values()) if (w.ink) { for (let layer in w.ink.band) for (let b of w.ink.band[layer].values()) b.g.remove(); w.ink.band = {}; }
+    for (let w of byId.values()) if (w.ink) {
+      for (let layer in w.ink.band) for (let b of w.ink.band[layer].values()) b.g.remove();
+      w.ink.band = {};
+      // the other theme's papers, given out afresh (they differ: so do the best neighbours)
+      applySlots(w);
+      send({type: 'slots', id: w.ink.id, slots: Array.from(w.ink.slots)});
+    }
     if (current) view(current.world, current.state, current.selected);
   };
   darkQuery.addEventListener('change', themeHandler);

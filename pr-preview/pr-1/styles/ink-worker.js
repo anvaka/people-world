@@ -67,6 +67,7 @@ self.onmessage = ({data}) => {
       self.postMessage({type: 'init', id: data.id, spots: r.spots, sea: r.sea}, [r.sea.ids.buffer, r.sea.toLand.buffer]);
     } else if (data.type === 'palette') engine.palette(data.palette);
     else if (data.type === 'decor') engine.decor(data.id, data.decor);
+    else if (data.type === 'slots') engine.slots(data.id, data.slots);
     else if (data.type === 'drop') { engine.drop(data.id); for (let key of [...kept.keys()]) if (key.startsWith(data.id + '|')) kept.delete(key); }
     else if (data.type === 'tiles') { queue = data.list; drain(); }
   } catch (e) {

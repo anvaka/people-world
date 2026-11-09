@@ -142,7 +142,49 @@ export function survey({w, h, ids, cell, x0, y0, seed, box}) {
   let cells = [];
   for (let i = 0; i < N; ++i) if (land[i] && acc[i] >= MIN) cells.push(i);
   const river = {cell: new Int32Array(cells), recv: new Int32Array(cells.map(i => recv[i])), acc: new Float32Array(cells.map(i => acc[i]))};
-  return {toSea, toLand, toEdge, river, ids, fields, spots: seaSpots({w, h, ids, cell, x0, y0, toLand, box})};
+  return {toSea, toLand, toEdge, river, ids, fields, thr: thresholds(ids, fields, toSea, cell), spots: seaSpots({w, h, ids, cell, x0, y0, toLand, box})};
+}
+
+// How much of each realm its terrain may take. The fields alone gave a big realm whole fields of
+// mountains and woods and left mid-size ones bare; so each realm gets thresholds of its own: no
+// more than a share of it under ranges, hills or woods (the highest of its fields, so ranges keep
+// their line), and a realm left nearly bare gets a few hills. A calmer, more even texture.
+const SHARE = {mountain: 0.13, hill: 0.1, forest: 0.2}, FLOOR = {mountain: 0.6, hill: 0.36, forest: 0.04}, BARE = 0.07;
+const smooth = (a, b, x) => { let t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+function thresholds(ids, F, toSea, cell) {
+  let n = 0;
+  for (let i = 0; i < ids.length; ++i) if (ids[i] > n) n = ids[i];
+  n += 1;
+  let vals = {mountain: Array.from({length: n}, () => []), hill: Array.from({length: n}, () => []), forest: Array.from({length: n}, () => [])}, count = new Int32Array(n);
+  for (let i = 0; i < ids.length; ++i) {
+    let id = ids[i];
+    if (id < 0) continue;
+    count[id]++;
+    let inland = toSea[i] * cell;
+    let m = inland < 1 ? 0 : F.mountain[i] * smooth(1, 3.5, inland);
+    vals.mountain[id].push(m);
+    if (m < 0.6) vals.hill[id].push(F.hill[i] * smooth(0.6, 2, inland));
+    if (F.dry[i] <= 0.2 && F.hill[i] <= 0.36 && m <= 0.3) vals.forest[id].push(F.forest[i]);
+  }
+  let thr = {mountain: new Float32Array(n), hill: new Float32Array(n), forest: new Float32Array(n)};
+  // the value above which a share of the realm's cells lies
+  let top = (list, share, total, floor) => {
+    let k = Math.floor(share * total);
+    if (k <= 0 || !list.length) return Infinity;
+    list.sort((a, b) => b - a);
+    return Math.max(floor, list[Math.min(k, list.length) - 1]);
+  };
+  let above = (list, t) => { let c = 0; for (let v of list) if (v >= t) c++; return c; };
+  for (let id = 0; id < n; ++id) {
+    let total = count[id];
+    if (!total) { thr.mountain[id] = thr.hill[id] = thr.forest[id] = Infinity; continue; }
+    // (a big realm a smaller share: its patch of ranges is big enough as it is)
+    let big = Math.min(1, Math.sqrt(9 / Math.max(1e-9, Math.sqrt(total) * cell)));
+    for (let kind in SHARE) thr[kind][id] = top(vals[kind][id], SHARE[kind] * big, total, FLOOR[kind]);
+    let covered = ['mountain', 'hill', 'forest'].reduce((c, kind) => c + above(vals[kind][id], thr[kind][id]), 0);
+    if (covered < BARE * total) thr.hill[id] = Math.min(thr.hill[id], top(vals.hill[id], BARE, total, 0.16));
+  }
+  return thr;
 }
 
 // Open water for the sea's furniture: the widest stretches inside the world's frame, each with how
