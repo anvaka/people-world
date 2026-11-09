@@ -175,7 +175,7 @@
      UX (round 3): title card, the dock (build status, your changes, the country panel), sharing,
      comparing before and after, keyboard and screen-reader support. Built only from the tokens
      and type above, so a new palette or typeface carries over. Layout and controls only: nothing
-     here draws the map itself, except .ux-ghost / .ux-edit (the edited borders, at the end).
+     here draws the map itself, except .hot (the border a neighbour's row points at, at the end).
      ========================================================================================= */
   .sr-only { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);
     clip-path: inset(50%); white-space: nowrap; }
@@ -291,12 +291,7 @@
     border: 2px solid var(--accent); border-radius: 50%; pointer-events: none; }
   #stage.picking { cursor: crosshair; }
 
-  /* on the map: edited borders. Removed ones as a dashed ghost, added ones in the accent colour;
-     shown even where the zoom hides lines around small countries */
-  .lines .ux-edit.hidden { display: inline; }
-  .border.ux-edit { stroke-width: 3; }
-  .ux-ghost { fill: none; stroke: var(--accent); stroke-width: 3; stroke-dasharray: 1 5; stroke-linecap: round;
-    stroke-linejoin: round; vector-effect: non-scaling-stroke; pointer-events: none; }
+  /* on the map: the border a neighbour's row in the panel points at */
   .border.hot { stroke: var(--accent); stroke-width: 5; stroke-dasharray: none; opacity: 1; display: inline; }
 
   @media (max-width: 600px) {
@@ -447,7 +442,7 @@
   <form class="row" id="find" role="search">
     <input id="search" type="search" list="names" placeholder="Find a country" aria-label="Find a country" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="search">
     <datalist id="names"></datalist>
-    <button type="button" id="reroll" title="Draw the same countries again as a different world">Another world</button>
+    <button type="button" id="reroll" title="Lay out the same countries and neighbours another way">Rearrange</button>
   </form>
   <div id="find-note" class="note" role="status" hidden></div>
   <div id="style-box" hidden>
@@ -517,7 +512,6 @@
     <div id="edits-body">
       <ul id="edits-list"></ul>
       <div class="more">
-        <button type="button" id="marks" class="mini" aria-pressed="false" title="Fade what did not change; mark the borders you changed">Highlight changes</button>
         <button type="button" id="clear" class="mini">Undo all</button>
       </div>
       <div id="clear-confirm" role="group" aria-label="Undo all changes?" hidden>
@@ -1343,11 +1337,8 @@ function showChecks(check, exclaves, ms) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// UX: what the map lights up. Either the selected country with its neighbours and their borders,
-// or, after an edit, what the edits changed: the edited countries lit, the ones that changed shape
-// as they are, the rest faded; the borders you added in the accent colour and the ones you
-// removed as a dashed ghost where they were. Only classes and one small group of ghost lines.
-let marksOn = false;      // the map shows what changed (rather than the selection)
+// UX: what the map lights up: the selected country with its neighbours and their borders. (What an
+// edit changed is seen with Show before, not marked on the map.) Only classes.
 let picking = null;       // {from: item}: the next country picked on the map gets a border with it
 let sheetOpen = false;    // phone: the country panel shows its border list, not just a peek
 let panelOpener = null;   // where focus goes back to when the panel closes
@@ -1355,12 +1346,8 @@ let panelOpener = null;   // where focus goes back to when the panel closes
 // the browser restyle that element.)
 function paint() {
   if (!world) return;
-  let ghosts = world.root.querySelector('#ux-marks');
-  if (ghosts) ghosts.remove();
   let want = {lit: new Set(), dim: new Set(), line: new Map()};
-  let changes = marksOn ? changesShown() : null;
-  if (changes) paintChanges(changes, want);
-  else if (selected) paintSelection(selected, want);
+  if (selected) paintSelection(selected, want);
   items.forEach(it => {
     let lit = want.lit.has(it), dim = !lit && want.dim.has(it);
     if (it.path.classList.contains('lit') !== lit) it.path.classList.toggle('lit', lit);
@@ -1369,7 +1356,7 @@ function paint() {
   });
   world.lineItems.forEach(line => {
     let w = want.line.get(line) || '', list = line.node.classList;
-    for (let cls of ['lit', 'ux-edit', 'hot']) if (list.contains(cls) !== (w === cls || (cls === 'lit' && w === 'ux-edit'))) list.toggle(cls);
+    for (let cls of ['lit', 'hot']) if (list.contains(cls) !== (w === cls)) list.toggle(cls);
   });
 }
 function paintSelection(item, want) {
@@ -1382,83 +1369,6 @@ function paintSelection(item, want) {
     if (line.kind === 'border' && (line.a === item.index || line.b === item.index)) want.line.set(line, 'lit');
   });
 }
-// the changes of the edited map, while either it or the map before it is shown
-function changesShown() {
-  if (!edited || !edited.changes || !plain) return null;
-  return world === edited.world || world === plain.world ? edited.changes : null;
-}
-const samePair = (pairs, a, b) => pairs.some(([p, q]) => (p === a && q === b) || (p === b && q === a));
-function paintChanges(changes, want) {
-  let after = world === edited.world;
-  let fade = changes.moved && changes.moved.size < 0.6 * items.length;   // a world drawn afresh: nothing to fade
-  items.forEach(it => {
-    if (changes.edited.has(it.index)) want.lit.add(it);
-    else if (fade && !changes.moved.has(it.index)) want.dim.add(it);
-  });
-  let here = after ? changes.adds : changes.cuts, gone = after ? changes.cuts : changes.adds;
-  world.lineItems.forEach(line => {
-    if (line.kind === 'border' && samePair(here, line.a, line.b)) want.line.set(line, 'ux-edit');
-  });
-  let other = after ? plain.world : edited.world;
-  let lines = other.lineItems.filter(line => line.kind === 'border' && samePair(gone, line.a, line.b));
-  if (!lines.length) return;
-  let g = el('g', {id: 'ux-marks'});
-  lines.forEach(line => el('path', {class: 'ux-ghost', d: lineToD(line.points)}, g));
-  world.root.insertBefore(g, world.root.querySelector('#labels'));
-}
-// What an edited map changed against the map without edits: the countries edited, the borders
-// removed and added (country indices), and which countries changed shape. Shape: both maps are
-// rasterised with one colour per country (about 1000 px wide); a country changed when more than a
-// fifth of its inside pixels are no longer its own. ~80 ms on a laptop, once per edited map.
-function changesBetween(before, after, list) {
-  let index = new Map(after.items.map(it => [it.country.id, it.index]));
-  let cuts = [], adds = [], editedSet = new Set();
-  list.forEach(e => {
-    if (!index.has(e.a) || !index.has(e.b)) return;
-    let pair = [index.get(e.a), index.get(e.b)];
-    (e.add ? adds : cuts).push(pair);
-    pair.forEach(i => editedSet.add(i));
-  });
-  let moved = null;
-  try { moved = shapeChanges(before, after); } catch (e) { console.warn('change detection skipped', e); }
-  return {cuts, adds, edited: editedSet, moved};
-}
-function shapeChanges(before, after) {
-  let box = before.box, W = 1000;
-  let s = W / (box.maxX - box.minX), H = Math.max(2, Math.min(1400, Math.ceil((box.maxY - box.minY) * s)));
-  let raster = w => {
-    let canvas = document.createElement('canvas');
-    canvas.width = W; canvas.height = H;
-    let ctx = canvas.getContext('2d', {willReadFrequently: true});
-    ctx.setTransform(s, 0, 0, s, -box.minX * s, -box.minY * s);
-    w.items.forEach(it => {
-      ctx.fillStyle = `rgb(${(it.index + 1) & 255},${(it.index + 1) >> 8},0)`;
-      ctx.fill(new Path2D(it.path.getAttribute('d')), 'evenodd');
-    });
-    let px = ctx.getImageData(0, 0, W, H).data, out = new Int32Array(W * H);
-    for (let i = 0; i < W * H; ++i) out[i] = px[i * 4 + 3] === 255 && px[i * 4 + 2] === 0 ? px[i * 4] + 256 * px[i * 4 + 1] : 0;
-    return out;
-  };
-  let A = raster(before), B = raster(after);
-  let n = Math.max(...before.items.map(it => it.index), ...after.items.map(it => it.index)) + 2;
-  let nA = new Float64Array(n), nB = new Float64Array(n), same = new Float64Array(n);
-  // inside pixels only: an edge pixel blends two colours and may read as a third country
-  for (let y = 1; y < H - 1; ++y) for (let x = 1; x < W - 1; ++x) {
-    let i = y * W + x, a = A[i], b = B[i];
-    let inA = a && A[i - 1] === a && A[i + 1] === a && A[i - W] === a && A[i + W] === a;
-    let inB = b && B[i - 1] === b && B[i + 1] === b && B[i - W] === b && B[i + W] === b;
-    if (inA) nA[a]++;
-    if (inB) nB[b]++;
-    if (inA && inB && a === b) same[a]++;
-  }
-  let moved = new Set();
-  for (let k = 1; k < n; ++k) {
-    let m = Math.max(nA[k], nB[k]);
-    if (m >= 12 && 1 - same[k] / m > 0.2) moved.add(k - 1);
-  }
-  return moved;
-}
-
 // ---------------------------------------------------------------------------------------------
 // Selection: a country, its neighbours and the borders between them
 // UX: select(item, how): how.quiet re-renders without announcing, moving the view or ending the
@@ -1469,7 +1379,7 @@ function select(item, how = {}) {
   let changed = item !== selected;
   if (!how.quiet) {
     if (changed) picking = null;
-    if (item) { marksOn = false; html.classList.add('ux-explored'); }
+    if (item) html.classList.add('ux-explored');
     if (item && changed && info.hidden) panelOpener = document.activeElement;
   }
   selected = item;
@@ -1673,7 +1583,7 @@ function describe(e) { return `${nameOfId(e.a)} – ${nameOfId(e.b)}`; }
 function borderName(e) { return `the ${nameOfId(e.a)}–${nameOfId(e.b)} border`; }
 const sameEdit = (e, f) => e.add === f.add && pairKey(e.a, e.b) === pairKey(f.a, f.b);
 // UX: your changes, in the dock. The edits in the address, each with its own undo; the ones not
-// drawn yet marked as such; and the tools: undo the last, hold to see before, highlight, undo all.
+// drawn yet marked as such; and the tools: undo the last, hold to see before, undo all.
 function showEdits() {
   let box = document.getElementById('edits');
   let undoing = lastGood.filter(e => !edits.some(f => sameEdit(e, f)));
@@ -1695,14 +1605,12 @@ function showEdits() {
   syncEditsTools();
   if (focusKey) { let back = box.querySelector(`[data-key="${focusKey}"]`); if (back) back.focus({preventScroll: true}); }
 }
-// UX: the state of the tools: what can be compared or highlighted with what is drawn now
+// UX: the state of the tools: what can be compared with what is drawn now
 function syncEditsTools() {
-  let flip = document.getElementById('flip'), marks = document.getElementById('marks');
+  let flip = document.getElementById('flip');
   let comparable = !!(edited && plain && (world === edited.world || world === plain.world) && lastGood.length);
   flip.disabled = !comparable;
   flip.setAttribute('aria-pressed', String(showingBefore));
-  marks.disabled = !comparable || !edited.changes;
-  marks.setAttribute('aria-pressed', String(marksOn && comparable));
   document.getElementById('undo-last').disabled = !edits.length;
   document.getElementById('ux-stamp').hidden = !showingBefore;
   // the list folds to its title row (a phone starts folded)
@@ -1903,7 +1811,8 @@ searchBox.addEventListener('change', () => {
   if (item && item.country.name.toLowerCase() === searchBox.value.trim().toLowerCase() && item !== selected) findFromSearch();
 });
 
-// Another world: the next seed goes into the address (with the same edits), which redraws the map
+// Rearrange: the next world number (the generator's seed) goes into the address, with the same
+// edits, which redraws the map: the same countries and neighbours, laid out another way
 $('reroll').addEventListener('click', () => { location.hash = linkOf(seed + 1, edits); });
 window.addEventListener('hashchange', () => {
   let next = readHash();
@@ -1968,13 +1877,6 @@ flip.addEventListener('pointerup', () => { if (peek) { endPeek(false); swallowCl
 flip.addEventListener('pointercancel', () => endPeek(true));
 flip.addEventListener('contextmenu', e => e.preventDefault());
 flip.addEventListener('click', () => { if (swallowClick) { swallowClick = false; return; } setBefore(!showingBefore); });
-$('marks').addEventListener('click', () => {
-  marksOn = !marksOn;
-  paint();
-  syncEditsTools();
-  if (!marksOn) hideStatus();
-  announce(marksOn ? 'Highlighting what your changes changed.' : 'Highlight off.');
-});
 function undoLast() { if (edits.length) location.hash = linkOf(seed, edits.slice(0, -1)); }
 $('undo-last').addEventListener('click', undoLast);
 $('status-undo').addEventListener('click', undoLast);
@@ -2143,27 +2045,24 @@ function jobText(from, to) {
   if (added.length > 1 && !removed.length && added.length <= 3) return `Redrawing with ${added.length} new changes: ${added.map(e => `${describe(e)} ${e.add ? 'added' : 'removed'}`).join(', ')}…`;
   return `Redrawing with your ${to.length} change${to.length > 1 ? 's' : ''}…`;
 }
-// what came of a build, in words, with the highlight's key
+// what came of a build, in words
 function reportDone(from, to, entry, how) {
   let added = to.filter(e => !from.some(f => sameEdit(e, f)));
   let removed = from.filter(e => !to.some(f => sameEdit(e, f)));
   let both = e => `${nameOfId(e.a)} and ${nameOfId(e.b)}`;
   let text;
   if (how === 'link') text = `This link shows world ${seed} with ${to.length} change${to.length > 1 ? 's' : ''}: ${to.map(e => (e.add ? 'added ' : 'removed ') + borderName(e)).join('; ')}.`;
-  else if (how === 'world') text = `World ${seed}, with your ${to.length} change${to.length > 1 ? 's' : ''}.`;
+  else if (how === 'world') text = `World ${seed}: the same countries laid out another way, with your ${to.length} change${to.length > 1 ? 's' : ''}.`;
   else if (added.length === 1 && !removed.length) text = added[0].add ? `${both(added[0])} now share a border.` : `${both(added[0])} no longer share a border.`;
   else if (removed.length === 1 && !added.length) text = 'Undone: ' + (removed[0].add ? `${both(removed[0])} no longer share a border.` : `${both(removed[0])} share a border again.`);
   else if (!to.length) text = `Back to world ${seed} as first drawn.`;
   else text = `Your ${to.length} changes are drawn.`;
-  let sub = '', changes = entry && entry.changes;
+  let sub = '';
   if (to.length && entry && entry.scratch) sub = 'It didn’t fit into the map as it was, so the world was drawn afresh: countries moved.';
-  else if (to.length && changes && changes.moved) {
-    let others = Array.from(changes.moved).filter(i => !changes.edited.has(i)).length;
-    sub = `${others} other countr${others === 1 ? 'y' : 'ies'} changed shape; the faded ones did not. Hold “Show before” to compare.`;
-  }
+  else if (to.length) sub = 'Hold “Show before” to compare.';
   showStatus(text, sub, {undo: added.length === 1 && !removed.length && how !== 'link', hideAfter: entry && entry.scratch ? 0 : 15000});
   if (selected) requestAnimationFrame(() => ensureVisible(selected));
-  announce(text + (sub ? ' ' + sub.replace('Hold “Show before” to compare.', '') : ''));
+  announce((text + ' ' + sub.replace('Hold “Show before” to compare.', '')).trim());
 }
 
 // Keyboard. On the map: arrows move it, + and − zoom, 0 shows the whole world, Enter picks the
@@ -2207,7 +2106,6 @@ function onEscape(e) {
   else if (!styleBox.hidden) closeStyles();
   else if (showingBefore) setBefore(false);
   else if (selected) select(null);
-  else if (marksOn) { marksOn = false; paint(); syncEditsTools(); }
   else return;
   e.preventDefault();
 }
@@ -2306,7 +2204,7 @@ async function chart() {
     if (stale()) return;
   }
   let fresh = false, from = plain && plain.seed === seed ? lastGood.slice() : [];
-  let newSeed = !!plain && plain.seed !== seed, entry = null;
+  let newSeed = !!plain && plain.seed !== seed, forward = newSeed && seed > plain.seed, entry = null;
   try {
     if (!plain || plain.seed !== seed) {
       select(null);
@@ -2343,7 +2241,6 @@ async function chart() {
           let next = await drawWorld(result, plain.world, stale);
           if (stale()) return;
           entry = {key, world: next, scratch};
-          entry.changes = changesBetween(plain.world, entry.world, edits);
           remember(entry);
         });
         if (stale()) return;
@@ -2380,7 +2277,6 @@ async function chart() {
     let view = fresh ? fitView() : {...state};
     if (!await prepare(current, view, stale) || stale()) return null;
     showingBefore = false;
-    marksOn = edits.length > 0;   // UX: after an edit the map shows what it changed
     if (fresh) { touched = false; Object.assign(state, view); }
     show(current);
     showChecks(checkOf(current), current.result.exclaves, performance.now() - started);
@@ -2391,7 +2287,12 @@ async function chart() {
     else if (fresh && !newSeed && edits.length && openedWithEdits) reportDone([], edits, edited, 'link');
     else if (fresh && newSeed && edits.length) reportDone(edits, edits, edited, 'world');
     else if (edits.length || from.length) reportDone(from, edits, edited, '');
-    else hideStatus();
+    else if (fresh && newSeed) {
+      // UX: say what Rearrange (or Back to another world number) did
+      let text = `World ${seed}: the same countries and neighbours, laid out another way.`;
+      showStatus(text, forward ? 'Back returns to the one before.' : '', {hideAfter: 8000});
+      announce(text);
+    } else hideStatus();
     // UX: fitted once the dock shows what it will (a link's changes), so no panel covers the map
     if (fresh) fit();
     else applyView();
