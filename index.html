@@ -215,9 +215,29 @@ const html = document.documentElement;
 html.setAttribute('data-map-state', 'loading');
 
 // Which world, and which border edits, so a link carries both: #world-3-cut-FR-ES-add-JP-KR is
-// world 3 without the France–Spain border and with a Japan–South Korea one. Letters, digits and
-// hyphens only: that is what survives the artifact's shared link. World 1 without edits when the
-// address says nothing. (Links in the earlier form, #world-3:-FR-ES,+JP-KR, still open.)
+// world 3 without the France–Spain border and with a Japan–South Korea one. Past a few edits the
+// link switches to a compact code, four letters or digits per edit: #world-3-e-0b9X3kQa. Letters,
+// digits and hyphens only: that is what survives the artifact's shared link. World 1 without
+// edits when the address says nothing. (Links in the earliest form, #world-3:-FR-ES,+JP-KR,
+// still open.)
+const READABLE_EDITS = 4;
+const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+// an edit as a number: both two-letter codes (26 × 26 each) and add-or-cut; four base-62 digits
+const letters = code => (code.charCodeAt(0) - 65) * 26 + (code.charCodeAt(1) - 65);
+const codeOf = n => String.fromCharCode(65 + Math.floor(n / 26), 65 + n % 26);
+function packEdit(e) {
+  let v = (letters(e.a) * 676 + letters(e.b)) * 2 + (e.add ? 1 : 0), out = '';
+  for (let k = 0; k < 4; ++k) { out = DIGITS[v % 62] + out; v = Math.floor(v / 62); }
+  return out;
+}
+function unpackEdit(text) {
+  let v = 0;
+  for (let ch of text) v = v * 62 + DIGITS.indexOf(ch);
+  let add = v % 2 === 1;
+  v = Math.floor(v / 2);
+  return {add, a: codeOf(Math.floor(v / 676)), b: codeOf(v % 676)};
+}
+const packable = e => /^[A-Z]{2}$/.test(e.a) && /^[A-Z]{2}$/.test(e.b);
 function readHash() {
   let hash = decodeURIComponent(location.hash);
   let list = [];
@@ -225,6 +245,8 @@ function readHash() {
   if (match) {
     let words = match[2].split('-').slice(1);
     for (let k = 0; k + 2 < words.length; k += 3) list.push({add: words[k] === 'add', a: words[k + 1], b: words[k + 2]});
+  } else if ((match = /^#world-(\d+)-e-((?:[0-9A-Za-z]{4})+)$/.exec(hash))) {
+    for (let k = 0; k < match[2].length; k += 4) list.push(unpackEdit(match[2].slice(k, k + 4)));
   } else if ((match = /^#world-(\d+):(.*)$/.exec(hash))) {
     for (let part of match[2].split(',')) {
       let e = /^([+-])([A-Za-z0-9]+)-([A-Za-z0-9]+)$/.exec(part);
@@ -234,10 +256,11 @@ function readHash() {
   return {seed: match ? Math.max(1, parseInt(match[1], 10)) : 1, edits: list};
 }
 function hashOf(seed, edits) {
+  if (edits.length > READABLE_EDITS && edits.every(packable)) return '#world-' + seed + '-e-' + edits.map(packEdit).join('');
   return '#world-' + seed + edits.map(e => (e.add ? '-add-' : '-cut-') + e.a + '-' + e.b).join('');
 }
 let {seed, edits} = readHash();
-// an address in the earlier form is rewritten in the current one, so a copied link carries it
+// an address in another form is rewritten in the current one, so a copied link carries it
 if (edits.length && decodeURIComponent(location.hash) !== hashOf(seed, edits)) history.replaceState(null, '', hashOf(seed, edits));
 
 // The world is built in a worker when the browser can run module workers, else right here.
