@@ -22,7 +22,7 @@
 
 const MAX_PR = 2;             // canvas pixels per CSS pixel, at most (see 'resolution' below)
 const LIGHT_N = 5, LIGHT_MAX = 12;   // levels of night lights shown at once; the finest level
-const MAX_OCT = 12;
+const MAX_OCT = 18;   // the five octaves that shape the land and at most 13 finer ones
 const MACRO = [3, 6, 12, 24, 48];   // noise octaves that shape the land (cycles across the world)
 // octave amplitudes fall as f^-1.25: the big forms carry the relief, the finer octaves only grain it.
 // Their slopes are divided by their expected size at the zoom, so the relief's grain shades with the
@@ -96,7 +96,7 @@ const PAINT_FS = `#version 300 es
 precision highp float; precision highp int;
 uniform sampler2D u_edges, u_fields, u_lut, u_ids, u_codes, u_fields2;
 uniform vec2 u_res, u_center, u_P0, u_fieldA, u_fieldB, u_fieldN, u_lat;
-uniform float u_pr, u_invK, u_kpr, u_bandPx, u_foamPx, u_night, u_formW, u_gradNorm;
+uniform float u_pr, u_invK, u_kpr, u_bandPx, u_foamPx, u_night, u_screen, u_gradNorm;
 uniform vec2 u_oct[${MAX_OCT}], u_rot[${MAX_OCT}]; uniform float u_freq[${MAX_OCT}], u_amp[${MAX_OCT}], u_shadeW[${MAX_OCT}];
 uniform int u_nOct;
 uniform vec3 u_pal[8];
@@ -158,6 +158,15 @@ vec3 dsmooth(float e0, float e1, vec3 x) {
   return vec3(t * t * (3.0 - 2.0 * t), (6.0 * t * (1.0 - t) / (e1 - e0)) * x.yz);
 }
 float lum(vec3 c) { return dot(c, vec3(0.3, 0.55, 0.15)); }
+// the larger of two heights (dual numbers), rounded over a height 'k' where they meet. A plain max is
+// a crease as sharp at any zoom, a line across a close view; rounded by a height of the map, the
+// valley between two ranges is a crease from afar and a valley close in
+vec3 dmax(vec3 a, vec3 b, float k) {
+  float h = clamp(0.5 + 0.5 * (b.x - a.x) / k, 0.0, 1.0);
+  vec3 v = mix(a, b, h);      // (its slope is exactly mix's: the bump's cancels the blend's)
+  v.x += k * h * (1.0 - h);
+  return v;
+}
 
 uint mix32(uint h) { h ^= h >> 16; h *= 0x7feb352du; h ^= h >> 15; h *= 0x846ca68bu; return h ^ (h >> 16); }
 // the four cells round q, each holding a crown (in its middle 60%, so one in any other cell is at
@@ -277,7 +286,12 @@ void main() {
     vec2 cs = u_rot[i], lp = local * f;
     vec3 n = noised(u_oct[i] + vec2(cs.x * lp.x - cs.y * lp.y, cs.y * lp.x + cs.x * lp.y), i);
     float v = n.x * 2.0 - 1.0; vec2 g = vec2(cs.x * n.y + cs.y * n.z, -cs.y * n.y + cs.x * n.z) * 2.0 * f;
-    float r = 1.0 - abs(v); vec2 gr = -sign(v) * g;
+    // ridged: 1 - |v|, its fold rounded by a fixed share of the octave (some 0.7% of a cycle). A
+    // fine octave's fold stays sharp to well under a pixel; a large one's, seen up close, is a ridge
+    // and not a line: a sharp fold there (and the slope it flips, which tames the octaves after it)
+    // would draw a seam straight across the view
+    float sq = sqrt(v * v + 4e-4);
+    float r = 1.0 - (sq - 0.02); vec2 gr = -(v / sq) * g;
     float r2 = r * r; vec2 gr2 = 2.0 * r * gr;
     acc += gr2 * a;
     float damp = 1.0 / (1.0 + 0.012 * dot(acc, acc));
@@ -297,8 +311,9 @@ void main() {
 
   // ---- height. Mountains are tents: a sharp crest along chains (where a low noise crosses its
   // middle, broken up by another) and along some borders (as the Pyrenees follow theirs), roughened
-  // by the ridged noise. A tent's own flanks shade only while they are narrow on screen; closer in
-  // the ridged detail carries the relief. Hills are a mask on the smooth noise.
+  // by the ridged noise. A tent's flanks shade until they are wider than the screen; from there they
+  // only tilt the view (their slope is the same across it), as the noise's large octaves do, and the
+  // ridged detail carries the relief. Hills are a mask on the smooth noise.
   vec3 rise = dsmooth(0.0, 0.6, dIn);
   vec3 c1 = noiseAt(1, local, vec2(31.7, 3.3), 24);
   vec3 c2 = noiseAt(2, local, vec2(2.9, 57.1), 25);
@@ -319,16 +334,19 @@ void main() {
   if (chain2.x <= 0.0) chain2 = vec3(0.0);
   chain2 = dmul(chain2, chain2);
   chain2 = dmul(chain2, dsmooth(0.5, 0.7, m2)) * 0.7;
-  if (chain2.x > chain.x) chain = chain2;
+  chain = dmax(chain, chain2, 0.12);
   // a chain stops short of a border: it never runs across one (ranges along borders are the belts,
   // which keep to one side)
   chain *= smoothstep(1.5, 5.0, bdist);
-  vec3 mount = chain.x > belt.x ? chain : belt;
+  vec3 mount = dmax(chain, belt, 0.12);
   mount = dmul(mount, dsmooth(0.0, 0.08, dIn));
   vec3 hills = dsmooth(0.45, 0.75, m2);
-  mount.yz *= u_formW; hills.yz *= 0.1;
+  // (the CSS px over which a flank rises by the tent's height)
+  float flank = 1.0 / (u_invK * max(length(mount.yz), 1e-6));
+  mount.yz *= 1.0 - smoothstep(0.8 * u_screen, 3.0 * u_screen, flank);
+  hills.yz *= 0.1;
   float hb = rise.x * 0.18 + macroS.x * 0.05 + mount.x * (0.35 + macroR.x * 0.65) * 0.6;   // for the climate
-  // shading as designed slopes: the mountains' flanks (while narrow on screen), their ridged detail,
+  // shading as designed slopes: the mountains' flanks (while the screen holds them), their ridged detail,
   // the lowlands' gentle grain; the noise's slope is divided by its expected size at this zoom
   vec2 sl = mount.yz * (0.22 / 75.0)
     + rg.yz * u_gradNorm * (0.1 + 1.7 * mount.x)
@@ -921,23 +939,30 @@ export function createTerrain(plate, svg, opts = {}) {
     gl.uniform2f(u.u_fieldN, F.nx, F.ny);
     let {box} = world;
     gl.uniform2f(u.u_lat, W.span / (box.maxY - box.minY), (W.cy - box.minY) / (box.maxY - box.minY));
-    // octaves: the five that shape the land, then the finest the screen can show (at most seven)
-    let fmax = kpr / 2.2;
-    let freqs = MACRO.slice();
+    // octaves: the five that shape the land, then every finer one the view needs, from the finest the
+    // screen can show up to those some three screens across (larger ones would only tilt the view).
+    // The finest fades in and the largest fades out, so a zoom adds and drops octaves without a jump,
+    // and the octaves that drew the ridges you zoom into stay with them
     let detail = [];
-    for (let f = 96; f <= fmax; f *= 2) detail.push(f);
-    freqs = freqs.concat(detail.slice(-(MAX_OCT - MACRO.length)));
+    for (let f = 96 * 2 ** Math.floor(Math.log2(Math.max(kpr / 2.2 / 96, 1))); f >= 96 && K / f < 3 * screen && detail.length < MAX_OCT - MACRO.length; f /= 2) {
+      if (f <= kpr / 2.2) detail.push(f);
+    }
+    let freqs = MACRO.concat(detail.reverse());
     let oct = new Float32Array(MAX_OCT * 2), rot = new Float32Array(MAX_OCT * 2), fr = new Float32Array(MAX_OCT), amp = new Float32Array(MAX_OCT), sw = new Float32Array(MAX_OCT);
     freqs.forEach((f, i) => {
       let wl = K / f;   // CSS px per cycle
-      sw[i] = 1 - smoothstep(0.8 * screen, 3 * screen, wl);
+      // (the ridges of a detail octave are short straight creases: one more than a screen across
+      // would draw seams across the view, so it stops shading sooner than the land's own octaves)
+      sw[i] = i < MACRO.length ? 1 - smoothstep(0.8 * screen, 3 * screen, wl) : 1 - smoothstep(0.4 * screen, 1.5 * screen, wl);
       // the octave's lattice is turned by an angle of its own (by its frequency, so a zoom that drops
       // or adds octaves keeps the others where they were)
       // (chosen so no octave lies within 14 degrees of the screen's axes or of its neighbours)
       let th = Math.log2(f) * 0.524 + 0.48, c = Math.cos(th), sn = Math.sin(th);
       rot[2 * i] = c; rot[2 * i + 1] = sn;
       oct[2 * i] = mod256((c * P0[0] - sn * P0[1]) * f); oct[2 * i + 1] = mod256((sn * P0[0] + c * P0[1]) * f);
-      fr[i] = f; amp[i] = Math.pow(3 / f, AMP_EXP);
+      // (a detail octave fades in from 2.2 to 4.4 canvas px a cycle, and out from 1.5 to 3 screens)
+      let fade = i < MACRO.length ? 1 : smoothstep(2.2, 4.4, kpr / f) * (1 - smoothstep(1.5 * screen, 3 * screen, wl));
+      fr[i] = f; amp[i] = Math.pow(3 / f, AMP_EXP) * fade;
     });
     gl.uniform2fv(u.u_oct, oct);
     gl.uniform2fv(u.u_rot, rot);
@@ -948,7 +973,7 @@ export function createTerrain(plate, svg, opts = {}) {
     let e2 = 0;
     freqs.forEach((f, i) => { e2 += (2 * amp[i] * f * sw[i]) ** 2; });
     gl.uniform1f(u.u_gradNorm, 1 / Math.sqrt(Math.max(e2, 1e-9)));
-    gl.uniform1f(u.u_formW, 1 - smoothstep(40, 320, 0.012 * K));
+    gl.uniform1f(u.u_screen, screen);
     gl.uniform1f(u.u_bandPx, bandPx);
     gl.uniform1f(u.u_foamPx, foamPx);
     gl.uniform1f(u.u_night, look.night ? 1 : 0);
