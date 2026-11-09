@@ -16,9 +16,7 @@ up, so each world number gives a different map of the same graph.
 
 - Drag, pinch, scroll or double-click to move around; the buttons at the right edge zoom in, out
   and back to the whole world. Tap a country to see its neighbours. **Find a country** takes a
-  name, the start of one or a two-letter code.
-- **Rearrange** lays the same countries and neighbours out another way: the generator runs again
-  with the next world number (the number in the link). Back returns to the one before.
+  name, the start of one or a two-letter code, and lists the countries that match as you type.
 - **Change borders.** In a country's panel, **Remove** takes a border away and the field below (or
   "pick it on the map") adds one. The map is then redrawn starting from the world as it was, so the
   countries an edit doesn't touch stay where they were. While it is redrawn the old map stays in
@@ -26,10 +24,11 @@ up, so each world number gives a different map of the same graph.
 - **Show before** switches between the map before your changes and after; holding it (or the B
   key) shows the map before only while held. Every change can be undone on its own; Undo, Ctrl+Z
   and the browser's Back are instant for the last few maps drawn.
-- **Style** draws the map as Ink (a book's endpapers: pen, parchment, hatched coasts, mountains and
-  woods) or Realm (a painted game world: terrain, shallows and rivers under the countries). Switching
-  doesn't build the world again, and the picker folds away once the map is drawn in the new style.
-  The browser remembers the choice.
+- **Style** opens a menu: the map as Ink (a book's endpapers: pen, parchment, hatched coasts,
+  mountains and woods) or Realm (a painted game world: terrain, shallows and rivers under the
+  countries), and the theme: Light, Dark, or Auto (as the device is set). Switching doesn't build
+  the world again, and the menu closes once the map is drawn in the new style. The browser
+  remembers both choices.
 - **Share a map.** The address holds the world number and the edits, so a link opens the same
   map. `#world-1-cut-FR-ES-add-JP-KR` is world 1 without the France–Spain border and with a
   Japan–South Korea one. Countries are named by their two-letter codes. Past four edits the link
