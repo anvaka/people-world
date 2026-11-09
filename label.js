@@ -7,7 +7,7 @@
 // The energy (Potts boundary length + area error + a coast noise field) is minimised by
 // Metropolis annealing under those rules.
 
-import {hash2} from './util.js';
+import {hash2, hypot} from './util.js';
 
 export const WATER = -1;
 
@@ -24,8 +24,11 @@ export function createState(mesh, NL, opts) {
     noise: new Float64Array(mesh.N),
     wArea: new Float64Array(NL),
     active: new Uint8Array(NL),
-    opts,
+    // (every field set later is here from the start, so the state keeps one shape)
+    opts: {contactBonus: undefined, bridgeWiden: undefined, ...opts},
+    cx: null, cy: null, _cw: null, keys: null, _ws: null, _fields: null, inner: null, why: '',
   };
+  if (!('_dial' in mesh)) mesh._dial = null;
   return S;
 }
 
@@ -61,17 +64,20 @@ export function recount(S) {
 // connected components of one label; keeps the one with the seed (else the largest)
 function components(S, label, cells) {
   const {mesh, lab} = S;
-  const comp = new Map();
+  // cells already in a group: marked with this call's stamp
+  const ws = workspace(S, 3);
+  const mark = ++ws.mark;
+  const seen = ws.stamp;
   const groups = [];
   for (const c of cells) {
-    if (comp.has(c)) continue;
+    if (seen[c] === mark) continue;
     const g = [c];
-    comp.set(c, groups.length);
+    seen[c] = mark;
     for (let i = 0; i < g.length; ++i) {
       const u = g[i];
       for (let k = mesh.start[u]; k < mesh.start[u + 1]; ++k) {
         const v = mesh.ringNbr[k];
-        if (lab[v] === label && !comp.has(v)) { comp.set(v, groups.length); g.push(v); }
+        if (lab[v] === label && seen[v] !== mark) { seen[v] = mark; g.push(v); }
       }
     }
     groups.push(g);
@@ -264,7 +270,11 @@ function cellKeys(S) {
     if (!mesh.frozen[u]) movable.push(u);
   }
   movable.sort((u, v) => key[u] - key[v] || mesh.coords[2 * u] - mesh.coords[2 * v]);
-  return (S.keys = {key, order: Int32Array.from(movable)});
+  const order = Int32Array.from(movable);
+  // each cell's place in that order (-1: not visited)
+  const rank = new Int32Array(mesh.N).fill(-1);
+  for (let i = 0; i < order.length; ++i) rank[order[i]] = i;
+  return (S.keys = {key, order, rank});
 }
 
 // opts.near: only cells of these labels, or touching them, are visited (a local repair anneals
@@ -275,16 +285,35 @@ export function anneal(S, rng, sweeps, tau0, tau1 = 0, opts = {}) {
   const keys = cellKeys(S), key = keys.key;
   let order = keys.order;
   if (opts.near) {
-    const near = opts.near instanceof Set ? opts.near : new Set(opts.near);
-    order = order.filter(u => {
-      if (near.has(lab[u])) return true;
-      for (let k = mesh.start[u]; k < mesh.start[u + 1]; ++k) if (near.has(lab[mesh.ringNbr[k]])) return true;
-      return false;
-    });
+    // (a mask over the labels: the same test as a set lookup, faster)
+    const mask = new Uint8Array(S.NL);
+    let water = false;
+    for (const l of opts.near) { if (l >= 0 && l < S.NL) mask[l] = 1; else if (l === WATER) water = true; }
+    const isNear = l => (l >= 0 ? mask[l] === 1 : water && l === WATER);
+    // (cells looked at in index order, then put back in visiting order by their rank)
+    const start = mesh.start, ringNbr = mesh.ringNbr, rank = keys.rank, all = order;
+    const kept = new Int32Array(all.length);
+    let n = 0;
+    for (let u = 0; u < mesh.N; ++u) {
+      if (rank[u] < 0) continue;
+      let hit = isNear(lab[u]);
+      for (let k = start[u]; !hit && k < start[u + 1]; ++k) hit = isNear(lab[ringNbr[k]]);
+      if (hit) kept[n++] = rank[u];
+    }
+    const ranks = kept.subarray(0, n).sort();
+    for (let i = 0; i < n; ++i) ranks[i] = all[ranks[i]];
+    order = ranks;
   }
   const call = ((opts.tag ?? 0) * 7919 + sweeps * 131 + Math.round(tau0 * 1000) * 17 + Math.round(tau1 * 1000)) | 0;
   const M = order.length;
   let accepted = 0;
+  // cells on an edge between labels (or land and water), kept current as cells change: a cell
+  // inside one label draws a neighbour of its own label and nothing happens, so it is skipped
+  const N = mesh.N, start = mesh.start, ringNbr = mesh.ringNbr;
+  const edge = v => { const l = lab[v]; for (let k = start[v]; k < start[v + 1]; ++k) if (lab[ringNbr[k]] !== l) return 1; return 0; };
+  const onEdge = new Uint8Array(N);
+  if (M > N >> 2) for (let u = 0; u < N; ++u) onEdge[u] = edge(u);
+  else for (let i = 0; i < M; ++i) onEdge[order[i]] = edge(order[i]);
   for (let sw = 0; sw < sweeps; ++sw) {
     if (S.opts.compact) centroids(S);
     const f = sweeps > 1 ? sw / (sweeps - 1) : 1;
@@ -292,6 +321,7 @@ export function anneal(S, rng, sweeps, tau0, tau1 = 0, opts = {}) {
     const salt = call * 1009 + sw;
     for (let it = 0; it < M; ++it) {
       const u = order[sw % 2 ? M - 1 - it : it];
+      if (!onEdge[u]) continue;
       const s = mesh.start[u], deg = mesh.start[u + 1] - s;
       const a = lab[u];
       const b = lab[mesh.ringNbr[s + Math.floor(hash2(key[u], salt, 17) * deg)]];
@@ -299,12 +329,14 @@ export function anneal(S, rng, sweeps, tau0, tau1 = 0, opts = {}) {
       if (a < 0) {
         // a water cell only turns to land if it touches land
       }
-      if (!tryMove(S, u, b)) continue;
+      // (the energy test first: it is cheaper and rejects more; both must pass)
       const dE = deltaE(S, u, b);
-      if (dE <= 0 || (tau > 0 && hash2(key[u], salt, 29) < Math.exp(-dE / (tau * mesh.hloc[u])))) {
-        applyMove(S, u, b);
-        accepted++;
-      }
+      if (!(dE <= 0 || (tau > 0 && hash2(key[u], salt, 29) < Math.exp(-dE / (tau * mesh.hloc[u]))))) continue;
+      if (!tryMove(S, u, b)) continue;
+      applyMove(S, u, b);
+      accepted++;
+      onEdge[u] = edge(u);
+      for (let k = start[u]; k < start[u + 1]; ++k) onEdge[ringNbr[k]] = edge(ringNbr[k]);
     }
   }
   return accepted;
@@ -313,14 +345,21 @@ export function anneal(S, rng, sweeps, tau0, tau1 = 0, opts = {}) {
 export function centroids(S) {
   const {mesh, lab, NL} = S;
   const cx = S.cx || (S.cx = new Float64Array(NL)), cy = S.cy || (S.cy = new Float64Array(NL));
-  const w = new Float64Array(NL);
-  cx.fill(0); cy.fill(0);
-  for (let u = 0; u < mesh.N; ++u) {
+  const w = S._cw || (S._cw = new Float64Array(NL));
+  cx.fill(0); cy.fill(0); w.fill(0);
+  centroidSums(lab, mesh.area, mesh.coords, mesh.N, cx, cy, w);
+  centroidMeans(cx, cy, w, NL);
+}
+// (two small functions rather than two loops in one: each is compiled with its own feedback)
+function centroidSums(lab, area, coords, N, cx, cy, w) {
+  for (let u = 0; u < N; ++u) {
     const a = lab[u];
     if (a < 0) continue;
-    const m = mesh.area[u];
-    cx[a] += mesh.coords[2 * u] * m; cy[a] += mesh.coords[2 * u + 1] * m; w[a] += m;
+    const m = area[u];
+    cx[a] += coords[2 * u] * m; cy[a] += coords[2 * u + 1] * m; w[a] += m;
   }
+}
+function centroidMeans(cx, cy, w, NL) {
   for (let a = 0; a < NL; ++a) if (w[a] > 0) { cx[a] /= w[a]; cy[a] /= w[a]; }
 }
 
@@ -386,12 +425,18 @@ function canTake(S, u, X) {
   return true;
 }
 
+// binary min-heap of (key, cell) over typed arrays (the same sift order as a plain array heap)
 class Heap {
-  constructor() { this.k = []; this.v = []; }
+  constructor(cap = 1024) { this.k = new Float64Array(cap); this.v = new Int32Array(cap); this.n = 0; }
+  grow() {
+    const k = new Float64Array(this.k.length * 2), v = new Int32Array(this.v.length * 2);
+    k.set(this.k); v.set(this.v);
+    this.k = k; this.v = v;
+  }
   push(key, val) {
+    if (this.n === this.k.length) this.grow();
     const k = this.k, v = this.v;
-    let i = k.length;
-    k.push(key); v.push(val);
+    let i = this.n++;
     while (i > 0) {
       const p = (i - 1) >> 1;
       if (k[p] <= key) break;
@@ -401,9 +446,8 @@ class Heap {
   }
   pop() {
     const k = this.k, v = this.v;
-    const top = v[0], last = k.length - 1;
+    const top = v[0], last = --this.n;
     const lk = k[last], lv = v[last];
-    k.pop(); v.pop();
     if (last > 0) {
       let i = 0;
       for (;;) {
@@ -417,13 +461,14 @@ class Heap {
     }
     return top;
   }
-  get size() { return this.k.length; }
+  clear() { this.n = 0; }
+  get size() { return this.n; }
 }
 
 function workspace(S, k) {
   S._ws = S._ws || [];
   const N = S.mesh.N;
-  if (!S._ws[k]) S._ws[k] = {dist: new Float64Array(N), prev: new Int32Array(N), stamp: new Uint32Array(N), mark: 0, list: []};
+  if (!S._ws[k]) S._ws[k] = {dist: new Float64Array(N), prev: new Int32Array(N), stamp: new Uint32Array(N), mark: 0, list: [], take: new Uint32Array(N)};
   return S._ws[k];
 }
 
@@ -431,7 +476,7 @@ function workspace(S, k) {
 function fieldFrom(S, X, cells, banned, limit, landCost, ws) {
   const {mesh, lab} = S;
   const m = ++ws.mark;
-  const {dist, prev, stamp} = ws;
+  const {dist, prev, stamp, take} = ws;
   const list = ws.list;
   list.length = 0;
   const heap = new Heap();
@@ -446,7 +491,9 @@ function fieldFrom(S, X, cells, banned, limit, landCost, ws) {
       if (lab[v] >= 0 && !landCost) continue;
       const dv = du + mesh.hloc[v] * (lab[v] < 0 ? 1 : landCost);
       if (stamp[v] === m && dv >= dist[v]) continue;
-      if (!canTake(S, v, X)) continue;
+      // (whether X may take v does not change during the search: worked out once per cell)
+      if (take[v] >>> 1 !== m) take[v] = (m << 1) | (canTake(S, v, X) ? 1 : 0);
+      if (!(take[v] & 1)) continue;
       if (stamp[v] !== m) { stamp[v] = m; list.push(v); }
       dist[v] = dv; prev[v] = u;
       heap.push(dv, v);
@@ -542,23 +589,142 @@ export function whyNot(S, u, b) {
 
 // ---------------------------------------------------------------------------------------------
 // Distance field (sum of cell sizes along the cheapest path) from the cells of some labels.
-export function distanceField(S, sources, limit, passable = null) {
+// Every cell within `limit` gets its exact cheapest-path distance, and every cell just beyond it
+// the cheapest distance through a cell within it (others stay Infinity): what Dijkstra's
+// algorithm with a binary heap gives, whatever order equal keys come in. Run on a bucket queue
+// (Dial's algorithm): a step costs at least twice the bucket width, so a cell is final when its
+// bucket comes up and the cells of one bucket can be settled in any order.
+function bucketPlan(mesh) {
+  if (mesh._dial) return mesh._dial;
+  let hmin = Infinity, hmax = 0;
+  for (let u = 0; u < mesh.N; ++u) { const h = mesh.hloc[u]; if (h > 0 && h < hmin) hmin = h; if (h > hmax) hmax = h; }
+  const width = 0.5 * hmin;
+  const B = Math.floor(hmax / width) + 4;
+  return (mesh._dial = {width, B, buckets: Array.from({length: B}, () => [])});
+}
+
+// `needed`: the cells whose distance the caller reads; the search may stop once they are settled.
+// (A source cell whose neighbours are all sources is not expanded: that would change nothing.)
+export function distanceField(S, sources, limit, passable = null, needed = null) {
   const {mesh} = S;
-  const dist = new Float64Array(mesh.N).fill(Infinity);
-  const heap = new Heap();
-  for (const c of sources) { if (dist[c] > 0) { dist[c] = 0; heap.push(0, c); } }
-  while (heap.size) {
-    const u = heap.pop();
-    const du = dist[u];
-    if (du > limit) break;
-    for (let k = mesh.start[u]; k < mesh.start[u + 1]; ++k) {
-      const v = mesh.ringNbr[k];
-      if (mesh.frozen[v] || (passable && !passable(v))) continue;
-      const dv = du + 0.5 * (mesh.hloc[u] + mesh.hloc[v]);
-      if (dv < dist[v]) { dist[v] = dv; heap.push(dv, v); }
+  const N = mesh.N, start = mesh.start, ringNbr = mesh.ringNbr, hloc = mesh.hloc, frozen = mesh.frozen;
+  // (the array comes from a pool: callers hand it back with releaseField when done with it)
+  const dist = (S._fields && S._fields.pop()) || new Float64Array(N);
+  dist.fill(Infinity);
+  const ws = workspace(S, 5), mark = ++ws.mark, seen = ws.stamp;
+  const {width, B, buckets} = bucketPlan(mesh);
+  let pending = 0;
+  for (const c of sources) dist[c] = 0;
+  const b0 = buckets[0];
+  for (const c of sources) {
+    if (seen[c] === mark) continue;
+    seen[c] = mark;
+    let inner = true;
+    for (let k = start[c]; k < start[c + 1]; ++k) {
+      const v = ringNbr[k];
+      if (dist[v] !== 0 && !frozen[v] && !(passable && !passable(v))) { inner = false; break; }
+    }
+    if (!inner) { b0.push(c); pending++; }
+  }
+  for (const c of b0) seen[c] = 0;
+  let want = 0;
+  const isNeeded = needed ? new Uint8Array(N) : null;
+  if (needed) for (const c of needed) if (!isNeeded[c] && dist[c] !== 0) { isNeeded[c] = 1; want++; }
+  for (let b = 0; pending > 0; ++b) {
+    if ((b - 1) * width > limit) break;     // (one bucket of slack for rounding)
+    if (needed && want === 0) break;
+    const bucket = buckets[b % B];
+    while (bucket.length) {
+      const u = bucket.pop();
+      pending--;
+      if (seen[u] === mark) continue;
+      const du = dist[u];
+      if (du > limit) continue;
+      seen[u] = mark;
+      if (isNeeded && isNeeded[u]) want--;
+      const hu = hloc[u];
+      for (let k = start[u]; k < start[u + 1]; ++k) {
+        const v = ringNbr[k];
+        if (frozen[v] || (passable && !passable(v))) continue;
+        const dv = du + 0.5 * (hu + hloc[v]);
+        if (dv < dist[v]) { dist[v] = dv; buckets[Math.floor(dv / width) % B].push(v); pending++; }
+      }
     }
   }
+  // leave the shared buckets empty
+  if (pending > 0) for (const bucket of buckets) bucket.length = 0;
   return dist;
+}
+
+// a distance field's array, back to the pool
+export function releaseField(S, f) { (S._fields || (S._fields = [])).push(f); }
+
+// A bucket queue on the shared buckets (see distanceField): cells come out in buckets of growing
+// distance; a cell may be pushed more than once, and the caller skips those already settled.
+function bucketQueue(mesh) {
+  const {width, B, buckets} = bucketPlan(mesh);
+  let cur = 0, pending = 0;
+  return {
+    push(v, d) { buckets[Math.floor(d / width) % B].push(v); pending++; },
+    pop() {
+      while (pending > 0) {
+        const bucket = buckets[cur % B];
+        if (bucket.length) { pending--; return bucket.pop(); }
+        cur++;
+      }
+      return -1;
+    },
+  };
+}
+
+// Depth of every cell of a region (the cells of one label, or water when `water`) below the
+// region's edge: half a cell at the edge, plus steps of half the two cells' sizes inward. Exact
+// shortest paths, as with a heap.
+function edgeDepth(S, water) {
+  const {mesh, lab} = S;
+  const N = mesh.N, start = mesh.start, ringNbr = mesh.ringNbr, hloc = mesh.hloc;
+  const depth = new Float64Array(N).fill(Infinity);
+  const ws = workspace(S, 6), mark = ++ws.mark, done = ws.stamp;
+  const q = bucketQueue(mesh);
+  for (let u = 0; u < N; ++u) {
+    const a = lab[u];
+    if (water ? a !== WATER : a < 0) continue;
+    for (let j = start[u]; j < start[u + 1]; ++j) if (lab[ringNbr[j]] !== a) { depth[u] = hloc[u] / 2; q.push(u, depth[u]); break; }
+  }
+  for (let u; (u = q.pop()) >= 0;) {
+    if (done[u] === mark) continue;
+    done[u] = mark;
+    const a = lab[u], du = depth[u], hu = hloc[u];
+    for (let j = start[u]; j < start[u + 1]; ++j) {
+      const v = ringNbr[j];
+      if (lab[v] !== a) continue;
+      const d = du + 0.5 * (hu + hloc[v]);
+      if (d < depth[v]) { depth[v] = d; q.push(v, d); }
+    }
+  }
+  return depth;
+}
+
+// From the cells where cover is 0, the distance within each region to every cell that lies
+// within reach(v, label) of them (others stay Infinity)
+function coverFrom(S, cover, reach) {
+  const {mesh, lab} = S;
+  const N = mesh.N, start = mesh.start, ringNbr = mesh.ringNbr, hloc = mesh.hloc;
+  const ws = workspace(S, 6), mark = ++ws.mark, done = ws.stamp;
+  const q = bucketQueue(mesh);
+  for (let u = 0; u < N; ++u) if (cover[u] === 0) q.push(u, 0);
+  for (let u; (u = q.pop()) >= 0;) {
+    if (done[u] === mark) continue;
+    done[u] = mark;
+    const a = lab[u], cu = cover[u], hu = hloc[u];
+    for (let j = start[u]; j < start[u + 1]; ++j) {
+      const v = ringNbr[j];
+      if (lab[v] !== a) continue;
+      const d = cu + 0.5 * (hu + hloc[v]);
+      if (d < cover[v] && d <= reach(v, a)) { cover[v] = d; q.push(v, d); }
+    }
+  }
+  return cover;
 }
 
 export function snapshot(S) { return Int32Array.from(S.lab); }
@@ -568,7 +734,11 @@ export function restore(S, snap) { S.lab.set(snap); recount(S); }
 export function growBlob(S, X, centre, area, mayTake) {
   const {mesh, lab} = S;
   const heap = new Heap();
-  const seen = new Set([centre]);
+  // cells already queued: marked with this call's stamp
+  const ws = workspace(S, 2);
+  const mark = ++ws.mark;
+  const seen = ws.stamp;
+  seen[centre] = mark;
   heap.push(0, centre);
   const cx = mesh.coords[2 * centre], cy = mesh.coords[2 * centre + 1];
   let got = S.area[X] || 0;
@@ -591,9 +761,9 @@ export function growBlob(S, X, centre, area, mayTake) {
     }
     for (let k = mesh.start[u]; k < mesh.start[u + 1]; ++k) {
       const v = mesh.ringNbr[k];
-      if (seen.has(v) || mesh.frozen[v]) continue;
-      seen.add(v);
-      heap.push(Math.hypot(mesh.coords[2 * v] - cx, mesh.coords[2 * v + 1] - cy), v);
+      if (seen[v] === mark || mesh.frozen[v]) continue;
+      seen[v] = mark;
+      heap.push(hypot(mesh.coords[2 * v] - cx, mesh.coords[2 * v + 1] - cy), v);
     }
   }
   return got;
@@ -608,13 +778,20 @@ export function reinsert(S, X, nbrs) {
   for (const u of cells) applyMove(S, u, WATER);
   const rho = Math.sqrt(S.target[X] / Math.PI);
   const lists = cellsByLabel(S);
-  const limit = 8 * rho + 20 * Math.sqrt(S.target[X]) ;
+  // (the score below saturates once a field passes 10.6 rho, so the fields only need to reach
+  // 12 rho: farther cells score the same; dBad only matters below 1.4 rho)
+  const limit = Math.min(8 * rho + 20 * Math.sqrt(S.target[X]), 12 * rho);
   const fields = nbrs.map(Y => distanceField(S, lists[Y], limit));
   const bad = [];
   const ok = new Uint8Array(NL);
   for (const Y of nbrs) ok[Y] = 1;
-  for (let u = 0; u < mesh.N; ++u) if (lab[u] >= 0 && !ok[lab[u]]) bad.push(u);
-  const dBad = distanceField(S, bad, 3 * rho);
+  // (only the edge of the bad land: dBad is read on water and ok land alone, which the inner
+  // cells of the bad land reach only through its edge)
+  for (let u = 0; u < mesh.N; ++u) {
+    if (lab[u] < 0 || ok[lab[u]]) continue;
+    for (let k = mesh.start[u]; k < mesh.start[u + 1]; ++k) { const y = lab[mesh.ringNbr[k]]; if (y < 0 || ok[y]) { bad.push(u); break; } }
+  }
+  const dBad = distanceField(S, bad, 1.5 * rho);
   let best = -1, bestScore = Infinity;
   for (let u = 0; u < mesh.N; ++u) {
     if (mesh.frozen[u]) continue;
@@ -627,6 +804,8 @@ export function reinsert(S, X, nbrs) {
     if (dBad[u] < 1.4 * rho) sc += 50 * (1.4 * rho - dBad[u]) ** 2 + 3e3 * rho * rho * (dBad[u] < 0.5 * rho);
     if (sc < bestScore) { bestScore = sc; best = u; }
   }
+  for (const f of fields) releaseField(S, f);
+  releaseField(S, dBad);
   if (best < 0) return false;
   growBlob(S, X, best, S.target[X], () => true);
   return S.area[X] > 0;
@@ -643,10 +822,31 @@ export function carveExclave(S, P, H, area, toward, H2 = -1) {
   const {mesh, lab} = S;
   const lists = cellsByLabel(S);
   const rho = Math.sqrt(area / Math.PI);
+  // (only the edge of the other land: dOther is read on the hosts and water alone, which the
+  // inner cells of the other land reach only through its edge)
   const others = [];
-  for (let u = 0; u < mesh.N; ++u) if (lab[u] >= 0 && lab[u] !== H && lab[u] !== H2) others.push(u);
+  for (let u = 0; u < mesh.N; ++u) {
+    const a = lab[u];
+    if (a < 0 || a === H || a === H2) continue;
+    for (let k = mesh.start[u]; k < mesh.start[u + 1]; ++k) { const y = lab[mesh.ringNbr[k]]; if (y < 0 || y === H || y === H2) { others.push(u); break; } }
+  }
   const dOther = distanceField(S, others, 4 * rho + 1);
-  const dToward = distanceField(S, toward, Infinity);
+  // dToward is read on the hosts' cells and the water next to them only
+  const needed = [];
+  for (const L of H2 >= 0 ? [H, H2] : [H]) for (const u of lists[L]) {
+    needed.push(u);
+    for (let k = mesh.start[u]; k < mesh.start[u + 1]; ++k) needed.push(mesh.ringNbr[k]);
+  }
+  const dToward = distanceField(S, toward, Infinity, null, needed);
+  try {
+    return carveWith(S, P, H, area, H2, lists, rho, dOther, dToward);
+  } finally {
+    releaseField(S, dOther); releaseField(S, dToward);
+  }
+}
+
+function carveWith(S, P, H, area, H2, lists, rho, dOther, dToward) {
+  const {mesh, lab} = S;
   const tryAt = (cands, mayTake) => {
     cands.sort((a, b) => a[1] - b[1]);
     for (const [u] of cands.slice(0, 6)) {
@@ -744,23 +944,7 @@ export function growFromSeeds(S, seeds, speed, costOf, fill = 1.0) {
 export function pruneArms(S, labels, k, keep = () => false) {
   const {mesh, lab, NL, linked} = S;
   // pole of each label: its thickest point (largest distance to its own boundary)
-  const depth = new Float64Array(mesh.N).fill(Infinity);
-  const heap = new Heap();
-  for (let u = 0; u < mesh.N; ++u) {
-    const a = lab[u];
-    if (a < 0) continue;
-    for (let j = mesh.start[u]; j < mesh.start[u + 1]; ++j) if (lab[mesh.ringNbr[j]] !== a) { depth[u] = mesh.hloc[u] / 2; heap.push(depth[u], u); break; }
-  }
-  while (heap.size) {
-    const u = heap.pop();
-    const a = lab[u];
-    for (let j = mesh.start[u]; j < mesh.start[u + 1]; ++j) {
-      const v = mesh.ringNbr[j];
-      if (lab[v] !== a) continue;
-      const d = depth[u] + 0.5 * (mesh.hloc[u] + mesh.hloc[v]);
-      if (d < depth[v]) { depth[v] = d; heap.push(d, v); }
-    }
-  }
+  const depth = edgeDepth(S, false);
   const pole = new Int32Array(NL).fill(-1);
   for (let u = 0; u < mesh.N; ++u) {
     const a = lab[u];
@@ -775,7 +959,7 @@ export function pruneArms(S, labels, k, keep = () => false) {
     if (a < 0 || !isL[a] || keep(a) || pole[a] < 0) continue;
     const R = Math.sqrt(S.target[a] / Math.PI);
     const p = pole[a];
-    const d = Math.hypot(mesh.coords[2 * u] - mesh.coords[2 * p], mesh.coords[2 * u + 1] - mesh.coords[2 * p + 1]);
+    const d = hypot(mesh.coords[2 * u] - mesh.coords[2 * p], mesh.coords[2 * u + 1] - mesh.coords[2 * p + 1]);
     const kk = typeof k === 'function' ? k(a) : k;
     if (d > kk * R) far.push([d / R, u]);
   }
@@ -847,6 +1031,7 @@ export function broadenChannels(S, opts) {
   let carved = 0;
   const lost = new Map();
   const heap = new Heap();
+  const ws = workspace(S, 4), dist = ws.dist, dstamp = ws.stamp;
   for (const cells of bodies) {
     // length of the body: its largest extent
     let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, hsum = 0;
@@ -856,7 +1041,7 @@ export function broadenChannels(S, opts) {
       hsum += mesh.hloc[c];
     }
     const h = hsum / cells.length;
-    const length = Math.hypot(x1 - x0, y1 - y0);
+    const length = hypot(x1 - x0, y1 - y0);
     // the countries along it: only channels long for their size, between countries big enough to
     // give up a coast, become seas
     const along = new Set();
@@ -867,13 +1052,14 @@ export function broadenChannels(S, opts) {
     if (length < opts.minLength * h || length < opts.minRel * Rmed || Rmed < opts.minR) continue;
     // widen: distance field from the body over land and water, then carve within w(x)
     const width = Math.min(opts.maxWidth, opts.widthRel * length, opts.bandR * radii[radii.length - 1] * 1.6);
-    const dist = new Map();
-    heap.k.length = 0; heap.v.length = 0;
-    for (const c of cells) { dist.set(c, 0); heap.push(0, c); }
+    // distances of this body: valid where the stamp is this body's
+    const mark = ++ws.mark;
+    heap.clear();
+    for (const c of cells) { dstamp[c] = mark; dist[c] = 0; heap.push(0, c); }
     const order = [];
     while (heap.size) {
       const u = heap.pop();
-      const du = dist.get(u);
+      const du = dist[u];
       const x = mesh.coords[2 * u], y = mesh.coords[2 * u + 1];
       const nz = 1 + opts.noiseAmp * opts.noise(x, y);
       if (du > width * nz) continue;
@@ -884,7 +1070,7 @@ export function broadenChannels(S, opts) {
         const v = mesh.ringNbr[k];
         if (mesh.frozen[v] && !S.inner?.[v]) continue;
         const dv = du + 0.5 * (mesh.hloc[u] + mesh.hloc[v]);
-        if (dv < (dist.has(v) ? dist.get(v) : Infinity)) { dist.set(v, dv); heap.push(dv, v); }
+        if (dv < (dstamp[v] === mark ? dist[v] : Infinity)) { dstamp[v] = mark; dist[v] = dv; heap.push(dv, v); }
       }
     }
     // carve in distance order, so the sea grows outward from the channel; only countries much
@@ -926,23 +1112,7 @@ export function broadenChannels(S, opts) {
 export function pruneThin(S, labels, rel, keep = () => false, minFrac = 0, dryRun = false) {
   const {mesh, lab, NL, linked} = S;
   const N = mesh.N;
-  const depth = new Float64Array(N).fill(Infinity);
-  const heap = new Heap();
-  for (let u = 0; u < N; ++u) {
-    const a = lab[u];
-    if (a < 0) continue;
-    for (let j = mesh.start[u]; j < mesh.start[u + 1]; ++j) if (lab[mesh.ringNbr[j]] !== a) { depth[u] = mesh.hloc[u] / 2; heap.push(depth[u], u); break; }
-  }
-  while (heap.size) {
-    const u = heap.pop();
-    const a = lab[u];
-    for (let j = mesh.start[u]; j < mesh.start[u + 1]; ++j) {
-      const v = mesh.ringNbr[j];
-      if (lab[v] !== a) continue;
-      const d = depth[u] + 0.5 * (mesh.hloc[u] + mesh.hloc[v]);
-      if (d < depth[v]) { depth[v] = d; heap.push(d, v); }
-    }
-  }
+  const depth = edgeDepth(S, false);
   const isL = new Uint8Array(NL);
   for (const l of labels) if (!keep(l)) isL[l] = 1;
   const maxDepth = new Float64Array(NL);
@@ -951,17 +1121,8 @@ export function pruneThin(S, labels, rel, keep = () => false, minFrac = 0, dryRu
   for (let a = 0; a < NL; ++a) if (isL[a]) r[a] = dryRun ? rel * Math.sqrt(S.target[a] / Math.PI) : Math.min(rel * Math.sqrt(S.target[a] / Math.PI), 0.8 * maxDepth[a]);
   // dilate the cores (cells with depth >= r) back by r, inside the country
   const cover = new Float64Array(N).fill(Infinity);
-  for (let u = 0; u < N; ++u) { const a = lab[u]; if (a >= 0 && isL[a] && depth[u] >= r[a]) { cover[u] = 0; heap.push(0, u); } }
-  while (heap.size) {
-    const u = heap.pop();
-    const a = lab[u];
-    for (let j = mesh.start[u]; j < mesh.start[u + 1]; ++j) {
-      const v = mesh.ringNbr[j];
-      if (lab[v] !== a) continue;
-      const d = cover[u] + 0.5 * (mesh.hloc[u] + mesh.hloc[v]);
-      if (d < cover[v] && d <= 1.35 * r[a] + mesh.hloc[v]) { cover[v] = d; heap.push(d, v); }
-    }
-  }
+  for (let u = 0; u < N; ++u) { const a = lab[u]; if (a >= 0 && isL[a] && depth[u] >= r[a]) cover[u] = 0; }
+  coverFrom(S, cover, (v, a) => 1.35 * r[a] + mesh.hloc[v]);
   // only countries that are substantially thin (a ribbon or a long arm), not every rough edge
   const thinArea = new Float64Array(NL);
   for (let u = 0; u < N; ++u) { const a = lab[u]; if (a >= 0 && isL[a] && cover[u] === Infinity) thinArea[a] += mesh.area[u]; }
@@ -1039,32 +1200,10 @@ export function fillThinWater(S, k = 1.5, passes = 6) {
   const N = mesh.N;
   let total = 0;
   for (let pass = 0; pass < passes; ++pass) {
-    const depth = new Float64Array(N).fill(Infinity);
-    const heap = new Heap();
-    for (let u = 0; u < N; ++u) {
-      if (lab[u] !== WATER) continue;
-      for (let j = mesh.start[u]; j < mesh.start[u + 1]; ++j) if (lab[mesh.ringNbr[j]] !== WATER) { depth[u] = mesh.hloc[u] / 2; heap.push(depth[u], u); break; }
-    }
-    while (heap.size) {
-      const u = heap.pop();
-      for (let j = mesh.start[u]; j < mesh.start[u + 1]; ++j) {
-        const v = mesh.ringNbr[j];
-        if (lab[v] !== WATER) continue;
-        const d = depth[u] + 0.5 * (mesh.hloc[u] + mesh.hloc[v]);
-        if (d < depth[v]) { depth[v] = d; heap.push(d, v); }
-      }
-    }
+    const depth = edgeDepth(S, true);
     const cover = new Float64Array(N).fill(Infinity);
-    for (let u = 0; u < N; ++u) if (lab[u] === WATER && depth[u] >= k * mesh.hloc[u]) { cover[u] = 0; heap.push(0, u); }
-    while (heap.size) {
-      const u = heap.pop();
-      for (let j = mesh.start[u]; j < mesh.start[u + 1]; ++j) {
-        const v = mesh.ringNbr[j];
-        if (lab[v] !== WATER) continue;
-        const d = cover[u] + 0.5 * (mesh.hloc[u] + mesh.hloc[v]);
-        if (d < cover[v] && d <= 1.35 * k * mesh.hloc[v] + mesh.hloc[v]) { cover[v] = d; heap.push(d, v); }
-      }
-    }
+    for (let u = 0; u < N; ++u) if (lab[u] === WATER && depth[u] >= k * mesh.hloc[u]) cover[u] = 0;
+    coverFrom(S, cover, v => 1.35 * k * mesh.hloc[v] + mesh.hloc[v]);
     const thin = [];
     for (let u = 0; u < N; ++u) if (lab[u] === WATER && cover[u] === Infinity && !(mesh.frozen[u] && !S.inner?.[u])) thin.push([depth[u], u]);
     thin.sort((a, b) => a[0] - b[0]);
