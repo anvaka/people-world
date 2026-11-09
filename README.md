@@ -17,12 +17,12 @@ up, so each world number gives a different map of the same graph.
 - Drag, pinch, scroll or double-click to move around; the buttons at the right edge zoom in, out
   and back to the whole world. Tap a country to see its neighbours. **Find a country** takes a
   name, the start of one or a two-letter code.
-- **Another world** draws the same graph again with the next world number.
+- **Rearrange** lays the same countries and neighbours out another way: the generator runs again
+  with the next world number (the number in the link). Back returns to the one before.
 - **Change borders.** In a country's panel, **Remove** takes a border away and the field below (or
   "pick it on the map") adds one. The map is then redrawn starting from the world as it was, so the
   countries an edit doesn't touch stay where they were. While it is redrawn the old map stays in
-  use, and a note at the bottom right says what is being drawn and can cancel it. Afterwards the
-  map lights the countries you edited and fades those that kept their shape.
+  use, and a note at the bottom right says what is being drawn and can cancel it.
 - **Show before** switches between the map before your changes and after; holding it (or the B
   key) shows the map before only while held. Every change can be undone on its own; Undo, Ctrl+Z
   and the browser's Back are instant for the last few maps drawn.
