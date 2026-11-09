@@ -21,6 +21,7 @@
 // looks the same, and an edit changes only what it moves.
 
 const MAX_PR = 2;             // canvas pixels per CSS pixel, at most (see 'resolution' below)
+const LIGHT_N = 5, LIGHT_MAX = 12;   // levels of night lights shown at once; the finest level
 const MAX_OCT = 12;
 const MACRO = [3, 6, 12, 24, 48];   // noise octaves that shape the land (cycles across the world)
 // octave amplitudes fall as f^-1.25: the big forms carry the relief, the finer octaves only grain it.
@@ -100,9 +101,18 @@ uniform vec2 u_oct[${MAX_OCT}], u_rot[${MAX_OCT}]; uniform float u_freq[${MAX_OC
 uniform int u_nOct;
 uniform vec3 u_pal[8];
 uniform uvec2 u_seed;
-uniform vec3 u_crown;      // crown cells: offset (mod 256) and cells per unit
-uniform vec3 u_lights;     // night lights: the same
-uniform vec3 u_ripple;     // sea surface grain: the same
+// Crowns, lights and the sea's grain are tied to the map, so a zoom spreads them and never shuffles
+// them. Level L has 2^L cells across the normalised unit; a level comes as its offset from P0 (mod 256,
+// which keeps the numbers small) and its cells per unit. The next finer level is twice both.
+uniform vec4 u_crown;      // crowns: level a-1 (offset, cells per unit) and how far the octave is on
+uniform int u_crownL;      // a-1
+uniform vec4 u_ripple;     // the sea's grain, surf and glades: the same
+uniform int u_rippleL;
+uniform vec4 u_lights[${LIGHT_N}];   // the levels of lights: offset, cells per unit, weight
+uniform vec2 u_lightP[${LIGHT_N + 2}];   // the towns of those levels and of the two above: for
+                                         // each, the offset of the level two coarser
+uniform float u_lightJ[${LIGHT_N}];  // how far each is past its first showing, in octaves (0..5)
+uniform int u_lightL[${LIGHT_N}];
 out vec4 o;
 
 uint hsh(ivec2 c, int s) {
@@ -149,23 +159,59 @@ vec3 dsmooth(float e0, float e1, vec3 x) {
 }
 float lum(vec3 c) { return dot(c, vec3(0.3, 0.55, 0.15)); }
 
-// a cell of round crowns (trees) or points (lights) near q: returns (distance to the nearest
-// in its own radius, offset from its centre), only cells whose hash passes 'keep'
-vec4 cells(vec2 q, float keep, int s) {
-  vec2 i = floor(q), f = q - i;
-  ivec2 c = ivec2(i);
+uint mix32(uint h) { h ^= h >> 16; h *= 0x7feb352du; h ^= h >> 15; h *= 0x846ca68bu; return h ^ (h >> 16); }
+// the four cells round q, each holding a crown (in its middle 60%, so one in any other cell is at
+// least 0.7 cells away) if its hash's top byte is under 'keep'. A crown comes when its level reaches
+// a moment of its own ('o': octaves of zoom since the level's cells were 'px' across) and goes two
+// octaves on; meanwhile its cells grow fourfold and the crown only twofold, so the wood thins as it
+// nears and the next level's crowns fill it. The crown that covers q most (one fading in or out
+// covers less), scaled by its radius: (distance, offset, tone), and in 'a' its cover
+vec4 crowns(vec2 q, float keep, int s, float o, out float a) {
+  ivec2 c0 = ivec2(floor(q - 0.5));
   vec4 best = vec4(9.0, 0.0, 0.0, 0.0);
-  for (int y = -1; y <= 1; ++y) for (int x = -1; x <= 1; ++x) {
-    ivec2 cc = c + ivec2(x, y);
-    float h = h1(cc, s);
-    if (h > keep) continue;
-    vec2 pt = vec2(h1(cc, s + 1), h1(cc, s + 2)) * 0.7 + 0.15;
-    float r = 0.36 + 0.46 * h1(cc, s + 3);
-    vec2 v = (f - vec2(x, y) - pt) / r;
-    float d = length(v);
-    if (d < best.x) best = vec4(d, v, h1(cc, s + 4));
+  a = 0.0;
+  for (int y = 0; y <= 1; ++y) for (int x = 0; x <= 1; ++x) {
+    ivec2 c = c0 + ivec2(x, y);
+    // (its hash's bits: 8 keep, 6 and 6 where, 6 its moment, 3 its size, 3 its tone)
+    uint h = mix32(hsh(c, s));
+    if (float(h >> 24) * (1.0 / 256.0) >= keep) continue;
+    float age = o + 1.0 - (0.1 + 0.8 * float((h >> 6) & 63u) * (1.0 / 63.0));
+    float here = smoothstep(-0.1, 0.1, age) * (1.0 - smoothstep(1.9, 2.1, age));
+    if (here <= 0.0) continue;
+    vec2 pt = vec2(c) + 0.2 + 0.6 * vec2(float((h >> 18) & 63u), float((h >> 12) & 63u)) * (1.0 / 63.0);
+    float r = (0.4 + 0.3 * float((h >> 3) & 7u) * (1.0 / 7.0)) * exp2(-0.5 * max(age, 0.0));
+    vec2 v = (q - pt) / r;
+    float d = length(v), cov = (1.0 - smoothstep(0.78, 1.0, d)) * here;
+    if (cov > a) { best = vec4(d, v, float(h & 7u) * (1.0 / 7.0)); a = cov; }
   }
   return best;
+}
+// the lights round q (cells 'px' CSS px across, a light in its cell's middle 60%): a sharp core and a
+// soft halo each, sized in CSS px, summed. Small cells: the four cells round q (a light in any other
+// is at least 0.7 cells away); from 40 px on, q's own cell (a light in another is at least 0.2 cells,
+// 8 px, away: by then the halo is spent)
+float lights(vec2 q, float keep, int s, float px, float j) {
+  bool four = px < 40.0;
+  ivec2 c0 = ivec2(floor(four ? q - 0.5 : q));
+  float g = exp2(0.4 * j), rc = 0.55 * g, rh = 1.6 * g, sum = 0.0;
+  for (int k = 0; k < 4; ++k) {
+    if (k > 0 && !four) break;
+    ivec2 c = c0 + ivec2(k & 1, k >> 1);
+    uint h = mix32(hsh(c, s));
+    if (float(h >> 24) * (1.0 / 256.0) >= keep) continue;
+    vec2 pt = vec2(c) + 0.2 + 0.6 * vec2(float((h >> 16) & 255u), float((h >> 8) & 255u)) * (1.0 / 255.0);
+    float d = length(q - pt) * px, b = float(h & 255u) * (1.0 / 255.0);
+    float glow = exp(-d * d / (rc * rc)) * 1.2 + exp(-d * d / (rh * rh)) * 0.2 * (0.4 + b);
+    sum += glow * (0.3 + 1.5 * b * b * b * b);
+  }
+  return sum;
+}
+// value noise on the ripple levels: level a's lattice times m (whole numbers, so the offsets stay
+// exact mod 256), fading to level a+1 through the octave
+float rnoise(vec2 local, vec2 m, int s) {
+  vec2 q = (u_ripple.xy + local * u_ripple.z) * m;
+  float a = noised(q, s + 3 * (u_rippleL & 15)).x, b = noised(q * 2.0, s + 3 * ((u_rippleL + 1) & 15)).x;
+  return mix(a, b, u_ripple.w);
 }
 
 void main() {
@@ -190,13 +236,12 @@ void main() {
     vec3 w = mix(cMid, cDeep, deep);
     w = mix(w, cShallow, shallow * shallow);
     w *= 1.0 + 0.1 * (v1 + 0.5 * v2);                          // currents and deeps
-    vec3 rp = noised(u_ripple.xy + local * u_ripple.z * vec2(1.0, 3.2), 30);
-    w *= 0.985 + 0.03 * rp.x;                                  // a faint surface grain
+    w *= 0.985 + 0.03 * rnoise(local, vec2(2.0, 6.0), 30);    // a faint surface grain
     if (E.g > 0.0) {
       float d = (1.0 - E.g) * u_foamPx / u_pr;
       float glow = exp(-d / 5.0);
       w = mix(w, vec3(0.55, 0.85, 0.82), glow * 0.35);
-      float brk = smoothstep(0.42, 0.62, noised(u_ripple.xy + local * u_ripple.z * 0.5, 31).x);
+      float brk = smoothstep(0.42, 0.62, rnoise(local, vec2(1.0), 31));
       float surf = exp(-pow((d - 4.2) / 0.8, 2.0)) * brk * 0.45;
       float edge = 1.0 - smoothstep(0.7, 1.9, d);
       w = mix(w, vec3(0.93, 0.98, 0.97), max(edge * 0.85, surf));
@@ -315,17 +360,25 @@ void main() {
   float stands = smoothstep(-0.06, 0.16, sm.x - macroS.x + 0.35 * (macroS.x - low.x) + 0.04);
   float forest = B.a * smoothstep(0.5, 0.7, m3.x + 0.22 * (macroS.x - low.x)) * stands * (1.0 - rock) * (1.0 - snow) * (1.0 - smoothstep(0.3, 0.7, mount.x));
   if (forest > 0.02) {
-    float glade = noised(u_ripple.xy + local * u_ripple.z * 2.5, 34).x;
-    vec4 t = cells(u_crown.xy + local * u_crown.z, (0.2 + forest * 0.75) * (0.55 + 0.6 * glade), 40);
-    float cov = (1.0 - smoothstep(0.78, 1.0, t.x)) * smoothstep(0.05, 0.3, forest);
-    vec3 cn = normalize(vec3(t.yz, sqrt(max(1.0 - t.x * t.x, 0.0)) + 0.35));
-    float lit = clamp(0.72 + 0.45 * dot(cn, L), 0.45, 1.25);
-    // crowns of several greens: darker firs, lighter broadleaves, a few yellowing
-    vec3 leaf = mix(vec3(0.13, 0.28, 0.12), vec3(0.26, 0.4, 0.14), t.w);
-    leaf = mix(leaf, vec3(0.42, 0.44, 0.16), smoothstep(0.86, 0.98, t.w));
-    vec3 canopy = mix(col, leaf + 0.3 * col, 0.5) * (0.86 + 0.24 * glade);
+    float glade = rnoise(local, vec2(5.0), 34);
+    float keep = (0.2 + forest * 0.75) * (0.55 + 0.6 * glade), dense = smoothstep(0.05, 0.3, forest);
     col = mix(col, col * vec3(0.7, 0.8, 0.68), smoothstep(0.05, 0.5, forest));   // the forest floor, in shade
-    col = mix(col, canopy * lit, cov);
+    // a crown lives two octaves of zoom (see crowns), so three levels show: a-1, a and a+1. Through
+    // a zoom of two, half the crowns stay where they were and the rest come and go one by one
+    vec2 qa = u_crown.xy + local * u_crown.z;
+    for (int k = 0; k < 3; ++k) {
+      float cov;
+      vec4 t = crowns(qa * (k == 0 ? 1.0 : k == 1 ? 2.0 : 4.0), keep * 0.7, 40 + 5 * ((u_crownL + k) & 15), u_crown.w + 1.0 - float(k), cov);
+      cov *= dense;
+      if (cov <= 0.0) continue;
+      vec3 cn = normalize(vec3(t.yz, sqrt(max(1.0 - t.x * t.x, 0.0)) + 0.35));
+      float lit = clamp(0.72 + 0.45 * dot(cn, L), 0.45, 1.25);
+      // crowns of several greens: darker firs, lighter broadleaves, a few yellowing
+      vec3 leaf = mix(vec3(0.13, 0.28, 0.12), vec3(0.26, 0.4, 0.14), t.w);
+      leaf = mix(leaf, vec3(0.42, 0.44, 0.16), smoothstep(0.86, 0.98, t.w));
+      vec3 canopy = mix(col, leaf + 0.3 * col, 0.5) * (0.86 + 0.24 * glade);
+      col = mix(col, canopy * lit, cov);
+    }
   }
   // light: warm on the lit slopes, cool in the shade, more contrast up high (aerial perspective)
   float k = 1.0 + 0.5 * smoothstep(0.15, 0.6, hb);
@@ -360,16 +413,28 @@ void main() {
       // rivers, thin on the heights; a few burn bright, most are hamlets; a warm haze over the towns
       float town = smoothstep(0.42, 0.72, m3.x + 0.4 * (macroS.x - low.x));
       float shore = land && E.g > 0.0 ? smoothstep(0.2, 0.9, E.g) : 0.0;
-      float keep = (0.06 + 0.62 * town + 0.35 * shore + 0.45 * smoothstep(0.0, 0.3, E.b)) * (1.0 - 0.8 * snow) * (1.0 - 0.5 * rock);
+      float keep = (0.1 + 0.62 * town + 0.35 * shore + 0.45 * smoothstep(0.0, 0.3, E.b)) * (1.0 - 0.8 * snow) * (1.0 - 0.5 * rock);
       keep = min(keep, 0.8);
       moon += vec3(0.11, 0.07, 0.03) * town * (0.6 + 0.4 * m1.x);
-      vec4 c = cells(u_lights.xy + local * u_lights.z, keep, 60);
-      if (c.x < 9.0) {
-        float b = c.w;
-        float bright = 0.3 + 1.5 * b * b * b * b;
-        float glow = exp(-c.x * c.x * 26.0) * 1.2 + exp(-c.x * c.x * 3.0) * 0.2 * (0.4 + b);
-        moon += vec3(1.0, 0.74, 0.4) * glow * bright;
+      // every level of lights the zoom shows: the finest are villages, fading in; the coarser are
+      // towns, a little larger and brighter the further the zoom has come since they first showed.
+      // They gather at every scale: each level has patches some four of its cells across (a noise on
+      // the level two coarser), and its lights keep to its own patches and to those of the two levels
+      // above, so villages crowd round towns and towns round cities. (What a light keeps to depends
+      // on its level, never on the zoom: no zoom puts one out)
+      float spot[${LIGHT_N + 2}];
+      float f = u_lights[0].z;
+      for (int i = 0; i < ${LIGHT_N + 2}; ++i, f *= 0.5)
+        spot[i] = 0.3 + 1.9 * smoothstep(0.35, 0.75, noised(u_lightP[i] + local * (f * 0.25), 80 + ((u_lightL[0] - i) & 31)).x);
+      float glow = 0.0;
+      for (int i = 0; i < ${LIGHT_N}; ++i) {
+        vec4 lv = u_lights[i];
+        if (lv.w <= 0.0) continue;
+        float j = u_lightJ[i];
+        float crowd = spot[i] * spot[i + 1] * spot[i + 2];
+        glow += lv.w * (0.55 + 0.15 * j) * lights(lv.xy + local * lv.z, keep * crowd, 60 + (u_lightL[i] & 31), 1.0 / (lv.z * u_invK), j);
       }
+      moon += vec3(1.0, 0.74, 0.4) * glow;
       moon += vec3(0.05, 0.034, 0.014);
     }
     outc = moon;
@@ -889,12 +954,38 @@ export function createTerrain(plate, svg, opts = {}) {
     gl.uniform1f(u.u_night, look.night ? 1 : 0);
     gl.uniform3fv(u.u_pal, new Float32Array(look.pal.flat()));
     gl.uniform2ui(u.u_seed, W.seed[0], W.seed[1]);
-    // crowns some 3.4 CSS px across, lights some 5.5, ripples some 60: cell levels in powers of two
-    let cellsAt = px => { let f = 2 ** Math.round(Math.log2(K / px)); return [mod256(P0[0] * f), mod256(P0[1] * f), f]; };
-    // crowns some 3.4 CSS px across at whole-world zoom, growing a little closer in (to some 7 px)
-    gl.uniform3fv(u.u_crown, cellsAt(3.4 * Math.min(2.2, Math.max(1, Math.pow(K / 1200, 0.28)))));
-    gl.uniform3fv(u.u_lights, cellsAt(5.5));
-    gl.uniform3fv(u.u_ripple, cellsAt(60));
+    // the levels of cells (see u_crown): level a, whose cells are 'px' CSS px across at the octave's
+    // start and twice that at its end, and how far through the octave the zoom is
+    let cellsOf = L => { let f = 2 ** L; return [mod256(P0[0] * f), mod256(P0[1] * f), f]; };
+    let octave = px => { let l = Math.log2(K / px), a = Math.floor(l); return [a, l - a]; };
+    // crowns: a level's cells are 'px' across when its first crowns could come. At whole-world zoom
+    // a crown is some 1.5 to 4.5 CSS px across when it comes and twice that when it goes; all of
+    // them grow a little closer in
+    let [ca, ct] = octave(3.4 * Math.min(2.2, Math.max(1, Math.pow(K / 1200, 0.28))));
+    gl.uniform4f(u.u_crown, ...cellsOf(ca - 1), ct);
+    gl.uniform1i(u.u_crownL, ca - 1);
+    // the sea's grain, surf and glades: cells 120 to 240 px (the shader takes whole multiples of them)
+    let [ra, rt] = octave(120);
+    gl.uniform4f(u.u_ripple, ...cellsOf(ra), rt);
+    gl.uniform1i(u.u_rippleL, ra);
+    // the people's lights. Level 12 has a cell for every village (some 1,900 people: on this map land
+    // is people). Every level whose cells are at least 4 CSS px shows, the finest fading in, so a
+    // zoom spreads the lights it showed and lights the villages between them; past level 12 no more
+    // come. At most five levels, the coarsest fading out as its cells pass 64 px
+    let lv = new Float32Array(LIGHT_N * 4), lp = new Float32Array((LIGHT_N + 2) * 2), lj = new Float32Array(LIGHT_N), ll = new Int32Array(LIGHT_N);
+    let finest = Math.min(LIGHT_MAX, Math.floor(Math.log2(K / 4)));
+    for (let i = 0; i < LIGHT_N; ++i) {
+      let L = finest - i, px = K / 2 ** L;
+      let w = L < 2 ? 0 : smoothstep(4, 8, px) * (i === LIGHT_N - 1 ? 1 - smoothstep(64, 128, px) : 1);
+      lv.set([...cellsOf(L), w], 4 * i);
+      lj[i] = Math.max(0, Math.min(5, Math.log2(px / 4)));
+      ll[i] = L;
+    }
+    for (let i = 0; i < LIGHT_N + 2; ++i) lp.set(cellsOf(finest - i - 2).slice(0, 2), 2 * i);
+    gl.uniform4fv(u.u_lights, lv);
+    gl.uniform2fv(u.u_lightP, lp);
+    gl.uniform1fv(u.u_lightJ, lj);
+    gl.uniform1iv(u.u_lightL, ll);
     gl.bindVertexArray(quadVao);
     if (rects) {
       gl.enable(gl.SCISSOR_TEST);
