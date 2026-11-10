@@ -221,6 +221,8 @@ html[data-style="ink"] #edits { border-top: 1px solid var(--ink-faint); font-siz
 html[data-style="ink"] #edits li span { font-style: italic; }
 html[data-style="ink"] #edits .row { justify-content: center; }
 html[data-style="ink"] button.mini { height: 24px; font-size: 15px; padding: 0 8px; font-family: 'Sorts Mill Goudy', Georgia, serif; }
+/* Fondamento's × is a small tick: the dismiss buttons take Goudy's, as the panel's × does */
+html[data-style="ink"] button.close-x { font-family: 'Sorts Mill Goudy', Georgia, serif; font-size: 19px; }
 
 /* the Style menu and the country suggestions: slips of the title's card, inked round */
 html[data-style="ink"] #style-box.menu,

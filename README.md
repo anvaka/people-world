@@ -22,8 +22,8 @@ up, so each world number gives a different map of the same graph.
   countries an edit doesn't touch stay where they were. While it is redrawn the old map stays in
   use, and a note at the bottom right says what is being drawn and can cancel it.
 - **Show before** switches between the map before your changes and after; holding it (or the B
-  key) shows the map before only while held. Every change can be undone on its own; Undo, Ctrl+Z
-  and the browser's Back are instant for the last few maps drawn.
+  key) shows the map before only while held. Each change in the list has its own Undo (Ctrl+Z
+  undoes the last); undoing, and the browser's Back, are instant for the last few maps drawn.
 - **Style** opens a menu: the map as Ink (a book's endpapers: pen, parchment, hatched coasts,
   mountains and woods) or Realm (a painted game world: terrain, shallows and rivers under the
   countries), and the theme: Light, Dark, or Auto (as the device is set). Switching doesn't build

@@ -542,7 +542,6 @@
     <div class="status-main">
       <span id="status-text"></span>
       <span class="actions">
-        <button type="button" id="status-undo" class="mini" hidden>Undo</button>
         <button type="button" id="status-cancel" class="mini" hidden>Cancel</button>
         <button type="button" id="status-close" class="close-x" aria-label="Dismiss" hidden>×</button>
       </span>
@@ -554,7 +553,7 @@
     <div class="edits-head">
       <h2><button type="button" id="edits-toggle" aria-expanded="true" aria-controls="edits-body">Your changes</button></h2>
       <div class="tools">
-        <button type="button" id="undo-last" class="mini" title="Undo the last change (Ctrl+Z)">Undo</button>
+        <button type="button" id="undo-last" class="mini" data-key="undo-last" title="Undo the last change (Ctrl+Z)" hidden>Undo</button>
         <button type="button" id="flip" class="mini" aria-pressed="false" title="Hold to see the map before your changes, or click to switch (B)">Show before</button>
       </div>
     </div>
@@ -1621,18 +1620,23 @@ function describe(e) { return `${nameOfId(e.a)} – ${nameOfId(e.b)}`; }
 // UX: an edit in words: "the France–Spain border"
 function borderName(e) { return `the ${nameOfId(e.a)}–${nameOfId(e.b)} border`; }
 const sameEdit = (e, f) => e.add === f.add && pairKey(e.a, e.b) === pairKey(f.a, f.b);
-// UX: your changes, in the dock. The edits in the address, each with its own undo; the ones not
-// drawn yet marked as such; and the tools: undo the last, hold to see before, undo all.
+// UX: your changes, in the dock. The edits in the address, each with its own Undo, the one Undo
+// button on the page (Ctrl+Z undoes the last; folded to its title row, the list puts an Undo for
+// the last change there instead); the ones not drawn yet marked as such; Show before; undo all.
 function showEdits() {
   let box = document.getElementById('edits');
   let undoing = lastGood.filter(e => !edits.some(f => sameEdit(e, f)));
+  let inside = box.contains(document.activeElement), focusKey = inside && document.activeElement.dataset.key;
   box.hidden = !edits.length && !undoing.length;
-  if (box.hidden) { document.getElementById('clear-confirm').hidden = true; return; }
-  let focusKey = box.contains(document.activeElement) && document.activeElement.dataset.key;
+  if (box.hidden) {
+    document.getElementById('clear-confirm').hidden = true;
+    if (inside) stage.focus({preventScroll: true});   // the list went with its last change
+    return;
+  }
   let drawnNow = e => lastGood.some(f => sameEdit(e, f));
   let rows = edits.map((e, k) => `<li><span>${e.add ? 'Added' : 'Removed'} ${escapeHtml(describe(e))}` +
       `${drawnNow(e) ? '' : ' <span class="tag">drawing…</span>'}</span>` +
-      `<button type="button" class="mini" data-undo="${k}" data-key="undo-${escapeHtml(pairKey(e.a, e.b))}" aria-label="Undo: ${e.add ? 'added' : 'removed'} ${escapeHtml(borderName(e))}">Undo</button></li>`)
+      `<button type="button" class="mini" data-undo="${k}" data-key="undo-${escapeHtml(pairKey(e.a, e.b))}" aria-label="Undo: ${e.add ? 'added' : 'removed'} ${escapeHtml(borderName(e))}"${k === edits.length - 1 ? ' title="Undo this change (Ctrl+Z)"' : ''}>Undo</button></li>`)
     .concat(undoing.map(e => `<li><span><s>${e.add ? 'Added' : 'Removed'} ${escapeHtml(describe(e))}</s> <span class="tag">undoing…</span></span></li>`));
   document.getElementById('edits-list').innerHTML = rows.join('');
   box.querySelectorAll('[data-undo]').forEach(button => {
@@ -1642,7 +1646,9 @@ function showEdits() {
   document.getElementById('clear').hidden = edits.length < 2;
   if (edits.length < 2) document.getElementById('clear-confirm').hidden = true;
   syncEditsTools();
-  if (focusKey) { let back = box.querySelector(`[data-key="${focusKey}"]`); if (back) back.focus({preventScroll: true}); }
+  // focus stays on the button it was on, or (its change undone) moves to the last Undo left or the title
+  if (focusKey) [box.querySelector(`[data-key="${focusKey}"]`), ...[...box.querySelectorAll('[data-undo], #undo-last')].reverse(),
+    document.getElementById('edits-toggle')].find(el => el && el.offsetParent)?.focus({preventScroll: true});
 }
 // UX: the state of the tools: what can be compared with what is drawn now
 function syncEditsTools() {
@@ -1650,12 +1656,12 @@ function syncEditsTools() {
   let comparable = !!(edited && plain && (world === edited.world || world === plain.world) && lastGood.length);
   flip.disabled = !comparable;
   flip.setAttribute('aria-pressed', String(showingBefore));
-  document.getElementById('undo-last').disabled = !edits.length;
   document.getElementById('ux-stamp').hidden = !showingBefore;
   // the list folds to its title row (a phone starts folded)
   let toggle = document.getElementById('edits-toggle');
   let open = toggle.getAttribute('aria-expanded') === 'true';
   document.getElementById('edits-body').hidden = !open;
+  document.getElementById('undo-last').hidden = open || !edits.length;
 }
 
 function escapeHtml(s) { return String(s).replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch])); }
@@ -2037,7 +2043,6 @@ flip.addEventListener('contextmenu', e => e.preventDefault());
 flip.addEventListener('click', () => { if (swallowClick) { swallowClick = false; return; } setBefore(!showingBefore); });
 function undoLast() { if (edits.length) location.hash = linkOf(seed, edits.slice(0, -1)); }
 $('undo-last').addEventListener('click', undoLast);
-$('status-undo').addEventListener('click', undoLast);
 // Undo all: at once for one change; for more, a question in the panel first
 $('clear').addEventListener('click', () => {
   if (edits.length < 2) { location.hash = linkOf(seed, []); return; }
@@ -2128,7 +2133,6 @@ function startJob(text, estimate, cancellable) {
     st.classList.remove('error');
     $('status-text').textContent = text;
     $('status-cancel').hidden = !cancellable;
-    $('status-undo').hidden = true;
     $('status-close').hidden = true;
     $('status-bar').hidden = false;
     st.hidden = false;
@@ -2166,7 +2170,7 @@ function endJob() {
   clearInterval(jobTimer);
   job = null;
 }
-function showStatus(text, sub, {undo = false, error = false, hideAfter = 0} = {}) {
+function showStatus(text, sub, {error = false, hideAfter = 0} = {}) {
   let st = $('status');
   $('loading').hidden = true;
   st.classList.toggle('error', error);
@@ -2174,7 +2178,6 @@ function showStatus(text, sub, {undo = false, error = false, hideAfter = 0} = {}
   $('status-sub').textContent = sub || '';
   $('status-bar').hidden = true;
   $('status-cancel').hidden = true;
-  $('status-undo').hidden = !undo;
   $('status-close').hidden = false;
   st.hidden = false;
   clearTimeout(statusTimer);
@@ -2218,7 +2221,7 @@ function reportDone(from, to, entry, how) {
   let sub = '';
   if (to.length && entry && entry.scratch) sub = 'It didn’t fit into the map as it was, so the world was drawn afresh: countries moved.';
   else if (to.length) sub = 'Hold “Show before” to compare.';
-  showStatus(text, sub, {undo: added.length === 1 && !removed.length && how !== 'link', hideAfter: entry && entry.scratch ? 0 : 15000});
+  showStatus(text, sub, {hideAfter: entry && entry.scratch ? 0 : 15000});
   if (selected) requestAnimationFrame(() => ensureVisible(selected));
   announce((text + ' ' + sub.replace('Hold “Show before” to compare.', '')).trim());
 }
