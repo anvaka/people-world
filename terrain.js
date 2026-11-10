@@ -3,13 +3,12 @@
 // colours; it invents no mountains or rivers of its own, so the same world shows the same ones
 // however it is drawn.
 //
-// Everything is a function of the world's number and of positions on the map (map units), on a
-// grid whose cells sit on a fixed lattice: where an edit leaves the map alone, it leaves the
-// terrain alone.
+// Everything is a function of the world's number and of positions on the map (map units), on the
+// grid of the world's land (land.js), whose cells sit on a fixed lattice: where an edit leaves the
+// map alone, it leaves the terrain alone. One of the generator's addons (addons.js).
 //
 //   makeTerrain({countries, lines}, seed) -> {
-//     grid      {w, h, cell, x0, y0}: cell (i, j) has its middle at (x0 + (i + 0.5) cell,
-//               y0 - (j + 0.5) cell), map coordinates with y up (row 0 is the northmost)
+//     grid      the land's: {w, h, cell, x0, y0} (read a field between cells with land.js's valueAt)
 //     mountain  Float32Array, w * h: how high the ranges stand, 0 to 1. Mountains are drawn where it
 //               is at least `shown`; below that the ground only rises toward them
 //     foot      Float32Array, w * h: the high ground the ranges stand on, 0 to 1 (foothills)
@@ -21,138 +20,21 @@
 //               thinner, so that it is seen to rise where it does
 //   }
 import {noise2, hypot} from './util.js';
+import {landOf, edt, spread, markLine, CELL} from './land.js';
 
 const smoothstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; ++i) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; };
 
 export const MOUNTAIN_SHOWN = 0.2;
-const CELLS_ACROSS = 720;          // about so many cells across the world and its margin
 // The lengths below are in map units of the world of countries, where a cell is about 0.3 across.
 // A world of another size (a graph of your own) gets the same terrain for its size: everything is
-// worked out with a cell counted as CELL across, whatever it measures on the map.
-const CELL = 0.3;
+// worked out with a cell counted as CELL across, whatever it measures on the map (land.js).
 const RIDGE = 1.05, RIDGE_HEIGHT = 7;     // every border stands on a low ridge: half its width, its height
 const MOUNTAIN_HEIGHT = 16, FOOT_HEIGHT = 3;
 const RIVER_MIN = 22;              // square map units of land drained: a river
 const SOURCE_MIN = 2.5;            // ... and how far up its largest stream a river is drawn
 const DIVIDE_MIN = 1.5 * RIVER_MIN;   // a divide carries a range where both the streams it parts drain so much
 const SHARE = 0.13;                // ... and at most this share of a country is under such ranges
-
-// Exact Euclidean distance transform (Felzenszwalb and Huttenlocher), in place: 0 where set, 1e20
-// elsewhere, becomes the distance in cells
-function edt1(f, n, d, v, z) {
-  let k = 0;
-  v[0] = 0; z[0] = -Infinity; z[1] = Infinity;
-  for (let q = 1; q < n; ++q) {
-    let s;
-    do { const p = v[k]; s = ((f[q] + q * q) - (f[p] + p * p)) / (2 * q - 2 * p); if (s <= z[k]) --k; else break; } while (k >= 0);
-    ++k; v[k] = q; z[k] = s; z[k + 1] = Infinity;
-  }
-  k = 0;
-  for (let q = 0; q < n; ++q) { while (z[k + 1] < q) ++k; const p = v[k]; d[q] = (q - p) * (q - p) + f[p]; }
-}
-function edt(grid, w, h) {
-  const m = Math.max(w, h), f = new Float64Array(m), d = new Float64Array(m), v = new Int32Array(m), z = new Float64Array(m + 1);
-  for (let x = 0; x < w; ++x) {
-    for (let y = 0; y < h; ++y) f[y] = grid[y * w + x];
-    edt1(f, h, d, v, z);
-    for (let y = 0; y < h; ++y) grid[y * w + x] = d[y];
-  }
-  for (let y = 0; y < h; ++y) {
-    for (let x = 0; x < w; ++x) f[x] = grid[y * w + x];
-    edt1(f, w, d, v, z);
-    for (let x = 0; x < w; ++x) grid[y * w + x] = Math.sqrt(d[x]);
-  }
-  return grid;
-}
-
-// Distance (in cells) from every cell to the nearest of `sources`, for cells within `radius` cells
-// of one (1e20 beyond): each source stamps a disc. Cheaper than a transform of the whole grid for
-// a field that is only read near its sources.
-function spread(sources, radius, w, h) {
-  const out = new Float32Array(w * h).fill(1e20), R = Math.ceil(radius), disc = [];
-  for (let dy = -R; dy <= R; ++dy) for (let dx = -R; dx <= R; ++dx) { const d = Math.sqrt(dx * dx + dy * dy); if (d <= radius) disc.push(dx, dy, d); }
-  for (const i of sources) {
-    const x = i % w, y = (i - x) / w;
-    for (let k = 0; k < disc.length; k += 3) {
-      const xx = x + disc[k], yy = y + disc[k + 1];
-      if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
-      const j = yy * w + xx;
-      if (disc[k + 2] < out[j]) out[j] = disc[k + 2];
-    }
-  }
-  return out;
-}
-
-// Which country each cell's middle lies in (-1: the sea): an even-odd scanline fill of the rings
-function rasterize(countries, G) {
-  const {w, h, cell, x0, y0} = G;
-  const ids = new Int16Array(w * h).fill(-1);
-  const rows = Array.from({length: h}, () => []);
-  for (const c of countries) for (const r of c.rings) {
-    for (let k = 0, m = r.length - 1; k < r.length; m = k++) {
-      // (rows run down the map: a row's y is y0 - (j + 0.5) cell)
-      const ax = r[m][0], ay = y0 - r[m][1], bx = r[k][0], by = y0 - r[k][1];
-      if (ay === by) continue;
-      const lo = Math.min(ay, by), hi = Math.max(ay, by);
-      const j0 = Math.max(0, Math.ceil(lo / cell - 0.5)), j1 = Math.min(h - 1, Math.ceil(hi / cell - 0.5) - 1);
-      for (let j = j0; j <= j1; ++j) rows[j].push(c.index, ax + ((j + 0.5) * cell - ay) * (bx - ax) / (by - ay));
-    }
-  }
-  for (let j = 0; j < h; ++j) {
-    const row = rows[j];
-    if (!row.length) continue;
-    const list = [];
-    for (let k = 0; k < row.length; k += 2) list.push([row[k], row[k + 1]]);
-    list.sort((p, q) => p[0] - q[0] || p[1] - q[1]);
-    for (let k = 0; k + 1 < list.length; k += 2) {
-      if (list[k][0] !== list[k + 1][0]) { k -= 1; continue; }   // (an odd count: skip one)
-      const i0 = Math.max(0, Math.ceil((list[k][1] - x0) / cell - 0.5)), i1 = Math.min(w - 1, Math.ceil((list[k + 1][1] - x0) / cell - 0.5) - 1);
-      for (let i = i0; i <= i1; ++i) ids[j * w + i] = list[k][0];
-    }
-  }
-  return ids;
-}
-// A few cells of no country inside the land, where borders meet (a cell whose middle fell in a
-// sliver between two shapes): left as sea, rivers would end there. Pockets of up to `most` cells
-// not joined to the open sea go to the country most round them
-function fillPockets(ids, w, h, most) {
-  const seen = new Uint8Array(w * h);
-  for (let i = 0; i < w * h; ++i) {
-    if (ids[i] !== -1 || seen[i]) continue;
-    const stack = [i], cells = [];
-    let open = false;
-    seen[i] = 1;
-    while (stack.length) {
-      const j = stack.pop(), x = j % w, y = (j - x) / w;
-      cells.push(j);
-      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) open = true;
-      for (const k of [x > 0 ? j - 1 : -1, x < w - 1 ? j + 1 : -1, y > 0 ? j - w : -1, y < h - 1 ? j + w : -1]) {
-        if (k >= 0 && ids[k] === -1 && !seen[k]) { seen[k] = 1; stack.push(k); }
-      }
-    }
-    if (open || cells.length > most) continue;
-    const count = new Map();
-    let best = -1, top = 0;
-    for (const j of cells) for (const k of [j - 1, j + 1, j - w, j + w]) {
-      const o = ids[k];
-      if (o >= 0) { const c = (count.get(o) || 0) + 1; count.set(o, c); if (c > top) { top = c; best = o; } }
-    }
-    for (const j of cells) ids[j] = best;
-  }
-}
-// The cells a line passes through (steps of a third of a cell), set to `value` in `out`
-function markLine(out, G, pts, value = 0) {
-  const {w, h, cell, x0, y0} = G;
-  for (let k = 1; k < pts.length; ++k) {
-    const ax = pts[k - 1][0], ay = pts[k - 1][1], bx = pts[k][0], by = pts[k][1];
-    const n = Math.max(1, Math.ceil(hypot(bx - ax, by - ay) / cell * 3));
-    for (let t = 0; t <= n; ++t) {
-      const x = Math.floor((ax + (bx - ax) * t / n - x0) / cell), y = Math.floor((y0 - (ay + (by - ay) * t / n)) / cell);
-      if (x >= 0 && y >= 0 && x < w && y < h) out[y * w + x] = value;
-    }
-  }
-}
 
 // A binary min-heap of cells by a key (the same order whatever the engine: ties go to the lower cell)
 function makeHeap(key) {
@@ -218,31 +100,17 @@ function flood(elev, ids, shore, w, h) {
 }
 
 export function makeTerrain(world, seed = 1) {
-  const countries = world.countries.filter(c => c.rings && c.rings.length);
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const c of countries) for (const r of c.rings) for (const p of r) {
-    if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0];
-    if (p[1] < minY) minY = p[1]; if (p[1] > maxY) maxY = p[1];
-  }
-  if (!(maxX > minX)) return {grid: {w: 1, h: 1, cell: 1, x0: 0, y0: 0}, mountain: new Float32Array(1), foot: new Float32Array(1), shown: MOUNTAIN_SHOWN, rivers: [], riverMin: RIVER_MIN};
-  // the grid: cells of a size from a fixed series (a quarter of a doubling apart), on a lattice
-  // through the origin, so a map that grows or shrinks a little keeps its cells where they were
-  const span = Math.max(maxX - minX, maxY - minY), pad = 0.12 * span;
-  const cell = 2 ** (Math.round(4 * Math.log2((span + 2 * pad) / CELLS_ACROSS)) / 4);
-  const x0 = Math.floor((minX - pad) / cell) * cell, y0 = Math.ceil((maxY + pad) / cell) * cell;
-  const w = Math.ceil((maxX + pad - x0) / cell), h = Math.ceil((y0 - (minY - pad)) / cell), N = w * h;
-  const G = {w, h, cell, x0, y0};
   const tm = globalThis.TERRAINLOG ? [['start', Date.now()]] : null, lap = name => { if (tm) tm.push([name, Date.now()]); };
-  const ids = rasterize(countries, G);
-  fillPockets(ids, w, h, 8);
+  const L = landOf(world);
+  if (!L) return {grid: {w: 1, h: 1, cell: 1, x0: 0, y0: 0}, mountain: new Float32Array(1), foot: new Float32Array(1), shown: MOUNTAIN_SHOWN, rivers: [], riverMin: RIVER_MIN};
+  const countries = world.countries.filter(c => c.rings && c.rings.length);
+  const G = L.grid, {w, h, cell, x0, y0} = G, N = w * h, {ids, inland, K, span} = L;
   const xOf = i => x0 + (i % w + 0.5) * cell, yOf = i => y0 - (Math.floor(i / w) + 0.5) * cell;
-  const K = CELL / cell;      // map units to the units the terrain is worked out in
 
   lap('raster');
-  // ---- distances (map units): inland from the coast, to the nearest border, to where borders meet
-  const inland = new Float64Array(N), borderD = new Float64Array(N).fill(1e20), coastLine = new Uint8Array(N);
-  for (let i = 0; i < N; ++i) inland[i] = ids[i] >= 0 ? 1e20 : 0;
-  edt(inland, w, h);
+  // ---- distances (map units): to the nearest border, to where borders meet (and inland from the
+  // coast: the land's own)
+  const borderD = new Float64Array(N).fill(1e20), coastLine = new Uint8Array(N);
   for (const line of world.lines) {
     if (line.kind === 'border') markLine(borderD, G, line.points, 0);
     else markLine(coastLine, G, line.points, 1);
@@ -276,7 +144,7 @@ export function makeTerrain(world, seed = 1) {
   }
   edt(borderD, w, h);
   const junctionD = spread(junctions, 2 * RIDGE / CELL + 1, w, h);
-  for (let i = 0; i < N; ++i) { inland[i] *= CELL; borderD[i] *= CELL; junctionD[i] *= CELL; }
+  for (let i = 0; i < N; ++i) { borderD[i] *= CELL; junctionD[i] *= CELL; }
 
   lap('distances');
   // ---- the ground before its ranges: rising inland, and rough. Every border stands on a low
@@ -538,15 +406,4 @@ export function makeTerrain(world, seed = 1) {
   lap('rivers');
   if (tm) console.log('terrain: ' + tm.slice(1).map(([n, t], k) => n + ' ' + (t - tm[k][1])).join(', ') + ' ms');
   return {grid: G, mountain, foot, shown: MOUNTAIN_SHOWN, rivers, riverMin: RIVER_MIN / (K * K)};
-}
-
-// The value of one of a terrain's fields at a point of the map (between the cells' middles)
-export function terrainAt(terrain, field, x, y) {
-  const {w, h, cell, x0, y0} = terrain.grid;
-  const fx = (x - x0) / cell - 0.5, fy = (y0 - y) / cell - 0.5;
-  const cx = Math.floor(fx), cy = Math.floor(fy);
-  if (cx < 0 || cy < 0 || cx >= w - 1 || cy >= h - 1) return 0;
-  const tx = fx - cx, ty = fy - cy, i = cy * w + cx;
-  const a = field[i], b = field[i + 1], c = field[i + w], d = field[i + w + 1];
-  return a + (b - a) * tx + (c - a) * ty + (a - b - c + d) * tx * ty;
 }

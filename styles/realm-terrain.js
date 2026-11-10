@@ -3,8 +3,9 @@
 //
 // What is made once per world (CPU, a fraction of a second):
 //   fields  a grid over the world: distance inland from the coast, distance out to sea, the land
-//           blurred (the shelf: wide shallows off big land, almost none round a tiny island) and
-//           how high the world's mountain ranges stand (its terrain: see terrain.js)
+//           blurred (the shelf: wide shallows off big land, almost none round a tiny island), how
+//           high the world's mountain ranges stand (its terrain: see terrain.js), its climate
+//           (warmth, moisture, woods: climate.js) and its rivers' valleys (valleys.js)
 //   meshes  every country triangulated (earcut: exactly the SVG's land), and every border and coast
 //           as segments, per level of detail
 // What is painted per view (GPU), in four draws whatever the number of countries:
@@ -14,7 +15,7 @@
 //           countries) and to the nearest coast on both sides (MAX blending)
 //   paint   one full-screen pass: height from the fields and a derivative-damped fBm (IQ's
 //           "erosion-like" noise; octaves follow the zoom, so relief keeps its grain at any scale),
-//           Whittaker biomes from temperature and moisture, NW light with warm lit slopes and cool
+//           Whittaker biomes from the world's temperature and moisture, NW light with warm lit slopes and cool
 //           shadows (Imhof), snow, rock, forest canopies, beaches and cliffs; water by depth with
 //           a foam edge; the countries' colours as a band inside each border (as strategy games do)
 // All noise is hashed from the world's number and positions on the map: the same world always
@@ -96,7 +97,7 @@ const PAINT_FS = `#version 300 es
 precision highp float; precision highp int;
 uniform sampler2D u_edges, u_fields, u_lut, u_ids, u_codes, u_fields2;
 uniform vec2 u_res, u_center, u_P0, u_fieldA, u_fieldB, u_fieldN, u_lat;
-uniform float u_pr, u_invK, u_kpr, u_bandPx, u_foamPx, u_night, u_screen, u_gradNorm;
+uniform float u_pr, u_invK, u_kpr, u_bandPx, u_foamPx, u_night, u_screen, u_gradNorm, u_climate;
 uniform vec2 u_oct[${MAX_OCT}], u_rot[${MAX_OCT}]; uniform float u_freq[${MAX_OCT}], u_amp[${MAX_OCT}], u_shadeW[${MAX_OCT}];
 uniform int u_nOct;
 uniform vec3 u_pal[8];
@@ -268,6 +269,9 @@ void main() {
   vec2 stp = tx / u_fieldA;
   vec4 Gx = (Fx - F) / stp.x, Gy = (Fy - F) / stp.y;
   vec3 dIn = vec3(F.r, Gx.r, Gy.r), belt = vec3(F.a, Gx.a, Gy.a);
+  // the world's climate (warmth, moisture, how wooded) and how deep its rivers' valleys are cut
+  vec4 Cl = cubic(u_fields2, uv);
+  vec3 vale = vec3(Cl.a, (cubic(u_fields2, uv + vec2(tx.x, 0.0)).a - Cl.a) / stp.x, (cubic(u_fields2, uv + vec2(0.0, tx.y)).a - Cl.a) / stp.y);
 
   // which country, its colour slot and state, and its size
   int idx = int(I.r * 255.0 + 0.5) - 1;
@@ -278,6 +282,7 @@ void main() {
 
   // ---- noise: smooth and ridged sums over the octaves the zoom needs
   vec3 sm = vec3(0.0), rg = vec3(0.0), low = vec3(0.0), macroS = vec3(0.0), macroR = vec3(0.0);
+  float mid = 0.0;
   vec2 acc = vec2(0.0);
   for (int i = 0; i < ${MAX_OCT}; ++i) {
     if (i >= u_nOct) break;
@@ -300,6 +305,7 @@ void main() {
     sm += a * vec3(v, g * sw);
     rg += a * damp * vec3(r2, gr2 * sw);
     if (i == 1) low = sm;
+    if (i == 2) mid = sm.x;
     if (i == 4) { macroS = sm; macroR = rg; }
   }
   if (u_nOct < 5) { macroS = sm; macroR = rg; }
@@ -323,20 +329,34 @@ void main() {
   float flank = 1.0 / (u_invK * max(length(mount.yz), 1e-6));
   mount.yz *= 1.0 - smoothstep(0.8 * u_screen, 3.0 * u_screen, flank);
   hills.yz *= 0.1;
-  float hb = rise.x * 0.18 + macroS.x * 0.05 + mount.x * (0.35 + macroR.x * 0.65) * 0.6;   // for the climate
+  // (a valley's sides shade as a range's flanks do: until they are wider than the screen)
+  vale.yz *= 1.0 - smoothstep(0.8 * u_screen, 3.0 * u_screen, 1.0 / (u_invK * max(length(vale.yz), 1e-6)));
+  float hb = rise.x * 0.18 + macroS.x * 0.05 + mount.x * (0.35 + macroR.x * 0.65) * 0.6 - 0.05 * vale.x;   // for the climate
   // shading as designed slopes: the mountains' flanks (while the screen holds them), their ridged detail,
-  // the lowlands' gentle grain; the noise's slope is divided by its expected size at this zoom
+  // the lowlands' gentle grain; the noise's slope is divided by its expected size at this zoom. The
+  // ground falls into the valleys the world's rivers have cut (valleys.js), so a river lies in the
+  // land: its sunward bank in shade, the other lit
   vec2 sl = mount.yz * (0.22 / 75.0)
-    + rg.yz * u_gradNorm * (0.1 + 1.7 * mount.x)
+    - vale.yz * (0.2 / 75.0)
+    + rg.yz * u_gradNorm * (0.1 + 1.7 * mount.x) * (1.0 - 0.5 * vale.x)
     + sm.yz * u_gradNorm * (0.12 + 0.35 * hills.x);
   vec3 N = normalize(vec3(-sl, 1.0));
   float slope = length(sl);
   float diff = dot(N, L), rel = diff - L.z;
 
-  // ---- climate: cold north, warm south, cooler up high; wet by the sea and where the winds bring it
-  float lat = P.y * u_lat.x + u_lat.y;
-  float T = clamp(0.02 + 1.12 * lat + 0.2 * (m2.x - 0.5) - 1.35 * max(hb - 0.24, 0.0), 0.0, 1.0);
-  float W = clamp(0.46 + 0.55 * wet + 0.22 * (1.0 - smoothstep(0.0, 0.25, dIn.x)) - 0.32 * smoothstep(0.3, 0.9, dIn.x), 0.0, 1.0);
+  // ---- climate: the world's own (climate.js: cold north, warm south, cooler up high; wet where the
+  // winds bring the sea's moisture, dry in the lee of the ranges and under the calms, green along
+  // the rivers), with a grain of this style's so that it has no edge at any zoom. A world built
+  // without a climate is painted one from noise
+  float T, W;
+  if (u_climate > 0.5) {
+    T = clamp(Cl.r + 0.07 * (m2.x - 0.5) - 0.5 * mount.x * (macroR.x - 0.5), 0.0, 1.0);
+    W = clamp(Cl.g + 0.1 * (m3.x - 0.5), 0.0, 1.0);
+  } else {
+    float lat = P.y * u_lat.x + u_lat.y;
+    T = clamp(0.02 + 1.12 * lat + 0.2 * (m2.x - 0.5) - 1.35 * max(hb - 0.24, 0.0), 0.0, 1.0);
+    W = clamp(0.46 + 0.55 * wet + 0.22 * (1.0 - smoothstep(0.0, 0.25, dIn.x)) - 0.32 * smoothstep(0.3, 0.9, dIn.x), 0.0, 1.0);
+  }
   vec4 B = texture(u_lut, vec2(T, W));
   vec3 col = B.rgb;
   // snow on the peaks: where the crest is high and the ridged detail rises, so it lies in patches
@@ -351,10 +371,15 @@ void main() {
   col = mix(col, vec3(0.68, 0.62, 0.54) + 0.08 * (macroS.x), rock * 0.8);
   col = mix(col, vec3(0.95, 0.96, 0.98), snow);
   // forest: clumps of round crowns, lit from the north-west, in shadow between them
-  // forest in woods and copses: a country-sized patch noise, broken by a finer one into stands and
-  // clearings, so no country is one green carpet
+  // forest in woods and copses: where the world's climate has woods (thicker in the wetter
+  // country; without a climate, a country-sized patch noise), broken by a finer noise into stands
+  // and clearings, so no country is one green carpet
   float stands = smoothstep(-0.06, 0.16, sm.x - macroS.x + 0.35 * (macroS.x - low.x) + 0.04);
-  float forest = B.a * smoothstep(0.5, 0.7, m3.x + 0.22 * (macroS.x - low.x)) * stands * (1.0 - rock) * (1.0 - snow) * (1.0 - smoothstep(0.3, 0.7, mount.x));
+  // (the edge of a wood is ragged at every scale: the world's field gives its place, this
+  // style's noise its outline)
+  float wooded = u_climate > 0.5 ? smoothstep(0.3, 0.7, Cl.b + 2.6 * (macroS.x - mid) + 3.0 * (sm.x - macroS.x)) * (0.45 + 0.65 * B.a)
+    : B.a * smoothstep(0.5, 0.7, m3.x + 0.22 * (macroS.x - low.x));
+  float forest = wooded * stands * (1.0 - rock) * (1.0 - snow) * (1.0 - smoothstep(0.3, 0.7, mount.x));
   if (forest > 0.02) {
     float glade = rnoise(local, vec2(5.0), 34);
     float keep = (0.2 + forest * 0.75) * (0.55 + 0.6 * glade), dense = smoothstep(0.05, 0.3, forest);
@@ -909,6 +934,7 @@ export function createTerrain(plate, svg, opts = {}) {
     gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, edges.ids); gl.uniform1i(u.u_ids, 3);
     gl.activeTexture(gl.TEXTURE4); gl.bindTexture(gl.TEXTURE_2D, codeTex); gl.uniform1i(u.u_codes, 4);
     gl.activeTexture(gl.TEXTURE5); gl.bindTexture(gl.TEXTURE_2D, W.fieldTex2); gl.uniform1i(u.u_fields2, 5);
+    gl.uniform1f(u.u_climate, W.F.climate ? 1 : 0);
     let cxCss = cssW / 2, cyCss = cssH / 2;
     let P0 = [(cxCss - Tx) / K, (cyCss - Ty) / K];
     gl.uniform2f(u.u_res, w, h);

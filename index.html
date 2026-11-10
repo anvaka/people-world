@@ -690,13 +690,17 @@ if ((location.hash || currentStyle !== DEFAULT_STYLE) && decodeURIComponent(loca
 // The world is built in a worker when the browser can run module workers, else right here.
 // A newer request cancels the one before it. `base`: the layout of an earlier world to start
 // from, so an edited map keeps everything the edit doesn't touch where it was.
+// The generator's addons (addons.js: terrain, valleys, climate) are all on. One named here is left
+// out of every world built, and the styles draw without it: {climate: false}. For a look at the
+// map without some, the address takes ?without=climate,valleys
+const ADDONS = Object.fromEntries((new URLSearchParams(location.search).get('without') || '').split(',').filter(Boolean).map(name => [name, false]));
 let running = null;
 function build(doc, seed, onProgress, base) {
   if (running) running.cancel();
   return new Promise((resolve, reject) => {
     let cancelled = false, worker = null;
     running = {cancel() { cancelled = true; if (worker) worker.terminate(); reject(new Error('cancelled')); }};
-    let here = () => buildWorld(doc, {seed, planarSubgraph, base, ...doc.build, onProgress: p => { if (!cancelled) onProgress(p); }})
+    let here = () => buildWorld(doc, {seed, planarSubgraph, base, addons: ADDONS, ...doc.build, onProgress: p => { if (!cancelled) onProgress(p); }})
       .then(r => { if (!cancelled) resolve(r); }, e => { if (!cancelled) reject(e); });
     try {
       worker = new Worker(new URL('./worker.js', import.meta.url), {type: 'module'});
@@ -717,7 +721,7 @@ function build(doc, seed, onProgress, base) {
       worker = null;
       here();
     };
-    worker.postMessage({doc, seed, base});
+    worker.postMessage({doc, seed, base, addons: ADDONS});
   });
 }
 // The same, given up after `ms` (resolves to null then)

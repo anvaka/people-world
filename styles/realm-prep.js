@@ -6,13 +6,15 @@
 //             1: distance inland from the coast, distance out to sea, the shelf (the land blurred:
 //                wide shallows off big land, almost none round a tiny island), and the mountains:
 //                how high the world's ranges stand (its terrain: see terrain.js)
-//             2: distance to the nearest border
+//             2: the world's climate (climate.js): warmth, moisture, how wooded the ground is; and
+//                how deep its rivers' valleys are cut (valleys.js). `climate` says whether the
+//                world has one (without, the style paints a climate of its own)
 //   rivers    the world's rivers (its terrain), as segments for the GPU
 //   triangles every country triangulated (earcut), exactly the land of the SVG
 // Input: plain data from the page's world (see realm.js, worldData). Output: typed arrays only, so
 // the worker hands them over without copying.
 import earcut from '../vendor/earcut.js';
-import {terrainAt} from '../terrain.js';
+import {valueAt} from '../land.js';
 
 export const FIELD_W = 640;
 
@@ -117,18 +119,6 @@ function fillPockets(ids, w, h, most, fill) {
     if (!open && cells.length <= most) { let v = fill(cells); for (let j of cells) ids[j] = v; }
   }
 }
-// Marks the texels a polyline passes through (steps of a third of a texel)
-function markLine(grid, nx, ny, x0, y0, s, pts) {
-  for (let k = 1; k < pts.length; ++k) {
-    let [ax, ay] = pts[k - 1], [bx, by] = pts[k];
-    let n = Math.max(1, Math.ceil(Math.hypot(bx - ax, by - ay) * s * 3));
-    for (let t = 0; t <= n; ++t) {
-      let x = Math.floor((ax + (bx - ax) * t / n - x0) * s), y = Math.floor((ay + (by - ay) * t / n - y0) * s);
-      if (x >= 0 && y >= 0 && x < nx && y < ny) grid[y * nx + x] = 0;
-    }
-  }
-}
-
 function ringArea(ring) {
   let a = 0;
   for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) a += ring[j][0] * ring[i][1] - ring[i][0] * ring[j][1];
@@ -144,8 +134,9 @@ function inRing(ring, x, y) {
 }
 
 
-// data: {seed, box, terrain, items: [{index, id, size, rings}], lines: [{kind, a, b, points}]} (world
-// coordinates, y up, as the generator gives them; terrain: the world's, see terrain.js)
+// data: {seed, box, terrain, climate, valleys, items: [{index, id, size, rings}], lines: [{kind, a, b,
+// points}]} (world coordinates, y up, as the generator gives them; terrain, climate and valleys:
+// the world's, see addons.js; any of them may be missing)
 export function prepareWorld(data) {
   let t0 = Date.now();
   let {box, seed} = data;
@@ -170,28 +161,29 @@ export function prepareWorld(data) {
   let mask = new Float32Array(n);
   for (let i = 0; i < n; ++i) mask[i] = ids[i] >= 0 ? 1 : 0;
   // the mountains: how high the world's ranges stand, at every texel (the same ranges every style
-  // draws); and the distance to any border
-  let T = data.terrain;
-  let belt = new Float32Array(n), borderD = new Float64Array(n).fill(1e20);
-  if (T) for (let j = 0; j < ny; ++j) for (let i = 0; i < nx; ++i) {
-    let k = j * nx + i;
-    if (ids[k] >= 0) belt[k] = Math.min(1, terrainAt(T, T.mountain, x0 + (i + 0.5) / s, -(y0 + (j + 0.5) / s)));
+  // draws); the climate and the valleys, as the world has them
+  let T = data.terrain, C = data.climate, V = data.valleys;
+  let belt = new Float32Array(n);
+  let f1 = new Uint8Array(n * 4), f2 = new Uint8Array(n * 4);
+  let byte = v => Math.round(Math.max(0, Math.min(1, v)) * 255);
+  for (let j = 0; j < ny; ++j) for (let i = 0; i < nx; ++i) {
+    let k = j * nx + i, x = x0 + (i + 0.5) / s, y = -(y0 + (j + 0.5) / s);
+    if (T && ids[k] >= 0) belt[k] = Math.min(1, valueAt(T, T.mountain, x, y));
+    // (the climate's fields run on a little way out to sea: so a texel off the coast holds the
+    // land's values, and the land's edge is painted as the land is)
+    if (C) { f2[4 * k] = byte(valueAt(C, C.temperature, x, y)); f2[4 * k + 1] = byte(valueAt(C, C.moisture, x, y)); f2[4 * k + 2] = byte(valueAt(C, C.woods, x, y)); }
+    if (V) f2[4 * k + 3] = byte(valueAt(V, V.depth, x, y));
   }
-  data.lines.forEach(line => { if (line.kind === 'border') markLine(borderD, nx, ny, x0, y0, s, svg(line.points)); });
-  edt(borderD, nx, ny);
   // distances inland and out to sea, in cells
   let inside = new Float64Array(n), outside = new Float64Array(n);
   for (let i = 0; i < n; ++i) { let l = mask[i] >= 0.5; inside[i] = l ? 1e20 : 0; outside[i] = l ? 0 : 1e20; }
   edt(inside, nx, ny); edt(outside, nx, ny);
   let shelf = blur(mask, nx, ny, 5);
-  let f1 = new Uint8Array(n * 4), f2 = new Uint8Array(n * 4);
   for (let i = 0; i < n; ++i) {
     f1[4 * i] = Math.round(Math.min(1, inside[i] / 64) * 255);
     f1[4 * i + 1] = Math.round(Math.min(1, outside[i] / 80) * 255);
     f1[4 * i + 2] = Math.round(Math.min(1, shelf[i] * 1.6) * 255);
     f1[4 * i + 3] = Math.round(belt[i] * 255);
-    f2[4 * i] = Math.round(Math.min(1, borderD[i] / 16) * 255);
-    f2[4 * i + 3] = 255;
   }
   let tRivers = Date.now();
   // the world's rivers as GPU segments (ax, ay, bx, by, half width, -1, -1), coordinates normalised
@@ -230,7 +222,7 @@ export function prepareWorld(data) {
   });
   let t1 = Date.now();
   return {
-    fields: {f1, f2, nx, ny, x0, y0, s}, rivers: new Float32Array(rv.length ? rv : [0, 0, 0, 0, 0, -1, -1]),
+    fields: {f1, f2, nx, ny, x0, y0, s, climate: !!C}, rivers: new Float32Array(rv.length ? rv : [0, 0, 0, 0, 0, -1, -1]),
     riverCount: rv.length / 7, tris: new Float32Array(verts), span, cx, cy,
     ms: {fields: tRivers - t0, rivers: tTri - tRivers, triangles: t1 - tTri, total: t1 - t0},
   };

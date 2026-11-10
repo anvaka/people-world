@@ -361,7 +361,8 @@ const seedOf = () => { let m = /world-(\d+)/.exec(decodeURIComponent(location.ha
 // ---- preparation, in a worker when module workers work, else on the page (a moment later)
 let worker = null, workerFailed = false, jobs = new Map(), jobSerial = 0;
 function worldData(world) {
-  return {seed: seedOf(), box: world.box, terrain: world.result && world.result.terrain,
+  let result = world.result || {};
+  return {seed: seedOf(), box: world.box, terrain: result.terrain, climate: result.climate, valleys: result.valleys,
     items: world.items.map(it => ({index: it.index, id: it.country.id, size: it.size, rings: it.country.rings})),
     lines: world.lineItems.map(l => ({kind: l.kind, a: l.a, b: l.b, points: l.points}))};
 }

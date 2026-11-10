@@ -1,12 +1,13 @@
 // The inked map's survey: from a raster of the world (which country, or sea, in each cell) it
 // measures how far every cell lies from the sea, from the land and from the nearest border or
-// coast, samples the terrain fields (the world's own mountains, and this style's woods, downs,
-// dry and wet ground), and finds the widest open water for the sea's furniture.
+// coast, samples the terrain fields (the world's own mountains, woods, deserts and marshes, and
+// this style's downs), and finds the widest open water for the sea's furniture.
 // Input {w, h, ids (Int16Array: country index, -1 sea, -2 an edge cell), cell (world units),
-// x0, y0 (world position of cell 0, y up), seed, box, terrain (the world's: see terrain.js)}.
+// x0, y0 (world position of cell 0, y up), seed, box, terrain and climate (the world's: see
+// terrain.js and climate.js; either may be missing)}.
 // Distances are in cells.
 import {makeTerrain} from './ink-noise.js';
-import {terrainAt} from '../terrain.js';
+import {valueAt} from '../land.js';
 
 // Exact Euclidean distance transform (Felzenszwalb & Huttenlocher) of one row, on squared distances
 function edt1d(f, n, d, v, z) {
@@ -65,7 +66,7 @@ export function fillPockets(ids, w, h, most = 8, fill = () => -2) {
   }
   return ids;
 }
-export function survey({w, h, ids, cell, x0, y0, seed, box, terrain}) {
+export function survey({w, h, ids, cell, x0, y0, seed, box, terrain, climate}) {
   const N = w * h;
   fillPockets(ids, w, h);
   const land = new Uint8Array(N), sea = new Uint8Array(N), edge = new Uint8Array(N);
@@ -81,18 +82,28 @@ export function survey({w, h, ids, cell, x0, y0, seed, box, terrain}) {
   // The terrain fields, sampled once per cell over the land (the page reads them back, smoothly
   // interpolated, instead of computing noise for every mark). The mountains and the high ground
   // they stand on are the world's own (terrain.js): every style draws the same ranges, and the
-  // world's rivers run off them. Woods, downs, dry and wet ground are this style's.
-  const T = makeTerrain(seed);
-  const fields = {mountain: new Float32Array(N), hill: new Float32Array(N), forest: new Float32Array(N), dry: new Float32Array(N), wet: new Float32Array(N)};
+  // world's rivers run off them. So are the woods, the deserts, the marshes and the cold (its
+  // climate: climate.js); in a world built without a climate they are this style's own noise.
+  const T = makeTerrain(seed), C = climate || null, marsh = C ? C.biomes.indexOf('marsh') : -1;
+  const fields = {mountain: new Float32Array(N), hill: new Float32Array(N), forest: new Float32Array(N), dry: new Float32Array(N), wet: new Float32Array(N), warmth: C ? new Float32Array(N) : null};
   for (let y = 0; y < h; ++y) for (let x = 0; x < w; ++x) {
     let i = y * w + x;
     // (sea cells next to land are sampled too, so interpolation at the coast is sound)
     if (!land[i] && toLand[i] > 1.5) continue;
     let wx = x0 + (x + 0.5) * cell, wy = y0 - (y + 0.5) * cell;
-    fields.mountain[i] = terrain ? terrainAt(terrain, terrain.mountain, wx, wy) : 0;
+    fields.mountain[i] = terrain ? valueAt(terrain, terrain.mountain, wx, wy) : 0;
     // foothills flank the ranges; a few downs and wolds stand on their own
-    fields.hill[i] = Math.max(terrain ? Math.min(1, 1.3 * terrainAt(terrain, terrain.foot, wx, wy)) : 0, T.downs(wx, wy));
-    fields.forest[i] = T.forest(wx, wy); fields.dry[i] = T.dry(wx, wy); fields.wet[i] = T.wet(wx, wy);
+    fields.hill[i] = Math.max(terrain ? Math.min(1, 1.3 * valueAt(terrain, terrain.foot, wx, wy)) : 0, T.downs(wx, wy));
+    if (!C) { fields.forest[i] = T.forest(wx, wy); fields.dry[i] = T.dry(wx, wy); fields.wet[i] = T.wet(wx, wy); continue; }
+    let warmth = valueAt(C, C.temperature, wx, wy), moisture = valueAt(C, C.moisture, wx, wy);
+    // woods where the world has them. Of each realm's this style draws the thickest (see
+    // thresholds); where all is forest, its own noise picks the stands
+    fields.forest[i] = valueAt(C, C.woods, wx, wy) - C.wooded + FLOOR.forest + 0.1 * T.forest(wx, wy);
+    // dunes in the deserts (warm and arid), reeds in the marshes
+    fields.dry[i] = 0.19 + 3 * (1 / 6 - moisture) * smooth(0.55, 0.66, warmth);
+    let gx = Math.floor((wx - C.grid.x0) / C.grid.cell), gy = Math.floor((C.grid.y0 - wy) / C.grid.cell);
+    fields.wet[i] = gx >= 0 && gy >= 0 && gx < C.grid.w && gy < C.grid.h && C.biome[gy * C.grid.w + gx] === marsh ? 0.6 : 0;
+    fields.warmth[i] = warmth;
   }
   const shown = terrain ? terrain.shown : Infinity;
   return {toSea, toLand, toEdge, ids, fields, thr: thresholds(ids, fields, toSea, cell, shown), spots: seaSpots({w, h, ids, cell, x0, y0, toLand, box})};

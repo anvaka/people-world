@@ -214,10 +214,10 @@ export function createEngine(makeCanvas) {
   const worlds = new Map();
   const pals = {};
 
-  function init(id, {packed, grid, seed, dev, terrain}) {
+  function init(id, {packed, grid, seed, dev, terrain, climate}) {
     let {items, lines} = unpackWorld(packed);
     let ids = grid.ids || drawIds(makeCanvas(grid.w, grid.h).getContext('2d', {willReadFrequently: true}), grid, Array.from(items.values(), it => [it.index, it.rings]));
-    let sv = {...grid, ids, ...survey({...grid, ids, seed, terrain})};
+    let sv = {...grid, ids, ...survey({...grid, ids, seed, terrain, climate})};
     let st = {id, seed, dev, sv, items, lines, T: makeTerrain(seed), marks: new Map(), levels: new Map(), decor: null};
     st.near = segmentGrid(lines, grid.box);
     st.nearBorder = segmentGrid(lines.filter(l => l.kind === 'border'), grid.box);
@@ -368,6 +368,9 @@ export function createEngine(makeCanvas) {
   const grow = b => Math.min(1.45, 1 + 0.1 * Math.max(0, b - 1));
   const RISE = {mountain: 0.36, hill: 0.15, tree: 0.55, marsh: 0.1, dune: 0.15};
   const SALT = {mountain: 1, hill: 2, tree: 3, marsh: 4, dune: 5};
+  // the climate's warmth below which trees are firs (the taiga and colder) and above which they are
+  // the flat-topped trees of the hot south
+  const COLD = 0.375, HOT = 0.8;
 
   function markTile(st, kind, b, ti, tj) {
     let key = kind + b + ':' + ti + ':' + tj, out = st.marks.get(key);
@@ -420,7 +423,10 @@ export function createEngine(makeCanvas) {
       let item = st.items.get(id);
       // a realm too small on screen keeps its paper plain (a mark would cover a good part of it)
       if (!item || item.size * kb < 26) continue;
-      out.push({x, y, kind, s: size * s, v: r1, w: r2, slot: item.slot, cold: y + 16 * T.noise(x / 13 + 4.1, y / 13 - 2.7) > 27});
+      // firs where it is cold and flat-topped trees where it is hot (the world's climate; without
+      // one, firs in the north)
+      let warmth = F.warmth ? at(F.warmth) : y + 16 * T.noise(x / 13 + 4.1, y / 13 - 2.7) > 27 ? 0 : 0.5;
+      out.push({x, y, kind, s: size * s, v: r1, w: r2, slot: item.slot, cold: warmth < COLD, hot: warmth > HOT});
     }
     st.marks.set(key, out);
     if (st.marks.size > 3000) st.marks.delete(st.marks.keys().next().value);
@@ -687,7 +693,8 @@ function hill(x, y, s, g, dark) {
   ctx.lineWidth = 0.75;
   ctx.stroke();
 }
-// A tree: a rounded crown on a short trunk, or in the north a fir with two tiers of boughs. Woods
+// A tree: a rounded crown on a short trunk; where it is cold a fir with two tiers of boughs, where
+// it is hot a flat-topped tree. Woods
 // are drawn in bands from the back, so the trees in front hide the feet of those behind.
 function tree(x, y, s, g, T, dark) {
   let f = T.fill, side = dark ? -1 : 1;
@@ -709,6 +716,20 @@ function tree(x, y, s, g, T, dark) {
     if (s < 5.5) return;
     T.shade.moveTo(x + side * half * 0.15, mid + h * 0.05); T.shade.lineTo(x + side * half * 0.55, foot - 0.5);
     T.shade.moveTo(x + side * half * 0.1, foot - h * 0.66); T.shade.lineTo(x + side * half * 0.35, mid - 0.3);
+    return;
+  }
+  if (g.hot) {
+    // a flat-topped tree of the savanna: a low wide crown on a long leaning trunk
+    let r = s * 0.6 * (0.9 + 0.2 * g.v), top = y - s * 1.12, base = top + r * 0.62, lean = (g.w - 0.5) * s * 0.3;
+    f.moveTo(x - r, base);
+    f.bezierCurveTo(x - r * 0.95, top - r * 0.12, x + r * 0.95, top - r * 0.12, x + r, base);
+    f.closePath();
+    T.line.moveTo(x - r, base);
+    T.line.bezierCurveTo(x - r * 0.95, top - r * 0.12, x + r * 0.95, top - r * 0.12, x + r, base);
+    T.line.closePath();
+    T.line.moveTo(x + lean * 0.3, base); T.line.quadraticCurveTo(x + lean, (base + y) / 2, x, y);
+    if (s < 5.5) return;
+    T.shade.moveTo(x + side * r * 0.2, base - 0.6); T.shade.lineTo(x + side * r * 0.8, base - 0.6);
     return;
   }
   let r = s * 0.5 * (0.9 + 0.2 * g.v), cy = y - s * 0.22 - r * 0.8;

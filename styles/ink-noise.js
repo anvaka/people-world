@@ -1,8 +1,9 @@
-// Seeded noise for the inked map's own terrain marks. Everything that decides where a wood, a
-// marsh or a dune goes is a function of the world number and of a position on the map (world
-// units), never of a random number drawn at load time: the same world gives the same marks, and
-// an edit that leaves a region alone leaves them alone. (The mountains and rivers are the world's:
-// terrain.js.)
+// Seeded noise for the inked map's own terrain marks: the downs, which stand of a forest is drawn,
+// and (in a world built without a climate) where the woods, marshes and dunes go. All of it is a
+// function of the world number and of a position on the map (world units), never of a random
+// number drawn at load time: the same world gives the same marks, and an edit that leaves a region
+// alone leaves them alone. (The mountains and rivers are the world's: terrain.js. So are the woods,
+// deserts and marshes: climate.js.)
 
 // A 32-bit hash of integers, as a number in [0, 1)
 export function hash(a, b, c, d) {
