@@ -351,6 +351,8 @@
 
   @media (max-width: 600px) {
     header .tools button { padding: 0 10px; }
+    /* (a panel leaves part of the map in sight: a style or theme picked in it is seen at once) */
+    header .panel { max-height: min(58vh, calc(100vh - 76px - 2 * var(--edge) - env(safe-area-inset-top) - env(safe-area-inset-bottom))); }
     /* after the first look around, the bar is all that stays: Customize has the rest */
     :root.ux-explored header .welcome { display: none; }
     #dock { left: calc(var(--edge) + env(safe-area-inset-left)); width: auto;
