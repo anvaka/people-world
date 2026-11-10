@@ -14,13 +14,15 @@
 //     foot      Float32Array, w * h: the high ground the ranges stand on, 0 to 1 (foothills)
 //     shown     the value of `mountain` from which a style draws mountains
 //     rivers    [{points: Float64Array (x, y, x, y, ...; y up), flow: Float32Array}], each from its
-//               source down to the sea or to the river it joins; flow is the land it has drained
-//               by each point, in square map units (rain falls more on the heights)
+//               source down to the sea or to the river it joins, the largest first. One that joins
+//               another ends on a point of that river's line, and no two cross. flow is the land
+//               a river has drained by each point, in square map units (rain falls more on the
+//               heights)
 //     riverMin  the flow from which a stream counts as a river. Each river is drawn from higher up,
 //               thinner, so that it is seen to rise where it does
 //   }
 import {noise2, hypot} from './util.js';
-import {landOf, edt, spread, markLine, CELL} from './land.js';
+import {landOf, edt, spread, markLine, valueAt, CELL} from './land.js';
 
 const smoothstep = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const hashStr = s => { let h = 2166136261; for (let i = 0; i < s.length; ++i) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0) / 4294967296; };
@@ -317,7 +319,8 @@ export function makeTerrain(world, seed = 1) {
   }
 
   lap('flood');
-  // ---- rivers: the cells that gather enough, each traced from its source down
+  // ---- rivers: the cells that gather enough. Where two streams meet, the larger is the river and
+  // runs on; the smaller is its tributary and ends there, on the river's line
   const isRiver = i => land(i) && flow[i] >= RIVER_MIN;
   const upBest = new Int32Array(N).fill(-1), hasUp = new Uint8Array(N);
   for (let i = 0; i < N; ++i) {
@@ -326,69 +329,153 @@ export function makeTerrain(world, seed = 1) {
     if (upBest[d] < 0 || flow[i] > flow[upBest[d]]) upBest[d] = i;
     if (isRiver(i)) hasUp[d] = 1;
   }
+  // the heads (where a stream first counts as a river), the largest rivers first: by what each
+  // carries where it ends, at the sea or in a larger river. So a river is drawn before any that
+  // joins it
   const heads = [];
-  for (let i = 0; i < N; ++i) if (isRiver(i) && !hasUp[i]) heads.push(i);
-  heads.sort((a, b) => flow[b] - flow[a] || a - b);
-  const taken = new Uint8Array(N), rivers = [];
-  for (const head of heads) {
+  for (let i = 0; i < N; ++i) {
+    if (!isRiver(i) || hasUp[i]) continue;
+    let e = i;
+    while (down[e] >= 0 && land(down[e]) && upBest[down[e]] === e) e = down[e];
+    heads.push([i, flow[e]]);
+  }
+  heads.sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+  // The courses bend. Every point of the map is pushed aside a little, by a slow wave and a quicker
+  // one: the same push for every river, so two that meet still meet and two that do not, do not
+  // cross. No push at the coast (a river ends where its water does) nor by a border (it crosses
+  // one square on)
+  const fieldsOf = {grid: G};
+  const pushed = (x, y) => {
+    const u = x * K, v = y * K;
+    const hold = smoothstep(0, 1.2, valueAt(fieldsOf, inland, x, y)) * smoothstep(0.3, 1.6, valueAt(fieldsOf, borderD, x, y)) / K;
+    return [x + hold * (0.4 * noise2(u / 2.5, v / 2.5, ns + 6) + 0.13 * noise2(u / 0.9, v / 0.9, ns + 7)),
+      y + hold * (0.4 * noise2(u / 2.5 + 37.2, v / 2.5 - 11.8, ns + 8) + 0.13 * noise2(u / 0.9 - 5.3, v / 0.9 + 21.4, ns + 9))];
+  };
+  // owner: the river through each cell (its place in `rivers`); place: how many cells down that
+  // river's course the cell is
+  const owner = new Int32Array(N).fill(-1), place = new Int32Array(N), rivers = [];
+  // drawn: the pieces of the rivers' lines that start in each cell, as a chain through `links`
+  // (river, point, the next piece in the cell)
+  const drawn = new Int32Array(N).fill(-1), links = [];
+  for (const [head] of heads) {
     // up its largest stream to where the river rises; a source is clear of the borders' ridges (a
     // river that begins on a border looks cut off by it)
     const source = [];
-    for (let u = upBest[head]; u >= 0 && !taken[u] && flow[u] >= SOURCE_MIN; u = upBest[u]) source.push(u);
+    for (let u = upBest[head]; u >= 0 && owner[u] < 0 && flow[u] >= SOURCE_MIN; u = upBest[u]) source.push(u);
     while (source.length && borderD[source[source.length - 1]] < RIDGE) source.pop();
     source.reverse();
-    const path = [...source, head];
-    for (const j of path) taken[j] = 1;
-    let i = head;
-    while (down[i] >= 0) {
+    // down to the sea, or to a larger river. It joins that river where it first comes alongside
+    // it, within two cells: two rivers so close are one to the eye, and drawn side by side they
+    // would run together or cross
+    let cells = [...source, head], join = -1;
+    for (let i = head; ;) {
+      const x = i % w, y = (i - x) / w;
+      for (let dy = -2; dy <= 2; ++dy) for (let dx = -2; dx <= 2; ++dx) {
+        const xx = x + dx, yy = y + dy;
+        if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+        const q = yy * w + xx;
+        if (owner[q] >= 0 && flow[q] >= flow[i] && (join < 0 || flow[q] > flow[join])) join = q;
+      }
+      if (join >= 0) break;
       const j = down[i];
-      path.push(j);
-      if (taken[j] || !land(j)) break;
-      taken[j] = 1;
+      if (j < 0) break;
+      if (owner[j] >= 0) { join = j; break; }
+      cells.push(j);
+      if (!land(j)) break;
       i = j;
     }
     // (one that starts on a border's ridge and has no stream above it starts below the ridge)
     let start = 0;
-    while (start < path.length - 1 && land(path[start]) && borderD[path[start]] < RIDGE && !source.length) ++start;
-    const cells = path.slice(start);
-    if (cells.length < 6) continue;
-    // meanders: resampled at half a cell, pushed sideways by a slow and a quick wave of noise along
-    // the course (less where the river is young, by a border or at its ends), then smoothed
-    // (Chaikin, twice)
-    let pts = [], fl = [], bd = [];
-    for (let k = 0; k + 1 < cells.length; ++k) for (let t = 0; t < 1; t += 0.5) {
-      const a = cells[k], b = cells[k + 1];
-      pts.push([xOf(a) + (xOf(b) - xOf(a)) * t, yOf(a) + (yOf(b) - yOf(a)) * t]);
-      fl.push(Math.min(flow[a], flow[b]) > 0 ? flow[a] + (flow[b] - flow[a]) * t : flow[a]);
-      bd.push(Math.min(borderD[a], borderD[b]));
+    while (start < cells.length - 1 && land(cells[start]) && borderD[cells[start]] < RIDGE && !source.length) ++start;
+    cells = cells.slice(start);
+    if (cells.length + (join >= 0 ? 1 : 0) < 6) continue;
+    // the course: the cells' middles, pushed; the last, where it joins, on the larger river's line
+    let pts = cells.map(c => pushed(xOf(c), yOf(c))), fl = cells.map(c => land(c) ? flow[c] : 0);
+    const R = join >= 0 ? rivers[owner[join]].points : null;
+    let met = -1;        // the point of the larger river's line where this one meets it
+    if (R) {
+      const at = pushed(xOf(join), yOf(join)), mid = Math.min(8 * place[join], R.length / 2 - 1);
+      for (let q = Math.max(0, mid - 12), d2 = Infinity; q <= Math.min(R.length / 2 - 1, mid + 12); ++q) {
+        const d = (R[2 * q] - at[0]) ** 2 + (R[2 * q + 1] - at[1]) ** 2;
+        if (d < d2) { d2 = d; met = q; }
+      }
+      pts.push([R[2 * met], R[2 * met + 1]]);
+      fl.push(fl[fl.length - 1]);
     }
-    const last = cells[cells.length - 1];
-    pts.push([xOf(last), yOf(last)]); fl.push(fl[fl.length - 1]); bd.push(borderD[last]);
-    // (a river's flow never falls on its way down: the cell it ends in may be the sea's)
+    // (a river's flow never falls on its way down: the cell it ends in is the sea's, or another river's)
     for (let k = 1; k < fl.length; ++k) if (fl[k] < fl[k - 1]) fl[k] = fl[k - 1];
+    // the grid's steps and corners smoothed away (the ends stay where they are)
+    for (let pass = 0; pass < 3; ++pass) {
+      const np = pts.map(p => p);
+      for (let k = 1; k + 1 < pts.length; ++k) np[k] = [0.25 * pts[k - 1][0] + 0.5 * pts[k][0] + 0.25 * pts[k + 1][0], 0.25 * pts[k - 1][1] + 0.5 * pts[k][1] + 0.25 * pts[k + 1][1]];
+      pts = np;
+    }
+    // a smooth line through those points (Catmull-Rom), four to a cell
+    let line = [], fline = [];
+    for (let k = 0; k + 1 < pts.length; ++k) {
+      const p0 = pts[Math.max(0, k - 1)], p1 = pts[k], p2 = pts[k + 1], p3 = pts[Math.min(pts.length - 1, k + 2)];
+      for (let t = 0; t < 1; t += 0.25) {
+        const t2 = t * t, t3 = t2 * t;
+        line.push([0.5 * (2 * p1[0] + (p2[0] - p0[0]) * t + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2 + (3 * p1[0] - p0[0] - 3 * p2[0] + p3[0]) * t3),
+          0.5 * (2 * p1[1] + (p2[1] - p0[1]) * t + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2 + (3 * p1[1] - p0[1] - 3 * p2[1] + p3[1]) * t3)]);
+        fline.push(fl[k] + (fl[k + 1] - fl[k]) * t);
+      }
+    }
+    line.push(pts[pts.length - 1]); fline.push(fl[fl.length - 1]);
+    // the small turns of a river's own, too small to bring it near another: a wave along its
+    // course, none at its ends
     let along = 0;
     const key = head % 9973;
-    pts = pts.map((p, k) => {
-      const a = pts[Math.max(0, k - 2)], b = pts[Math.min(pts.length - 1, k + 2)];
+    line = line.map((p, k) => {
+      const a = line[Math.max(0, k - 1)], b = line[Math.min(line.length - 1, k + 1)];
       const dx = b[0] - a[0], dy = b[1] - a[1], l = hypot(dx, dy) || 1;
-      if (k) along += hypot(p[0] - pts[k - 1][0], p[1] - pts[k - 1][1]) * K;
-      const ends = Math.min(1, k / 4, (pts.length - 1 - k) / 4) * smoothstep(0.3, 1.6, bd[k]);
-      const off = (0.4 * noise2(along / 2.5, key * 0.37, ns + 6) + 0.16 * noise2(along / 0.9, key * 0.37, ns + 7)) * ends / K;
+      if (k) along += hypot(p[0] - line[k - 1][0], p[1] - line[k - 1][1]) * K;
+      const off = 0.05 * noise2(along / 0.33, key * 0.37, ns + 10) * Math.min(1, k / 6, (line.length - 1 - k) / 6) / K;
       return [p[0] - dy / l * off, p[1] + dx / l * off];
     });
-    for (let it = 0; it < 2; ++it) {
-      const np = [pts[0]], nf = [fl[0]];
-      for (let k = 0; k + 1 < pts.length; ++k) {
-        const [ax, ay] = pts[k], [bx, by] = pts[k + 1];
-        np.push([0.75 * ax + 0.25 * bx, 0.75 * ay + 0.25 * by], [0.25 * ax + 0.75 * bx, 0.25 * ay + 0.75 * by]);
-        nf.push(0.75 * fl[k] + 0.25 * fl[k + 1], 0.25 * fl[k] + 0.75 * fl[k + 1]);
-      }
-      np.push(pts[pts.length - 1]); nf.push(fl[fl.length - 1]);
-      pts = np; fl = nf;
+    // (and its corners cut once: Chaikin)
+    const points = new Float64Array(4 * line.length), told = new Float32Array(2 * line.length);
+    let n = 0;
+    const put = (x, y, f) => { points[2 * n] = x; points[2 * n + 1] = y; told[n++] = f; };
+    put(line[0][0], line[0][1], fline[0]);
+    for (let k = 0; k + 1 < line.length; ++k) {
+      const [ax, ay] = line[k], [bx, by] = line[k + 1];
+      put(0.75 * ax + 0.25 * bx, 0.75 * ay + 0.25 * by, 0.75 * fline[k] + 0.25 * fline[k + 1]);
+      put(0.25 * ax + 0.75 * bx, 0.25 * ay + 0.75 * by, 0.25 * fline[k] + 0.75 * fline[k + 1]);
     }
-    const points = new Float64Array(2 * pts.length);
-    pts.forEach((p, k) => { points[2 * k] = p[0]; points[2 * k + 1] = p[1]; });
-    rivers.push({points, flow: Float32Array.from(fl, f => f / (K * K)), told: Float32Array.from(fl)});
+    put(line[line.length - 1][0], line[line.length - 1][1], fline[fline.length - 1]);
+    // A river ends where it first meets one drawn before it: the river it joins, as a rule at the
+    // point found above, or another that came between (two tributaries that reach a river side by
+    // side). Its last point is then a point of that river's line
+    meet: for (let k = 0; k + 1 < n; ++k) {
+      const ax = points[2 * k], ay = points[2 * k + 1], bx = points[2 * k + 2], by = points[2 * k + 3];
+      const gx = Math.floor((ax - x0) / cell), gy = Math.floor((y0 - ay) / cell);
+      let hit = 2, to = -1, of = null;
+      for (let yy = Math.max(0, gy - 1); yy <= Math.min(h - 1, gy + 1); ++yy) for (let xx = Math.max(0, gx - 1); xx <= Math.min(w - 1, gx + 1); ++xx) {
+        for (let e = drawn[yy * w + xx]; e >= 0; e = links[3 * e + 2]) {
+          const S = rivers[links[3 * e]].points, q = links[3 * e + 1];
+          const cx = S[2 * q], cy = S[2 * q + 1], dx = S[2 * q + 2], dy = S[2 * q + 3];
+          const d = (bx - ax) * (dy - cy) - (by - ay) * (dx - cx);
+          if (d === 0) continue;
+          const t = ((cx - ax) * (dy - cy) - (cy - ay) * (dx - cx)) / d, u = ((cx - ax) * (by - ay) - (cy - ay) * (bx - ax)) / d;
+          if (t < 0 || t > 1 || u < 0 || u > 1 || t >= hit) continue;
+          hit = t; of = S; to = u < 0.5 ? q : q + 1;
+        }
+      }
+      if (!of) continue;
+      points[2 * k + 2] = of[2 * to]; points[2 * k + 3] = of[2 * to + 1];
+      n = k + 2;
+      break meet;
+    }
+    cells.forEach((c, k) => { if (land(c)) { owner[c] = rivers.length; place[c] = k; } });
+    rivers.push({points: points.slice(0, 2 * n), flow: Float32Array.from(told.subarray(0, n), f => f / (K * K)), told: told.slice(0, n)});
+    // (its line, by cell, for the rivers still to come)
+    for (let q = 0; q + 1 < n; ++q) {
+      const gx = Math.floor((points[2 * q] - x0) / cell), gy = Math.floor((y0 - points[2 * q + 1]) / cell);
+      if (gx < 0 || gy < 0 || gx >= w || gy >= h) continue;
+      links.push(rivers.length - 1, q, drawn[gy * w + gx]);
+      drawn[gy * w + gx] = links.length / 3 - 1;
+    }
   }
   // Where a river passes through a range the range is broken: a gap as wide as the valley. (Its
   // headwaters, above where it counts as a river, rise among the mountains.)

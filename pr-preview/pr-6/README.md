@@ -117,7 +117,8 @@ forks get no preview.
    ones, on their highest stretches, and along some long borders. Rain run off the ground with
    its ranges, more of it on the heights, gives the rivers, each drawn from its source down. So
    a river rises in the mountains or runs along their feet, keeps off the borders, and where it
-   passes through a range the range is broken.
+   passes through a range the range is broken. Where two rivers meet, the larger runs on and the
+   smaller ends on its line; no two cross.
 9. **Valleys.** Each river gets the valley it would have cut (`valleys.js`): wider and deeper the
    more water it carries. Nothing is worn down grain by grain; a style that shows relief lowers
    the ground by the valley's depth, so its rivers lie in the land and not on it.
