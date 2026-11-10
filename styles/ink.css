@@ -256,7 +256,7 @@ html[data-style="ink"] #info .close { border: 0; font-size: 22px; letter-spacing
 html[data-style="ink"] #info ul.nbrs li { border-bottom: 1px dotted var(--ink-faint); }
 html[data-style="ink"] #info .note { color: var(--ink); opacity: 0.85; }
 html[data-style="ink"] #tip { background: var(--card); border: 1px solid var(--ink-soft); font-style: italic; font-size: 13.5px; box-shadow: 0 2px 8px var(--shadow); }
-html[data-style="ink"] #loading .box {
+html[data-style="ink"] #loading .box, html[data-style="ink"] #drop-hint .box {
   background: var(--card); border: 1px solid var(--ink);
   box-shadow: inset 0 0 0 3px var(--card), inset 0 0 0 4px var(--ink-soft), 0 3px 14px var(--shadow);
   font-style: italic; padding: 16px 24px;

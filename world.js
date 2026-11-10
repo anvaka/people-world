@@ -93,7 +93,7 @@ export async function buildWorld(doc, options = {}) {
   const lg = linkGeometry(geoEdges, P1, rad);
   const hard = new Map(geoEdges.map(([a, b], k) => [a + ',' + b, lg.cross[k] * 2 + Math.max(0, lg.stretch[k] - 0.9) * 3]));
   const baseRemoved = new Set(base ? base.removed.flatMap(([a, b]) => [a + '-' + b, b + '-' + a]) : []);
-  const ps = base ? {removed: []} : options.planarSubgraph(n, edges, {seed, budgetMs: 60000, weight: e => {
+  const ps = base ? {removed: []} : options.planarSubgraph(n, edges, {seed, budgetMs: options.planarBudget ?? 60000, weight: e => {
     const [a, b] = edges[e];
     const h = hard.get(a + ',' + b) ?? 0;
     // a warm start prefers the exclaves the earlier world had
@@ -189,8 +189,9 @@ export async function buildWorld(doc, options = {}) {
   stage('mesh');
   await pause();
 
-  // ---- labels: countries are labels 0..n-1, exclave pieces come after
-  const NL = n + 48;
+  // ---- labels: countries are labels 0..n-1, exclave pieces come after: room for the planned
+  // ones twice over and a good many that the land turns out to need
+  const NL = n + Math.max(48, Math.min(edges.length, 2 * planned.length + 120));
   const S = createState(mesh, NL, {seed, areaTol: 0.04, needRel: 0.22, coastWeight: globalThis.CW ?? 2, compact: globalThis.COMPACT ?? 1, wideStraits: globalThis.WIDE ?? true});
   for (const i of meshIds) S.target[i] = meshArea[i];
   edges.forEach(([a, b]) => { if (keptLinked(a, b)) { S.linked[a * NL + b] = S.linked[b * NL + a] = 1; } });
@@ -476,7 +477,8 @@ export async function buildWorld(doc, options = {}) {
       done = true;
       break;
     }
-    if (!done) throw new Error(`no room for an exclave between ${doc.nodes[a][1]} and ${doc.nodes[b][1]}`);
+    // (options.lenient: the map is drawn without that border, and the page's check says so)
+    if (!done && !options.lenient) throw new Error(`no room for an exclave between ${doc.nodes[a][1]} and ${doc.nodes[b][1]}`);
   }
   stage('exclaves');
   // long channels between countries that may not touch become broad seas with ragged shores
@@ -606,7 +608,7 @@ export async function buildWorld(doc, options = {}) {
         ok = collapse(geo, i, Math.sqrt(trueTarget[i] / A2));
       }
       if (ok) tiny.add(i);
-      else throw new Error(`could not shrink ${doc.nodes[i][1]} to its size`);
+      else if (!options.lenient) throw new Error(`could not shrink ${doc.nodes[i][1]} to its size`);
     }
   }
   stage('tiny');
@@ -702,7 +704,7 @@ export async function buildWorld(doc, options = {}) {
       if (was) return was;
       const w = contW.get(it.continent);
       if (w) return [w[0] / w[2], w[1] / w[2]];
-      if (it.continent === 'Oceania') { const a = contW.get('Asia'); return [a[0] / a[2] + 25, a[1] / a[2] - 30]; }
+      if (it.continent === 'Oceania' && contW.has('Asia')) { const a = contW.get('Asia'); return [a[0] / a[2] + 25, a[1] / a[2] - 30]; }
       // a continent with no land on the map (the islands of the Antarctic): off the coast of the
       // southernmost country, as near as is free. (Ten units out to sea below the middle of the
       // world, the ring that marks them read as a stray dot.)

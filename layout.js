@@ -327,6 +327,10 @@ function uncross(P, segs, r, inv) {
     return lists;
   })());
   let done = -1;     // the last pair visited: copies and passed pairs are skipped
+  // (a graph that no arrangement can draw flat has crossings left however many are mended, and
+  // each one mended brings its neighbours up again: a call mends so many and leaves the rest to
+  // the next. Far more than the countries ever need, where a call mends some fifty at most.)
+  let left = 64 + (ns >> 3);
   while (size > 0 || next < list.length) {
     const code = pop();
     if (code <= done) continue;
@@ -334,6 +338,7 @@ function uncross(P, segs, r, inv) {
     const x = Math.floor(code / ns), y = code - x * ns;
     const p = fix(x, y);
     if (p < 0) continue;
+    if (--left === 0) break;
     const zs = atNode.get(p);
     for (const z of zs) if (movedMark[z] !== 1) { movedMark[z] = 1; moved.push(z); }
     // the segments whose boxes overlap a moved one now: among those not moved yet in this call,

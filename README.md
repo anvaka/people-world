@@ -41,6 +41,31 @@ up, so each world number gives a different map of the same graph.
 A world takes about 5 seconds to build on a laptop, longer on a phone; an edit about 4. A link with
 edits first builds the world without them, so it takes about twice as long.
 
+## A graph of your own
+
+Nothing among the page's controls says so, but a DOT file (Graphviz's `.dot` or `.gv`) dropped
+anywhere on the page is drawn in the countries' place: every node a country, every link a border.
+
+- **Sizes.** A node is as large as its `population`, `size`, `weight`, `value`, `count` or `area`
+  attribute: the first of these that most nodes carry as a number and that tells them apart.
+  Failing those, its `width` × `height` when the file sets them by hand (a file that has been
+  through a Graphviz layout has them from the length of the labels, and they are passed over).
+  Failing that, its PageRank, with every link read both ways and a link's `weight` counted.
+- **Names and groups.** A node's `label` is its name. The cluster it sits in
+  (`subgraph cluster_…`), or its `group` attribute, stands where a country's continent does.
+- **What comes out.** Graphs near to flat keep all three rules: trees, grids, road-like and small
+  social graphs. Zachary's karate club (34 nodes, 78 links) takes about 4 seconds; the characters
+  of Les Misérables (77 nodes, 254 links) 15 to 20, with a hundred exclaves. A node with dozens of
+  links, or a graph with many more links than a flat map can hold, comes out with a rule broken
+  (usually sizes: the hubs are too small), and the line under the title says which. At most 500
+  nodes; a graph that is still being drawn after three minutes is given up.
+- **The address** names the graph by a key made from the file's text (`#graph-1a9qplw-world-1`),
+  and the browser tab keeps the text, so reloading, Back and Forward, other world numbers and
+  border edits work as they do for the countries. The file is not in the link: opened anywhere
+  else, the link shows the countries and says why, so such a map has no Share button.
+
+`window.peopledMap.openDot(text, name)` does the same from the console.
+
 ## Running it
 
 It is a static page with no build step and no dependencies. Serve the folder with any file server,
@@ -129,6 +154,7 @@ node tools/check.mjs 1 --edits cut-FR-ES-add-JP-KR # world 1, then world 1 with 
 
 builds the worlds in Node (tested with Node 22) and checks all three rules on each, with areas
 within 1% of their share of the population. It exits with 1 when a rule fails.
+`node tools/check.mjs --dot graph.dot` does the same for a graph of your own.
 
 ## Known flaws
 
@@ -148,6 +174,7 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 | `index.html` | the page: drawing, pan and zoom, border editing, the style picker |
 | `styles/` | the two styles: `ink` and `realm` (`.css`, `.js`, `.fonts` and helpers) |
 | `worker.js` | runs the generator off the main thread |
+| `dot.js` | reads a DOT file into a graph the generator draws; loaded when a file is dropped |
 | `world.js` | the pipeline, `buildWorld(graph, {seed, base})` |
 | `layout.js` | country discs: stress majorization and constraint projection |
 | `planar.js` | planarity test and the fewest-removal planar subgraph |

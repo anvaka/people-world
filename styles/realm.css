@@ -221,7 +221,7 @@ html[data-style="realm"] #tip {
   background: var(--panel); color: var(--panel-ink); border: 1px solid var(--panel-line); border-radius: 6px;
   font-size: 13.5px; box-shadow: 0 3px 10px var(--shadow);
 }
-html[data-style="realm"] #loading .box {
+html[data-style="realm"] #loading .box, html[data-style="realm"] #drop-hint .box {
   background: var(--panel); color: var(--panel-ink); border: 1px solid var(--panel-line); border-radius: 10px;
   box-shadow: 0 6px 24px var(--shadow); padding: 16px 24px; font-family: 'Alegreya SC', Georgia, serif; letter-spacing: 0.04em;
 }
