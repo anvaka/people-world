@@ -10,7 +10,7 @@ border. The map keeps three rules:
 Nothing else comes from the real world. Where countries sit, their shapes and the coasts are made
 up, so each world number gives a different map of the same graph.
 
-![World 1](docs/world-1.jpg)
+[![World 1](docs/world-1.jpg)](https://anvaka.github.io/people-world/)
 
 ## Using the map
 
@@ -108,7 +108,37 @@ forks get no preview.
 6. **Geometry.** Cell boundaries become smooth, slightly rough hand-drawn lines. Areas are then
    fitted exactly, and the tiniest countries shrink to their true size.
 7. **Islands.** Countries with no neighbours are blobs of exact area, placed in archipelagos off
-   the coast of their continent.
+   the coast of their continent. A small piece of land of its own (two countries that share an
+   island and no other border, as Britain and Ireland do) is laid out like the large ones and
+   put in the open water nearest the middle of its continent.
+8. **Terrain.** Mountains and rivers belong to the world, not to the style it is drawn in
+   (`terrain.js`). The ground rises inland, rough, with every border on a low ridge. Rain run off
+   it finds the rivers and the land each drains; ranges stand on the divides between the larger
+   ones, on their highest stretches, and along some long borders. Rain run off the ground with
+   its ranges, more of it on the heights, gives the rivers, each drawn from its source down. So
+   a river rises in the mountains or runs along their feet, keeps off the borders, and where it
+   passes through a range the range is broken. Where two rivers meet, the larger runs on and the
+   smaller ends on its line; no two cross.
+9. **Valleys.** Each river gets the valley it would have cut (`valleys.js`): wider and deeper the
+   more water it carries. Nothing is worn down grain by grain; a style that shows relief lowers
+   the ground by the valley's depth, so its rivers lie in the land and not on it.
+10. **Climate.** The south is warm, the north cold, the heights colder (`climate.js`). The winds
+    blow in three belts, as on the Earth: trades in the south, westerlies in the middle,
+    easterlies in the far north (half the worlds turn the other way). They carry the sea's
+    moisture inland. The coast the wind reaches first is the wettest and the heart of a continent
+    is dry; a range takes the rain on its windward side and leaves a rain shadow in its lee.
+    Where two belts meet the air is still and dry, and there lie the deserts. A river waters its
+    banks whatever the sky does. Warmth and moisture give what grows (Whittaker's table): tundra,
+    taiga, steppe, grassland, forest, scrub, desert, savanna, jungle, with woods in patches and
+    marshes on low wet ground near the sea.
+
+**Addons.** Steps 8 to 10 are addons (`addons.js`). Each adds one part to what the generator
+returns (`terrain`, `valleys`, `climate`), on one grid over the world's land (`land.js`). Each is on
+unless it is turned off: `buildWorld(graph, {addons: {climate: false}})` in code, or
+`?without=climate,valleys` in the page's address. The styles draw without a part that is missing:
+no mountains or rivers without the terrain, rivers that lie flat without the valleys, and woods of
+each style's own invention without the climate. A new addon is a module with a function
+`(world, seed)` that returns its part, and a line in the list in `addons.js`.
 
 **Edited maps** start from the world without edits. Countries start where they were, with a weak
 pull back to that spot. The earlier exclaves are kept, and only the edited links get a new
@@ -130,7 +160,11 @@ calls the map ready, and `unmount()` when another style is picked. A style's can
 `index.html` lists the hooks.
 
 Switching styles draws the worlds on hand (and the map before your edits, when there is one)
-again from what the generator returned, at the same view and with the same country picked.
+again from what the generator returned, at the same view and with the same country picked. The
+mountains and rivers are part of what it returned (`result.terrain`), and so are the valleys
+(`result.valleys`) and the woods, deserts and marshes (`result.climate`): every style shows the
+same ones. A style chooses how to draw them (firs, round crowns or flat-topped trees by the
+warmth, dunes, reeds, the colour of the ground) and adds only its own hills and grain.
 
 The heavy work of each style runs off the page's thread: Ink draws its terrain and seas in a
 worker, in tiles kept per zoom level (one worker on a phone, two elsewhere); Realm prepares its
@@ -163,8 +197,11 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 
 - Some worlds have long, thin water channels where wide seas would look better.
 - In the most crowded regions (the Balkans, the Caucasus, Central Africa) a few countries come out
-  stretched, and there are 14–18 exclaves per world.
+  stretched, and most worlds have 9 to 16 exclaves.
 - An edit reshapes many countries, not only the ones edited: the warm start is not local.
+- The land is not eroded: a valley is drawn from its river's flow, and there are no lakes.
+- The climate has no seasons, and its belts lie at much the same latitudes in every world: the
+  deserts are always about a third of the way up the map.
 - On a phone held upright the whole world is a band across the middle of the screen: it is about
   twice as wide as it is tall.
 - At whole-world zoom many countries are smaller than a pixel. That is rule 3: populations range
@@ -178,7 +215,7 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 | `styles/` | the two styles: `ink` and `realm` (`.css`, `.js`, `.fonts` and helpers) |
 | `worker.js` | runs the generator off the main thread |
 | `dot.js` | reads a DOT file into a graph the generator draws; loaded when a file is dropped |
-| `world.js` | the pipeline, `buildWorld(graph, {seed, base})` |
+| `world.js` | the pipeline, `buildWorld(graph, {seed, base, addons})` |
 | `layout.js` | country discs: stress majorization and constraint projection |
 | `planar.js` | planarity test and the fewest-removal planar subgraph |
 | `mesh.js` | the cell mesh |
@@ -186,6 +223,11 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 | `geom.js` | boundary lines from the cells |
 | `process.js` | smoothing, roughening, exact area fitting |
 | `islands.js` | island countries |
+| `addons.js` | the list of addons run once the countries are drawn, each of which can be turned off |
+| `land.js` | the grid the addons share: which country each cell is in, how far it is from the sea |
+| `terrain.js` | addon: the mountains and rivers of a world |
+| `valleys.js` | addon: the valleys its rivers have cut |
+| `climate.js` | addon: warmth, winds, rain and what grows where |
 | `util.js` | seeded random numbers, noise, polygon helpers |
 | `countries.json` | the graph |
 | `vendor/` | Delaunator, the `orient2d` predicate from robust-predicates, earcut (Realm's triangles) |
@@ -195,6 +237,9 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 
 - Countries, populations and land neighbours: [GeoNames](https://www.geonames.org/)
   ([countryInfo.txt](https://download.geonames.org/export/dump/countryInfo.txt)), CC BY 4.0.
+  Left out of that list: Serbia and Montenegro and the Netherlands Antilles, which no longer
+  exist and are listed beside the countries that followed them, and the border of Serbia and
+  Albania, which is Kosovo's (the list has Kosovo as a country of its own).
 - [Delaunator](https://github.com/mapbox/delaunator) by Mapbox, ISC license.
 - [robust-predicates](https://github.com/mourner/robust-predicates) by Vladimir Agafonkin, after
   Jonathan Shewchuk's predicates, public domain (Unlicense).
