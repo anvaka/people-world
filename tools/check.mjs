@@ -8,16 +8,23 @@
 //   node tools/check.mjs 1 --edits cut-FR-ES-add-JP-KR
 //                                              world 1, then the same world with those border
 //                                              edits, drawn from it as the page does
+//   node tools/check.mjs --dot graph.dot 1 2   a graph of your own in place of the countries, as
+//                                              the page draws a DOT file dropped on it
 // Exits with 1 when a rule fails.
 import {readFileSync} from 'node:fs';
 import {buildWorld} from '../world.js';
 import {planarSubgraph} from '../planar.js';
+import {graphFromDot} from '../dot.js';
 
 const args = process.argv.slice(2);
 const at = args.indexOf('--edits');
 const editsArg = at >= 0 ? args.splice(at, 2)[1] || '' : '';
-const seeds = args.length ? args.map(Number) : [1, 2, 3];
-const doc = JSON.parse(readFileSync(new URL('../countries.json', import.meta.url), 'utf8'));
+const dotAt = args.indexOf('--dot');
+const dotFile = dotAt >= 0 ? args.splice(dotAt, 2)[1] : '';
+const seeds = args.length ? args.map(Number) : dotFile ? [1] : [1, 2, 3];
+const doc = dotFile ? graphFromDot(readFileSync(dotFile, 'utf8'), dotFile.replace(/^.*[\\/]/, ''))
+  : JSON.parse(readFileSync(new URL('../countries.json', import.meta.url), 'utf8'));
+if (dotFile) console.log(`${doc.title}: ${doc.about}, sized by ${doc.measure}`);
 
 function parseEdits(text) {
   const words = text.split('-').filter(Boolean), list = [];
@@ -66,7 +73,7 @@ function check(world, graph) {
 let failed = false;
 async function run(label, graph, options) {
   const t = Date.now();
-  const world = await buildWorld(graph, {planarSubgraph, ...options});
+  const world = await buildWorld(graph, {planarSubgraph, ...doc.build, ...options});
   const r = check(world, graph);
   const ok = !r.missing.length && !r.extra.length && !r.off.length;
   failed ||= !ok;
