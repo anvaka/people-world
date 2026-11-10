@@ -218,7 +218,7 @@ function startSurvey(world) {
   let b = world.box, span = Math.max(b.maxX - b.minX, b.maxY - b.minY), pad = span * 0.12, cell = (span + 2 * pad) / 720;
   let grid = {w: Math.ceil((b.maxX - b.minX + 2 * pad) / cell), h: Math.ceil((b.maxY - b.minY + 2 * pad) / cell), cell,
     x0: b.minX - pad, y0: -(b.minY - pad), box: {x0: b.minX, x1: b.maxX, y0: -b.maxY, y1: -b.minY}};
-  send({type: 'init', id: world.ink.id, packed, grid, seed: seedOf(), dev: dev()}, transfer);
+  send({type: 'init', id: world.ink.id, packed, grid, seed: seedOf(), dev: dev(), terrain: world.result.terrain, climate: world.result.climate}, transfer);
 }
 function seedOf() {
   let m = /^#world-(\d+)/.exec(decodeURIComponent(location.hash));

@@ -5,7 +5,7 @@ import {planarSubgraph} from './planar.js';
 self.onmessage = async ({data}) => {
   try {
     let result = await buildWorld(data.doc, {
-      seed: data.seed, planarSubgraph, base: data.base, ...data.doc.build,
+      seed: data.seed, planarSubgraph, base: data.base, addons: data.addons, ...data.doc.build,
       onProgress: progress => self.postMessage({type: 'progress', progress}),
     });
     self.postMessage({type: 'done', result});

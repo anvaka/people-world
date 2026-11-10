@@ -12,14 +12,14 @@
 // tiles drawn separately meet without a seam in their content.
 import {hash, makeTerrain, smoothstep} from './ink-noise.js';
 import {drawIds} from './ink-raster.js';
-import {survey, RIDGE_CELLS} from './ink-survey.js';
+import {survey} from './ink-survey.js';
 
 export const K_REF = 6;        // px per world unit of a whole-world view on a laptop
 export const TILE_PX = 480;    // a tile's side in css px at its band's zoom
 export const bandK = (z, dev) => K_REF * 2 ** z / dev;
 export const bandOf = (k, dev) => Math.max(-6, Math.min(30, Math.round(Math.log2(k * dev / K_REF))));
 const SLOTS = 7;
-const RIVER_MIN = 300;         // cells of rain a river gathers before it is drawn (the same at every zoom)
+const RIVER_MIN = 300;         // the flow of a stream where it begins to count as a river, as the widths are worked out
 
 // ---------------------------------------------------------------------------------------------
 // The world, packed into flat arrays on the page (cheap to send) and unpacked here
@@ -214,14 +214,14 @@ export function createEngine(makeCanvas) {
   const worlds = new Map();
   const pals = {};
 
-  function init(id, {packed, grid, seed, dev}) {
+  function init(id, {packed, grid, seed, dev, terrain, climate}) {
     let {items, lines} = unpackWorld(packed);
     let ids = grid.ids || drawIds(makeCanvas(grid.w, grid.h).getContext('2d', {willReadFrequently: true}), grid, Array.from(items.values(), it => [it.index, it.rings]));
-    let sv = {...grid, ids, ...survey({...grid, ids, seed})};
+    let sv = {...grid, ids, ...survey({...grid, ids, seed, terrain, climate})};
     let st = {id, seed, dev, sv, items, lines, T: makeTerrain(seed), marks: new Map(), levels: new Map(), decor: null};
     st.near = segmentGrid(lines, grid.box);
     st.nearBorder = segmentGrid(lines.filter(l => l.kind === 'border'), grid.box);
-    st.rivers = riverLines(st);
+    st.rivers = riverLines(st, terrain);
     worlds.set(id, st);
     while (worlds.size > 4) worlds.delete(worlds.keys().next().value);
     // the page needs the open water (to place the furniture and the seas' names) and where it is
@@ -317,7 +317,7 @@ export function createEngine(makeCanvas) {
     }
   }
 
-  // Rivers: blue, unbroken, swelling downstream, and across a border unbroken too. The survey keeps
+  // Rivers: blue, unbroken, swelling downstream, and across a border unbroken too. The terrain keeps
   // them off the borders (each border stands on a low ridge they cross square on); where one still
   // runs along a border, within a few pixels and nearly parallel, that stretch is not drawn, so a
   // river is never taken for a border. The same rivers at every zoom.
@@ -368,6 +368,9 @@ export function createEngine(makeCanvas) {
   const grow = b => Math.min(1.45, 1 + 0.1 * Math.max(0, b - 1));
   const RISE = {mountain: 0.36, hill: 0.15, tree: 0.55, marsh: 0.1, dune: 0.15};
   const SALT = {mountain: 1, hill: 2, tree: 3, marsh: 4, dune: 5};
+  // the climate's warmth below which trees are firs (the taiga and colder) and above which they are
+  // the flat-topped trees of the hot south
+  const COLD = 0.375, HOT = 0.8;
 
   function markTile(st, kind, b, ti, tj) {
     let key = kind + b + ':' + ti + ':' + tj, out = st.marks.get(key);
@@ -388,27 +391,28 @@ export function createEngine(makeCanvas) {
       if (!(rid >= 0)) continue;
       let tM = sv.thr.mountain[rid], tH = sv.thr.hill[rid], tF = sv.thr.forest[rid];
       if (kind === 'mountain') {
-        if (inland < 1) continue;
-        let M = at(F.mountain) * smoothstep(1.0, 3.5, inland);
+        // where the world's terrain shows mountains (the same in every style), the higher the larger
+        let M = at(F.mountain);
         if (M < tM) continue;
-        s = 0.7 + 0.6 * smoothstep(tM, tM + 0.3, M);
+        s = 0.7 + 0.6 * smoothstep(tM, tM + 0.45, M);
       } else if (kind === 'hill') {
         if (at(F.hill) * smoothstep(0.6, 2, inland) < tH) continue;
-        if (at(F.mountain) * smoothstep(1.0, 3.5, inland) >= Math.min(0.6, tM)) continue;
+        if (at(F.mountain) >= tM) continue;
         s = 0.8 + 0.3 * r1;
       } else if (kind === 'tree') {
         if (at(F.forest) < tF || at(F.dry) > 0.2 || at(F.hill) > 0.36) continue;
-        if (at(F.mountain) * smoothstep(1.0, 3.5, inland) > 0.3) continue;
+        if (at(F.mountain) > 0.75 * tM) continue;
         // clearings at the scale of the screen, deeper in
         if (b >= 2 && T.noise(x * kb / 70 + 7.7, y * kb / 70 - 3.1) < -0.12) continue;
         s = 0.85 + 0.3 * r2;
       } else if (kind === 'marsh') {
         if (inland > 4 || at(F.wet) < 0.3 || at(F.forest) > 0.1 || at(F.mountain) > 0.15) continue;
       } else if (kind === 'dune') {
-        if (inland < 2.5 || at(F.dry) < 0.22 || at(F.forest) > 0.0 || at(F.mountain) > 0.3) continue;
+        if (inland < 2.5 || at(F.dry) < 0.22 || at(F.forest) > 0.0 || at(F.mountain) > 0.75 * tM) continue;
       }
-      // not on a river, nor right beside one
-      if (kind !== 'mountain' && nearRiver(sv, c)) continue;
+      // not on a river, nor right beside one (a mountain may stand by a river's headwaters, which
+      // rise among the mountains, but not on the river itself)
+      if (nearRiver(sv, c, kind === 'mountain' ? RIVER_MIN : 1)) continue;
       // in one country, clear of its borders and coasts
       let id = sv.ids[c];
       if (!(id >= 0 && (sv.toEdge[c] - 1.5) * sv.cell > clear)) {
@@ -419,15 +423,18 @@ export function createEngine(makeCanvas) {
       let item = st.items.get(id);
       // a realm too small on screen keeps its paper plain (a mark would cover a good part of it)
       if (!item || item.size * kb < 26) continue;
-      out.push({x, y, kind, s: size * s, v: r1, w: r2, slot: item.slot, cold: y + 16 * T.noise(x / 13 + 4.1, y / 13 - 2.7) > 27});
+      // firs where it is cold and flat-topped trees where it is hot (the world's climate; without
+      // one, firs in the north)
+      let warmth = F.warmth ? at(F.warmth) : y + 16 * T.noise(x / 13 + 4.1, y / 13 - 2.7) > 27 ? 0 : 0.5;
+      out.push({x, y, kind, s: size * s, v: r1, w: r2, slot: item.slot, cold: warmth < COLD, hot: warmth > HOT});
     }
     st.marks.set(key, out);
     if (st.marks.size > 3000) st.marks.delete(st.marks.keys().next().value);
     return out;
   }
-  function nearRiver(sv, c) {
+  function nearRiver(sv, c, min) {
     let a = sv.acc, w = sv.w;
-    return a[c] >= RIVER_MIN || a[c - 1] >= RIVER_MIN || a[c + 1] >= RIVER_MIN || a[c - w] >= RIVER_MIN || a[c + w] >= RIVER_MIN;
+    return a[c] >= min || a[c - 1] >= min || a[c + 1] >= min || a[c - w] >= min || a[c + w] >= min;
   }
   function countryNear(st, c, x, y) {
     let sv = st.sv, seen = new Set();
@@ -608,74 +615,25 @@ export const roseRadius = (spot, k) => Math.max(24, Math.min(spot.d * 0.7 * k, 6
 export const vignetteSize = (spot, k) => Math.max(16, Math.min(spot.d * 0.55 * k, 36));
 
 // ---------------------------------------------------------------------------------------------
-// Rivers: the cells that gather enough rain, from their heads down to the sea, smoothed
-function riverLines(st) {
-  let sv = st.sv, acc = new Float32Array(sv.w * sv.h);
-  for (let i = 0; i < sv.river.cell.length; ++i) acc[sv.river.cell[i]] = sv.river.acc[i];
+// Rivers: the world's own (terrain.js), each from its source down to the sea or to the river it
+// joins. A point's third number is its flow: RIVER_MIN where a stream begins to count as a river,
+// less along its headwaters (the width is read from it). The survey's cells a river runs through
+// are marked with that flow, so the marks keep off it.
+function riverLines(st, terrain) {
+  let sv = st.sv, acc = new Float32Array(sv.w * sv.h), lines = [];
   sv.acc = acc;
-  let recv = new Map(), up = new Map();
-  for (let i = 0; i < sv.river.cell.length; ++i) {
-    if (sv.river.acc[i] < RIVER_MIN) continue;
-    let c = sv.river.cell[i], r = sv.river.recv[i];
-    recv.set(c, r);
-    up.set(r, (up.get(r) || 0) + 1);
-  }
-  let heads = [...recv.keys()].filter(c => !up.has(c)).sort((a, b) => a - b);
-  let seen = new Set(), lines = [];
-  let pos = c => { let cx = c % sv.w, cy = (c - cx) / sv.w; return [sv.x0 + (cx + 0.5) * sv.cell, sv.y0 - (cy + 0.5) * sv.cell]; };
-  // A river whose rain reaches the threshold by a border (gathered over a border's saddle) would
-  // begin on the border, as if cut off by it: it begins upstream instead, up its largest stream (of
-  // the cells the survey kept), at the first cell clear of every border (or, if the stream keeps
-  // close to borders, the one furthest from them), so it is seen to cross
-  let upBest = new Map();
-  for (let i = 0; i < sv.river.cell.length; ++i) {
-    let c = sv.river.cell[i], r = sv.river.recv[i], b = upBest.get(r);
-    if (r >= 0 && (b === undefined || acc[c] > acc[b])) upBest.set(r, c);
-  }
-  for (let head of heads) {
-    let source = [], tb = sv.toBorder;
-    if (tb[head] < RIDGE_CELLS) {
-      let walk = [], best = -1;
-      for (let u = upBest.get(head); u !== undefined && !seen.has(u) && walk.length < 4 * RIDGE_CELLS; u = upBest.get(u)) {
-        walk.push(u);
-        if (best < 0 || tb[u] > tb[walk[best]]) best = walk.length - 1;
-        if (tb[u] >= RIDGE_CELLS) break;
-      }
-      if (best >= 0 && tb[walk[best]] > tb[head]) source = walk.slice(0, best + 1).reverse();
+  if (!terrain) return lines;
+  let k = RIVER_MIN / terrain.riverMin;
+  for (let r of terrain.rivers) {
+    let pts = [];
+    for (let q = 0; q < r.flow.length; ++q) {
+      let x = r.points[2 * q], y = r.points[2 * q + 1], a = r.flow[q] * k, c = cellAt(sv, x, y);
+      pts.push([x, y, a]);
+      if (c >= 0 && acc[c] < Math.max(1, a)) acc[c] = Math.max(1, a);
     }
-    let pts = source.map(c => { seen.add(c); return [...pos(c), acc[c]]; }), c = head;
-    while (true) {
-      pts.push([...pos(c), acc[c] || RIVER_MIN]);
-      if (seen.has(c)) break;
-      seen.add(c);
-      let r = recv.get(c);
-      if (r === undefined || r < 0) break;
-      if (!recv.has(r)) { pts.push([...pos(r), acc[c]]); break; }
-      c = r;
-    }
-    if (pts.length < 4) continue;
-    let smooth = smoothRiver(pts, st.T, sv.cell);
-    lines.push({pts: smooth, box: boxOf([smooth])});
+    if (pts.length > 1) lines.push({pts, box: boxOf([pts])});
   }
   return lines;
-}
-function smoothRiver(pts, T, cell) {
-  let out = pts.map(([x, y, a], i) => {
-    if (i === 0 || i === pts.length - 1) return [x, y, a];
-    let n = T.noise(x / 1.3 + 50, y / 1.3 - 20) * cell * 0.45;
-    let [px, py] = pts[i - 1], [qx, qy] = pts[i + 1], dx = qx - px, dy = qy - py, l = Math.hypot(dx, dy) || 1;
-    return [x - dy / l * n, y + dx / l * n, a];
-  });
-  for (let it = 0; it < 3; ++it) {
-    let next = [out[0]];
-    for (let i = 0; i < out.length - 1; ++i) {
-      let [ax, ay, aa] = out[i], [bx, by, ba] = out[i + 1];
-      next.push([0.75 * ax + 0.25 * bx, 0.75 * ay + 0.25 * by, aa], [0.25 * ax + 0.75 * bx, 0.25 * ay + 0.75 * by, ba]);
-    }
-    next.push(out[out.length - 1]);
-    out = next;
-  }
-  return out;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -735,7 +693,8 @@ function hill(x, y, s, g, dark) {
   ctx.lineWidth = 0.75;
   ctx.stroke();
 }
-// A tree: a rounded crown on a short trunk, or in the north a fir with two tiers of boughs. Woods
+// A tree: a rounded crown on a short trunk; where it is cold a fir with two tiers of boughs, where
+// it is hot a flat-topped tree. Woods
 // are drawn in bands from the back, so the trees in front hide the feet of those behind.
 function tree(x, y, s, g, T, dark) {
   let f = T.fill, side = dark ? -1 : 1;
@@ -757,6 +716,20 @@ function tree(x, y, s, g, T, dark) {
     if (s < 5.5) return;
     T.shade.moveTo(x + side * half * 0.15, mid + h * 0.05); T.shade.lineTo(x + side * half * 0.55, foot - 0.5);
     T.shade.moveTo(x + side * half * 0.1, foot - h * 0.66); T.shade.lineTo(x + side * half * 0.35, mid - 0.3);
+    return;
+  }
+  if (g.hot) {
+    // a flat-topped tree of the savanna: a low wide crown on a long leaning trunk
+    let r = s * 0.6 * (0.9 + 0.2 * g.v), top = y - s * 1.12, base = top + r * 0.62, lean = (g.w - 0.5) * s * 0.3;
+    f.moveTo(x - r, base);
+    f.bezierCurveTo(x - r * 0.95, top - r * 0.12, x + r * 0.95, top - r * 0.12, x + r, base);
+    f.closePath();
+    T.line.moveTo(x - r, base);
+    T.line.bezierCurveTo(x - r * 0.95, top - r * 0.12, x + r * 0.95, top - r * 0.12, x + r, base);
+    T.line.closePath();
+    T.line.moveTo(x + lean * 0.3, base); T.line.quadraticCurveTo(x + lean, (base + y) / 2, x, y);
+    if (s < 5.5) return;
+    T.shade.moveTo(x + side * r * 0.2, base - 0.6); T.shade.lineTo(x + side * r * 0.8, base - 0.6);
     return;
   }
   let r = s * 0.5 * (0.9 + 0.2 * g.v), cy = y - s * 0.22 - r * 0.8;

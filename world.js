@@ -8,6 +8,7 @@ import {extractBoundary, Geo} from './geom.js';
 import {smooth, subdivide, simplify, roughen, fitAreas, collapse, openGaps, despike, cutSpurs, straightenJunctions} from './process.js';
 import {placeIslands, islandRing} from './islands.js';
 import {isPlanar} from './planar.js';
+import {addAddons} from './addons.js';
 import {createState, setTargets, recount, enforce, anneal, growFromSeeds, pruneArms, pruneThin, broadenChannels, fillFingers, fillThinWater, missingPairs, falseContacts, bridge, cellsByLabel, reinsert, linksOf, snapshot, restore, carveExclave, WATER} from './label.js';
 
 export const UNIT = 1e6;          // people per square map unit
@@ -154,8 +155,38 @@ export async function buildWorld(doc, options = {}) {
     compBox.push({ids, R, bx0, bx1, by0, by1});
   }
   // place components: the main one at the centre, the second beside it (left or right), the
-  // small ones in the nearest free spot around them
+  // small ones off the coast of their continent, as island countries are (two countries that
+  // share an island and nothing else: Britain and Ireland off Europe)
   const placed = [];
+  const discs = [];                 // the countries placed so far: [x, y, radius, country]
+  // Where a small piece goes: the open water nearest the middle of its continent's countries on
+  // the land placed so far. Open: clear of every country's disc by `gap`, and with a straight way
+  // out to sea from there (not a hole in the middle of the land, which the countries round it
+  // are to grow into). null if its continent has no land yet.
+  const offItsContinent = (cb, ang0) => {
+    const people = new Map();
+    for (const i of cb.ids) people.set(doc.nodes[i][3], (people.get(doc.nodes[i][3]) || 0) + pop[i]);
+    const home = [...people].sort((a, b) => b[1] - a[1])[0][0];
+    let ax = 0, ay = 0, w = 0, far = 0;
+    for (const [x, y, , i] of discs) if (doc.nodes[i][3] === home) { ax += x * meshArea[i]; ay += y * meshArea[i]; w += meshArea[i]; }
+    if (home == null || !(w > 0)) return null;
+    ax /= w; ay /= w;
+    for (const [x, y, r] of discs) far = Math.max(far, hypot(x - ax, y - ay) + r);
+    const gap = 4;
+    const clear = (x, y, g) => { for (const [dx, dy, r] of discs) if (hypot(x - dx, y - dy) < cb.R + 1.15 * r + g) return false; return true; };
+    for (let dist = 0; dist < far + cb.R + gap + 2; dist += 1) {
+      const steps = Math.max(1, Math.ceil(2 * Math.PI * dist / 2));
+      for (let t = 0; t < steps; ++t) {
+        const ang = ang0 + t * Math.PI * 2 / steps, c = Math.cos(ang), s = Math.sin(ang);
+        const x = ax + c * dist, y = ay + s * dist;
+        if (!clear(x, y, gap)) continue;
+        let open = true;
+        for (let out = 2; open && dist + out < far + cb.R; out += 2) open = clear(x + c * out, y + s * out, 0);
+        if (open) return [x, y];
+      }
+    }
+    return null;
+  };
   if (!base) compBox.forEach((cb, k) => {
     let ox = 0, oy = 0;
     if (k === 1) {
@@ -165,7 +196,10 @@ export async function buildWorld(doc, options = {}) {
       oy = (rng() - 0.5) * 0.4 * (m.by1 - m.by0);
     } else if (k > 1) {
       const ang0 = rng() * Math.PI * 2;
-      outer: for (let dist = placed[0].R * 0.5; ; dist += 1.5) {
+      const spot = offItsContinent(cb, ang0);
+      if (spot) [ox, oy] = spot;
+      // (a piece whose continent has no other land: the nearest free spot round the main land)
+      else outer: for (let dist = placed[0].R * 0.5; ; dist += 1.5) {
         for (let t = 0; t < 36; ++t) {
           const ang = ang0 + t * Math.PI * 2 / 36;
           const x = Math.cos(ang) * dist * 1.3, y = Math.sin(ang) * dist * 0.75;
@@ -173,7 +207,7 @@ export async function buildWorld(doc, options = {}) {
         }
       }
     }
-    for (const i of cb.ids) pos[i] = [pos[i][0] + ox, pos[i][1] + oy];
+    for (const i of cb.ids) { pos[i] = [pos[i][0] + ox, pos[i][1] + oy]; discs.push([pos[i][0], pos[i][1], rad[i], i]); }
     placed.push({x: ox, y: oy, R: cb.R, bx0: cb.bx0 + ox, bx1: cb.bx1 + ox, by0: cb.by0 + oy, by1: cb.by1 + oy});
   });
   onProgress({done: 0.15});
@@ -291,6 +325,14 @@ export async function buildWorld(doc, options = {}) {
     for (const [a, b] of missingPairs(S, keptPairs).filter(([a, b, len]) => len <= 0)) bridge(S, a, b, lists);
     recount(S);
   };
+  // A repair that takes a country off the map and grows it again must leave it on the map, with a
+  // border: one that did not grow back has no arms and no thin parts, and would pass as round. (A
+  // country with one neighbour was then drawn as nothing but its own exclave, a quarter too small.)
+  const stands = X => {
+    if (!(S.area[X] > 0.5 * S.target[X])) return false;
+    const links = linksOf(S, X, keptPairs);
+    return !links.length || links.some(Y => S.pairLen[X * NL + Y] > 0);
+  };
   const tried = new Set();
   for (let round = 0; round < 2; ++round) {
     const miss = missingPairs(S, keptPairs).sort((x, y) => Math.min(S.target[x[0]], S.target[x[1]]) - Math.min(S.target[y[0]], S.target[y[1]]));
@@ -309,7 +351,7 @@ export async function buildWorld(doc, options = {}) {
       recount(S);
       const after = missingPairs(S, keptPairs).length;
       if (debug) debug.log(`  reinsert ${doc.nodes[X][0]}: ${before} -> ${after}`);
-      if (after >= before) restore(S, snap);
+      if (after >= before || !stands(X)) restore(S, snap);
       }
     }
   }
@@ -342,7 +384,7 @@ export async function buildWorld(doc, options = {}) {
       if (debug) debug.log(`  reshape ${doc.nodes[X][0]}: roundness ${c0.toFixed(2)} -> ${c1.toFixed(2)}, missing ${before} -> ${after}`);
       // a severe ribbon may cost one more exclave
       const allowed = c0 > 7 && c1 < 0.45 * c0 ? before + 1 : before;
-      if (after > allowed || c1 > 0.8 * c0) restore(S, snap);
+      if (after > allowed || c1 > 0.8 * c0 || !stands(X)) restore(S, snap);
       else shape = fresh;
     }
   }
@@ -398,7 +440,7 @@ export async function buildWorld(doc, options = {}) {
         recount(S);
         const after = missNow();
         const tf1 = pruneThin(S, meshIds, 0.4, tiny0, 0, true);
-        const ok = tf1[X] < 0.5 * t0 && after <= before + (t0 > 0.5 ? 2 : 1);
+        const ok = tf1[X] < 0.5 * t0 && after <= before + (t0 > 0.5 ? 2 : 1) && stands(X);
         if (debug) debug.log(`  ribbon ${doc.nodes[X][0]}: thin ${(100 * t0).toFixed(0)}% -> ${(100 * tf1[X]).toFixed(0)}%, missing ${before} -> ${after}${ok ? '' : ' (undone)'}`);
         if (ok) tf = tf1; else restore(S, snap);
       }
@@ -493,6 +535,7 @@ export async function buildWorld(doc, options = {}) {
     if (debug) debug.log(`seas: ${r.bodies} channel bodies, ${r.carved} cells carved; missing ${missingPairs(S, finalPairsNow()).filter(([a, b, len]) => len <= 0).length}`);
   };
   const finalPairsNow = () => keptPairs.filter(([a, b]) => S.linked[a * NL + b]).concat(pieces.map(p => [p.label, p.host]), pieces.filter(p => p.host2 >= 0).map(p => [p.label, p.host2]));
+  if (debug) debug.log(`exclaves carved: missing ${missingPairs(S, finalPairsNow()).filter(([a, b, len]) => len <= 0).map(([a, b]) => (a < n ? doc.nodes[a][0] : 'piece') + '-' + (b < n ? doc.nodes[b][0] : 'piece')).join(' ') || 'none'}`);
   if (globalThis.SEAS ?? true) { makeSeas(); makeSeas(); }
   anneal(S, rng, 16, 0.15, 0.01);
   recount(S);
@@ -739,7 +782,13 @@ export async function buildWorld(doc, options = {}) {
     for (const p of r) { x += p[0]; y += p[1]; }
     layout.islands[c.id] = [x / r.length, y / r.length];
   }
-  return {countries, lakes: [], lines, exclaves, links: edges.map(([a, b]) => [a, b]), layout};
+  // What is worked out about the world now that its countries are drawn (addons.js): where the
+  // mountains stand and the rivers run, the valleys they have cut, the climate and what grows
+  // where. Every style draws from these. Each is on unless options.addons turns it off
+  // ({climate: false}); a style copes without
+  const world = {countries, lakes: [], lines, exclaves, links: edges.map(([a, b]) => [a, b]), layout};
+  addAddons(world, seed, options.addons, stage);
+  return world;
 }
 
 // The cell nearest to (x, y) that is not skipped (the lowest-numbered of equally near ones), as a
