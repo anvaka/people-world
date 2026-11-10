@@ -78,6 +78,9 @@ python3 -m http.server 8080
 and open http://localhost:8080. (Opening `index.html` straight from disk does not work: the page
 loads ES modules and a module worker.) The same works on GitHub Pages.
 
+The page counts its visits with Google Analytics: the tag is the `gtag` script in the head of
+`index.html`. Take those lines out of a copy you publish yourself, or put your own ID there.
+
 ## Previews
 
 GitHub Actions publish `main` to the `gh-pages` branch, which GitHub Pages serves. Every pull
