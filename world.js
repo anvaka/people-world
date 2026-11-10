@@ -8,6 +8,7 @@ import {extractBoundary, Geo} from './geom.js';
 import {smooth, subdivide, simplify, roughen, fitAreas, collapse, openGaps, despike, cutSpurs, straightenJunctions} from './process.js';
 import {placeIslands, islandRing} from './islands.js';
 import {isPlanar} from './planar.js';
+import {makeTerrain} from './terrain.js';
 import {createState, setTargets, recount, enforce, anneal, growFromSeeds, pruneArms, pruneThin, broadenChannels, fillFingers, fillThinWater, missingPairs, falseContacts, bridge, cellsByLabel, reinsert, linksOf, snapshot, restore, carveExclave, WATER} from './label.js';
 
 export const UNIT = 1e6;          // people per square map unit
@@ -781,7 +782,10 @@ export async function buildWorld(doc, options = {}) {
     for (const p of r) { x += p[0]; y += p[1]; }
     layout.islands[c.id] = [x / r.length, y / r.length];
   }
-  return {countries, lakes: [], lines, exclaves, links: edges.map(([a, b]) => [a, b]), layout};
+  // the lie of the land: where the mountains stand and the rivers run (every style draws these)
+  const terrain = makeTerrain({countries, lines}, seed);
+  stage('terrain');
+  return {countries, lakes: [], lines, exclaves, links: edges.map(([a, b]) => [a, b]), layout, terrain};
 }
 
 // The cell nearest to (x, y) that is not skipped (the lowest-numbered of equally near ones), as a

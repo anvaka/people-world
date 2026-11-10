@@ -1,7 +1,8 @@
-// Seeded noise for the inked map's invented terrain. Everything that decides where a mountain, a
-// wood or a river goes is a function of the world number and of a position on the map (world
-// units), never of a random number drawn at load time: the same world gives the same terrain, and
-// an edit that leaves a region alone leaves its terrain alone.
+// Seeded noise for the inked map's own terrain marks. Everything that decides where a wood, a
+// marsh or a dune goes is a function of the world number and of a position on the map (world
+// units), never of a random number drawn at load time: the same world gives the same marks, and
+// an edit that leaves a region alone leaves them alone. (The mountains and rivers are the world's:
+// terrain.js.)
 
 // A 32-bit hash of integers, as a number in [0, 1)
 export function hash(a, b, c, d) {
@@ -47,19 +48,15 @@ export function makeNoise(seed) {
 
 export const smoothstep = (a, b, x) => { let t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 
-// The fields the terrain is read from, all in world units (a world is about 180 across). Each is a
-// smooth function of position: thresholds on them give regions, not scattered marks.
+// The fields the style's own marks are read from, all in world units (a world is about 180
+// across). Each is a smooth function of position: thresholds on them give regions, not scattered
+// marks. (Where the mountains stand, and their foothills, is the world's terrain: see terrain.js.)
 export function makeTerrain(seed) {
   const {fbm, noise} = makeNoise(seed * 7919 + 13);
-  // ranges: the zero lines of a noise field, sharpened into long winding ridges, and only in some
-  // regions of the world (so not every ridge becomes mountains)
-  const ridge = (x, y) => { let r = 1 - Math.abs(fbm(x / 34, y / 34, 3)); return r * r; };
-  const region = (x, y) => smoothstep(-0.2, 0.18, fbm(x / 70 + 31.7, y / 70 - 12.9, 2));
-  const mountain = (x, y) => { let r = ridge(x, y); return r * r * region(x, y); };
   return {
-    fbm, noise, ridge, region, mountain,
-    // foothills flank the ranges; a few downs and wolds stand on their own
-    hill: (x, y) => { let r = ridge(x, y); return Math.max(r * r * region(x, y) * 0.8, 0.8 * smoothstep(0.4, 0.64, fbm(x / 13 + 5.3, y / 13 + 3.1, 2))); },
+    fbm, noise,
+    // a few downs and wolds that stand on their own
+    downs: (x, y) => 0.8 * smoothstep(0.4, 0.64, fbm(x / 13 + 5.3, y / 13 + 3.1, 2)),
     forest: (x, y) => fbm(x / 15 + 100.3, y / 15 - 40.7, 3) + 0.1 * fbm(x / 4 + 9, y / 4 - 3, 2),
     dry: (x, y) => fbm(x / 40 - 70.1, y / 40 + 20.9, 2),
     wet: (x, y) => fbm(x / 6 + 200.7, y / 6 + 0.3, 2),

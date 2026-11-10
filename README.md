@@ -111,6 +111,13 @@ forks get no preview.
    the coast of their continent. A small piece of land of its own (two countries that share an
    island and no other border, as Britain and Ireland do) is laid out like the large ones and
    put in the open water nearest the middle of its continent.
+8. **Terrain.** Mountains and rivers belong to the world, not to the style it is drawn in
+   (`terrain.js`). The ground rises inland, rough, with every border on a low ridge. Rain run off
+   it finds the rivers and the land each drains; ranges stand on the divides between the larger
+   ones, on their highest stretches, and along some long borders. Rain run off the ground with
+   its ranges, more of it on the heights, gives the rivers, each drawn from its source down. So
+   a river rises in the mountains or runs along their feet, keeps off the borders, and where it
+   passes through a range the range is broken.
 
 **Edited maps** start from the world without edits. Countries start where they were, with a weak
 pull back to that spot. The earlier exclaves are kept, and only the edited links get a new
@@ -132,7 +139,9 @@ calls the map ready, and `unmount()` when another style is picked. A style's can
 `index.html` lists the hooks.
 
 Switching styles draws the worlds on hand (and the map before your edits, when there is one)
-again from what the generator returned, at the same view and with the same country picked.
+again from what the generator returned, at the same view and with the same country picked. The
+mountains and rivers are part of what it returned (`result.terrain`), so every style shows the
+same ones; a style adds its own woods, hills, marshes and colours.
 
 The heavy work of each style runs off the page's thread: Ink draws its terrain and seas in a
 worker, in tiles kept per zoom level (one worker on a phone, two elsewhere); Realm prepares its
@@ -188,6 +197,7 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 | `geom.js` | boundary lines from the cells |
 | `process.js` | smoothing, roughening, exact area fitting |
 | `islands.js` | island countries |
+| `terrain.js` | the mountains and rivers of a world |
 | `util.js` | seeded random numbers, noise, polygon helpers |
 | `countries.json` | the graph |
 | `vendor/` | Delaunator, the `orient2d` predicate from robust-predicates, earcut (Realm's triangles) |

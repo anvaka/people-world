@@ -4,7 +4,7 @@
 // What is made once per world (CPU, a fraction of a second):
 //   fields  a grid over the world: distance inland from the coast, distance out to sea, the land
 //           blurred (the shelf: wide shallows off big land, almost none round a tiny island) and
-//           mountain belts along some borders (as the Pyrenees or the Andes follow theirs)
+//           how high the world's mountain ranges stand (its terrain: see terrain.js)
 //   meshes  every country triangulated (earcut: exactly the SVG's land), and every border and coast
 //           as segments, per level of detail
 // What is painted per view (GPU), in four draws whatever the number of countries:
@@ -275,7 +275,6 @@ void main() {
   int code = int(C.r * 255.0 + 0.5) - 1;
   int slot = code & 7, state = code >> 3;
   float csize = C.g;          // the country's width, 1 at 8% of the world's
-  float bdist = texture(u_fields2, uv).r * 16.0;   // cells to the nearest border
 
   // ---- noise: smooth and ridged sums over the octaves the zoom needs
   vec3 sm = vec3(0.0), rg = vec3(0.0), low = vec3(0.0), macroS = vec3(0.0), macroR = vec3(0.0);
@@ -310,36 +309,14 @@ void main() {
   vec3 m3 = noiseAt(2, local, vec2(9.7, 23.4), 23);
   float wet = (m1.x - 0.5) * 1.2 + (m2.x - 0.5) * 0.7 + (m3.x - 0.5) * 0.5;
 
-  // ---- height. Mountains are tents: a sharp crest along chains (where a low noise crosses its
-  // middle, broken up by another) and along some borders (as the Pyrenees follow theirs), roughened
-  // by the ridged noise. A tent's flanks shade until they are wider than the screen; from there they
-  // only tilt the view (their slope is the same across it), as the noise's large octaves do, and the
-  // ridged detail carries the relief. Hills are a mask on the smooth noise.
+  // ---- height. Mountains are tents: a sharp crest along the world's ranges (its terrain, the same
+  // in every style: the ranges stand where the waters part, and along some borders as the Pyrenees
+  // follow theirs), roughened by the ridged noise. A tent's flanks shade until they are wider than
+  // the screen; from there they only tilt the view (their slope is the same across it), as the
+  // noise's large octaves do, and the ridged detail carries the relief. Hills are a mask on the
+  // smooth noise.
   vec3 rise = dsmooth(0.0, 0.6, dIn);
-  vec3 c1 = noiseAt(1, local, vec2(31.7, 3.3), 24);
-  vec3 c2 = noiseAt(2, local, vec2(2.9, 57.1), 25);
-  vec3 cv = vec3(c1.x * 2.0 - 1.0, c1.yz * 2.0) + 0.35 * vec3(c2.x * 2.0 - 1.0, c2.yz * 2.0);
-  // a rounded crest (no straight knife edge), broken along its length into peaks and saddles
-  vec3 q = cv / 0.17;
-  vec3 chain = vec3(max(0.0, 1.0 - q.x * q.x), -2.0 * q.x * q.yz);
-  if (chain.x <= 0.0) chain = vec3(0.0);
-  chain = dmul(chain, chain);
-  vec3 peaks = noiseAt(3, local, vec2(44.1, 7.7), 27);
-  chain = dmul(chain, dsmooth(0.25, 0.7, peaks) * 0.6 + vec3(0.4, 0.0, 0.0));
-  chain = dmul(chain, dsmooth(0.36, 0.56, m1));
-  // smaller ranges in the hill country
-  vec3 c3 = noiseAt(2, local, vec2(61.3, 12.9), 26);
-  vec3 cw = vec3(c3.x * 2.0 - 1.0, c3.yz * 2.0);
-  vec3 q2 = cw / 0.22;
-  vec3 chain2 = vec3(max(0.0, 1.0 - q2.x * q2.x), -2.0 * q2.x * q2.yz);
-  if (chain2.x <= 0.0) chain2 = vec3(0.0);
-  chain2 = dmul(chain2, chain2);
-  chain2 = dmul(chain2, dsmooth(0.5, 0.7, m2)) * 0.7;
-  chain = dmax(chain, chain2, 0.12);
-  // a chain stops short of a border: it never runs across one (ranges along borders are the belts,
-  // which keep to one side)
-  chain *= smoothstep(1.5, 5.0, bdist);
-  vec3 mount = dmax(chain, belt, 0.12);
+  vec3 mount = belt;
   mount = dmul(mount, dsmooth(0.0, 0.08, dIn));
   vec3 hills = dsmooth(0.45, 0.75, m2);
   // (the CSS px over which a flank rises by the tent's height)
