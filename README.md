@@ -199,6 +199,12 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 - Fonts from [Google Fonts](https://fonts.google.com/), SIL Open Font License: Eagle Lake,
   Fondamento and Sorts Mill Goudy (Ink), Alegreya and Alegreya SC (Realm).
 
+## Support
+
+If you enjoy the map and would like to support the work, you can sponsor it on
+[GitHub Sponsors](https://github.com/sponsors/anvaka), one time or monthly. The page carries the
+same link, in its credit line and under "more".
+
 ## License
 
 MIT, see [LICENSE](LICENSE).

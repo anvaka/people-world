@@ -265,8 +265,10 @@ html[data-style="ink"] #loading .bar { height: 3px; background: var(--ink-faint)
 html[data-style="ink"] #loading .bar div { background: var(--ink); }
 html[data-style="ink"] #credit {
   font-size: 11.5px;
-  color: var(--ink); opacity: 0.75; padding: 1px 6px; background: color-mix(in srgb, var(--sea) 85%, transparent); border-radius: 2px;
+  color: color-mix(in srgb, var(--ink) 78%, var(--sea)); padding: 1px 6px; background: color-mix(in srgb, var(--sea) 64%, transparent); border-radius: 2px;
 }
+/* (the one link that asks for something is in full ink: the accent is too faint on the sea) */
+html[data-style="ink"] #credit a.support { color: var(--ink); }
 html:not([data-style="ink"]) #ink-frame { display: none; }
 
 @media (max-width: 600px) {

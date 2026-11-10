@@ -175,6 +175,9 @@
   #credit { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(6px + env(safe-area-inset-bottom));
     font-size: 12px; font-style: italic; color: var(--ink-soft); }
   #credit a { color: inherit; }
+  #credit a.support { font-style: normal; color: var(--accent); }
+  /* (the long form of the credit needs a wide window: the dock sits beside it) */
+  @media (max-width: 1000px) { #credit .wide { display: none; } }
   @media (max-width: 600px) {
     header h1 { font-size: 21px; }
     header p { font-size: 13px; }
@@ -231,6 +234,7 @@
   #about-body li { margin: 2px 0; }
   #about-body p { margin: 4px 0; }
   #about-body .ok { color: inherit; }
+  #about-body a { color: inherit; }
   kbd { font: inherit; font-size: 12px; border: 1px solid var(--ink-soft); border-radius: 3px; padding: 0 4px;
     background: var(--control); white-space: nowrap; }
   /* sharing: the link, a copy button and what the link carries */
@@ -418,6 +422,7 @@
     #style-button { width: 32px; padding: 0; }
     #style-button .caret { display: none; }
     html.dock-open #credit { visibility: hidden; }
+    #credit.own .by { display: none; }
     /* (the dock already stops 130 px under the card: room for the controls) */
     #dock { max-height: calc(100% - var(--card-bottom, 120px) - 130px); }
   }
@@ -539,7 +544,8 @@
   <button type="button" data-zoom="out" aria-label="Zoom out" title="Zoom out (−)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg></button>
   <button type="button" data-zoom="fit" aria-label="Show the whole world" title="The whole world (0)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg></button>
 </div>
-<div id="credit">Countries, neighbours and populations: <a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>, CC BY 4.0</div>
+<!-- the credit line: whose data, who made the page (the link is the source), and where to support it -->
+<div id="credit"><span id="credit-data"><span class="wide">Countries, neighbours and populations: </span><a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>, CC BY 4.0</span><span class="by"> · <span class="wide">Made </span>by <a href="https://github.com/anvaka/people-world" target="_blank" rel="noopener" title="The source, on GitHub">anvaka</a></span> · <a class="support" href="https://github.com/sponsors/anvaka" target="_blank" rel="noopener" title="Sponsor the author on GitHub: one time or monthly">Support this map</a></div>
 <!-- UX: the dock, bottom right (a sheet at the bottom of a phone): a build in progress, your
      changes, the country panel. #flip and #clear keep their ids and jobs. -->
 <div id="dock">
@@ -1386,7 +1392,8 @@ function showChecks(check, exclaves, ms) {
     <p>${exclaves.length} exclaves: no flat map can give every pair of neighbours a border, so ${exclaves.length} borders are made by a detached piece of one country touching the other, like Kaliningrad.</p>
     <p>World ${seed}${which}${ms ? `, drawn in ${(ms / 1000).toFixed(1)} s` : ''}. Each world number draws the same countries differently.` +
     (edits.length && !showingBefore && edited && edited.scratch ? ' Drawn from scratch: the last change didn’t fit into the map as it was, so countries moved.' : '') + `</p>
-    <p>Keys: <kbd>/</kbd> find · arrows, <kbd>+</kbd> <kbd>−</kbd> and <kbd>0</kbd> move the map · <kbd>Enter</kbd> picks the country in the middle · <kbd>B</kbd> before and after · <kbd>Ctrl</kbd> <kbd>Z</kbd> undo · <kbd>Esc</kbd> close.</p>`;
+    <p>Keys: <kbd>/</kbd> find · arrows, <kbd>+</kbd> <kbd>−</kbd> and <kbd>0</kbd> move the map · <kbd>Enter</kbd> picks the country in the middle · <kbd>B</kbd> before and after · <kbd>Ctrl</kbd> <kbd>Z</kbd> undo · <kbd>Esc</kbd> close.</p>
+    <p>Made by <a href="https://github.com/anvaka" target="_blank" rel="noopener">anvaka</a>; the <a href="https://github.com/anvaka/people-world" target="_blank" rel="noopener">source is on GitHub</a>. If you enjoy the map, you can <a href="https://github.com/sponsors/anvaka" target="_blank" rel="noopener">support the work</a>.</p>`;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2427,11 +2434,12 @@ function tagged(result) {
 }
 // The title card, the credit and the map's name say which graph is drawn
 const HOME = {title: document.title, name: document.querySelector('header h1').textContent, lede: document.querySelector('header .lede').textContent,
-  credit: $('credit').innerHTML, map: svg.getAttribute('aria-label'), shown: ''};
+  credit: $('credit-data').innerHTML, map: svg.getAttribute('aria-label'), shown: ''};
 function graphTexts() {
   if (HOME.shown === graphKey) return;
   HOME.shown = graphKey;
-  let own = !!graphKey, credit = $('credit');
+  let own = !!graphKey, credit = $('credit-data');
+  $('credit').classList.toggle('own', own);
   document.title = own ? `${doc.title} · ${HOME.title}` : HOME.title;
   document.querySelector('header h1').textContent = own ? doc.title : HOME.name;
   document.querySelector('header .lede').textContent = own
