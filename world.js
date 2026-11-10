@@ -291,6 +291,14 @@ export async function buildWorld(doc, options = {}) {
     for (const [a, b] of missingPairs(S, keptPairs).filter(([a, b, len]) => len <= 0)) bridge(S, a, b, lists);
     recount(S);
   };
+  // A repair that takes a country off the map and grows it again must leave it on the map, with a
+  // border: one that did not grow back has no arms and no thin parts, and would pass as round. (A
+  // country with one neighbour was then drawn as nothing but its own exclave, a quarter too small.)
+  const stands = X => {
+    if (!(S.area[X] > 0.5 * S.target[X])) return false;
+    const links = linksOf(S, X, keptPairs);
+    return !links.length || links.some(Y => S.pairLen[X * NL + Y] > 0);
+  };
   const tried = new Set();
   for (let round = 0; round < 2; ++round) {
     const miss = missingPairs(S, keptPairs).sort((x, y) => Math.min(S.target[x[0]], S.target[x[1]]) - Math.min(S.target[y[0]], S.target[y[1]]));
@@ -309,7 +317,7 @@ export async function buildWorld(doc, options = {}) {
       recount(S);
       const after = missingPairs(S, keptPairs).length;
       if (debug) debug.log(`  reinsert ${doc.nodes[X][0]}: ${before} -> ${after}`);
-      if (after >= before) restore(S, snap);
+      if (after >= before || !stands(X)) restore(S, snap);
       }
     }
   }
@@ -342,7 +350,7 @@ export async function buildWorld(doc, options = {}) {
       if (debug) debug.log(`  reshape ${doc.nodes[X][0]}: roundness ${c0.toFixed(2)} -> ${c1.toFixed(2)}, missing ${before} -> ${after}`);
       // a severe ribbon may cost one more exclave
       const allowed = c0 > 7 && c1 < 0.45 * c0 ? before + 1 : before;
-      if (after > allowed || c1 > 0.8 * c0) restore(S, snap);
+      if (after > allowed || c1 > 0.8 * c0 || !stands(X)) restore(S, snap);
       else shape = fresh;
     }
   }
@@ -398,7 +406,7 @@ export async function buildWorld(doc, options = {}) {
         recount(S);
         const after = missNow();
         const tf1 = pruneThin(S, meshIds, 0.4, tiny0, 0, true);
-        const ok = tf1[X] < 0.5 * t0 && after <= before + (t0 > 0.5 ? 2 : 1);
+        const ok = tf1[X] < 0.5 * t0 && after <= before + (t0 > 0.5 ? 2 : 1) && stands(X);
         if (debug) debug.log(`  ribbon ${doc.nodes[X][0]}: thin ${(100 * t0).toFixed(0)}% -> ${(100 * tf1[X]).toFixed(0)}%, missing ${before} -> ${after}${ok ? '' : ' (undone)'}`);
         if (ok) tf = tf1; else restore(S, snap);
       }
@@ -493,6 +501,7 @@ export async function buildWorld(doc, options = {}) {
     if (debug) debug.log(`seas: ${r.bodies} channel bodies, ${r.carved} cells carved; missing ${missingPairs(S, finalPairsNow()).filter(([a, b, len]) => len <= 0).length}`);
   };
   const finalPairsNow = () => keptPairs.filter(([a, b]) => S.linked[a * NL + b]).concat(pieces.map(p => [p.label, p.host]), pieces.filter(p => p.host2 >= 0).map(p => [p.label, p.host2]));
+  if (debug) debug.log(`exclaves carved: missing ${missingPairs(S, finalPairsNow()).filter(([a, b, len]) => len <= 0).map(([a, b]) => (a < n ? doc.nodes[a][0] : 'piece') + '-' + (b < n ? doc.nodes[b][0] : 'piece')).join(' ') || 'none'}`);
   if (globalThis.SEAS ?? true) { makeSeas(); makeSeas(); }
   anneal(S, rng, 16, 0.15, 0.01);
   recount(S);

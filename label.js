@@ -849,10 +849,15 @@ function carveWith(S, P, H, area, H2, lists, rho, dOther, dToward) {
   const {mesh, lab} = S;
   const tryAt = (cands, mayTake) => {
     cands.sort((a, b) => a[1] - b[1]);
+    // (a piece on the border of two hosts takes a stretch of that border: it must leave the hosts
+    // a border of their own, at least half of what they had or of what they need. The first cell
+    // of a piece is taken without the border test, and a short border could vanish under it.)
+    const hh = H2 >= 0 ? H * S.NL + H2 : -1;
+    const keep = hh >= 0 ? 0.5 * Math.min(S.pairLen[hh], S.need[hh]) : 0;
     for (const [u] of cands.slice(0, 6)) {
       const snap = snapshot(S);
       growBlob(S, P, u, area, mayTake);
-      const ok = S.area[P] >= 0.6 * area && (H2 < 0 || S.pairLen[P * S.NL + H] > 0 && S.pairLen[P * S.NL + H2] > 0);
+      const ok = S.area[P] >= 0.6 * area && (H2 < 0 || S.pairLen[P * S.NL + H] > 0 && S.pairLen[P * S.NL + H2] > 0 && S.pairLen[hh] > 0 && S.pairLen[hh] >= keep);
       if (ok) return true;
       restore(S, snap);
     }
