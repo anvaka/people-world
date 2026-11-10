@@ -162,6 +162,11 @@
   #loading .bar { height: 4px; background: var(--paper-deep); margin-top: 8px; }
   #loading .bar div { height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
   :root[data-map-state="ready"] #loading { display: none; }
+  /* a file held over the page: a DOT file dropped here is drawn as a map */
+  #drop-hint { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; pointer-events: none; padding: 0 16px;
+    outline: 2px dashed var(--ink-soft); outline-offset: -12px; }
+  #drop-hint .box { background: var(--panel); border: 1px solid var(--ink-soft); padding: 14px 20px; text-align: center; max-width: 100%; box-sizing: border-box; }
+  #drop-hint[hidden] { display: none; }
   #compass { position: fixed; right: calc(16px + env(safe-area-inset-right)); top: calc(14px + env(safe-area-inset-top));
     width: 74px; height: 74px; opacity: 0.85; pointer-events: none; color: var(--ink); }
   #compass .ink { fill: currentColor; }
@@ -575,6 +580,7 @@
 <div id="sr-live" class="sr-only" aria-live="polite"></div>
 <div id="tip" hidden></div>
 <div id="loading"><div class="box"><div id="loading-text">Charting the world…</div><div class="bar"><div></div></div><div id="loading-sub"></div></div></div>
+<div id="drop-hint" hidden><div class="box">Drop a DOT file to draw its graph as a map</div></div>
 
 <script type="module">
 import {buildWorld} from './world.js';
@@ -589,6 +595,9 @@ html.setAttribute('data-map-state', 'loading');
 // digits and hyphens only: that is what survives the artifact's shared link. World 1 without
 // edits when the address says nothing. (Links in the earliest form, #world-3:-FR-ES,+JP-KR,
 // still open.) A style other than ink ends the link: #world-3-cut-FR-ES-realm.
+// A map of a graph of your own (a DOT file dropped on the page, see "Which graph" below) starts
+// with the graph's key: #graph-1x2y3z-world-1-cut-AA-AB.
+let graphKey = '';   // '' for the countries
 const READABLE_EDITS = 4;
 const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 // an edit as a number: both two-letter codes (26 × 26 each) and add-or-cut; four base-62 digits
@@ -616,6 +625,8 @@ function readHash() {
   let style = (styleSuffix.exec(hash) || [])[1] || null;
   if (style) hash = hash.slice(0, -style.length - 1);
   if (RETIRED_STYLES.includes(style)) style = DEFAULT_STYLE;
+  let graph = (/^#graph-([0-9a-z]+)-/.exec(hash) || [])[1] || '';
+  if (graph) hash = '#' + hash.slice(graph.length + 8);
   let list = [];
   let match = /^#world-(\d+)((?:-(?:cut|add)-[A-Za-z0-9]+-[A-Za-z0-9]+)*)$/.exec(hash);
   if (match) {
@@ -629,17 +640,19 @@ function readHash() {
       if (e) list.push({add: e[1] === '+', a: e[2], b: e[3]});
     }
   }
-  return {seed: match ? Math.max(1, parseInt(match[1], 10)) : 1, edits: list, style};
+  return {seed: match ? Math.max(1, parseInt(match[1], 10)) : 1, edits: list, style, graph};
 }
-function hashOf(seed, edits) {
-  if (edits.length > READABLE_EDITS && edits.every(packable)) return '#world-' + seed + '-e-' + edits.map(packEdit).join('');
-  return '#world-' + seed + edits.map(e => (e.add ? '-add-' : '-cut-') + e.a + '-' + e.b).join('');
+function hashOf(seed, edits, graph = graphKey) {
+  let head = '#' + (graph ? 'graph-' + graph + '-' : '') + 'world-' + seed;
+  if (edits.length > READABLE_EDITS && edits.every(packable)) return head + '-e-' + edits.map(packEdit).join('');
+  return head + edits.map(e => (e.add ? '-add-' : '-cut-') + e.a + '-' + e.b).join('');
 }
 // The address of a map: the world and the edits (hashOf, which also names drawn maps), then the
 // style when it isn't ink, so a shared link shows the map as it was seen
 let currentStyle = html.dataset.style;
-const linkOf = (seed, edits) => hashOf(seed, edits) + (currentStyle !== DEFAULT_STYLE ? '-' + currentStyle : '');
+const linkOf = (seed, edits, graph = graphKey) => hashOf(seed, edits, graph) + (currentStyle !== DEFAULT_STYLE ? '-' + currentStyle : '');
 let {seed, edits} = readHash();
+graphKey = readHash().graph;
 // an address in another form is rewritten in the current one, so a copied link carries it
 if ((location.hash || currentStyle !== DEFAULT_STYLE) && decodeURIComponent(location.hash) !== linkOf(seed, edits)) history.replaceState(null, '', linkOf(seed, edits));
 
@@ -652,7 +665,7 @@ function build(doc, seed, onProgress, base) {
   return new Promise((resolve, reject) => {
     let cancelled = false, worker = null;
     running = {cancel() { cancelled = true; if (worker) worker.terminate(); reject(new Error('cancelled')); }};
-    let here = () => buildWorld(doc, {seed, planarSubgraph, base, onProgress: p => { if (!cancelled) onProgress(p); }})
+    let here = () => buildWorld(doc, {seed, planarSubgraph, base, ...doc.build, onProgress: p => { if (!cancelled) onProgress(p); }})
       .then(r => { if (!cancelled) resolve(r); }, e => { if (!cancelled) reject(e); });
     try {
       worker = new Worker(new URL('./worker.js', import.meta.url), {type: 'module'});
@@ -1265,6 +1278,8 @@ function dress(world) {
   return world;
 }
 
+// Names in order, a number in one by its value (a graph from a file may have Node 2 and Node 10)
+const byName = new Intl.Collator(undefined, {numeric: true}).compare;
 // Puts a rendered world on the page in place of the one shown, keeping the selected country
 function show(next) {
   let keep = selected && selected.country.id;
@@ -1274,7 +1289,7 @@ function show(next) {
   items = next.items;
   html.classList.add('map-shown');
   // the names to suggest: the same in the maps before and after an edit, so made once per graph
-  if (!next.names) next.names = items.map(it => it.country.name).sort(new Intl.Collator().compare);
+  if (!next.names) next.names = items.map(it => it.country.name).sort(byName);
   // (its lines keep the detail they were last drawn with, and get the current zoom's if it differs)
   updateDetail();
   updateMarkers();
@@ -1365,8 +1380,9 @@ function showChecks(check, exclaves, ms) {
   document.getElementById('about-body').innerHTML = `<ul>
       <li>${mark(check.missing === 0)} Neighbours share a border: ${check.pairs - check.missing} of ${check.pairs} pairs do.</li>
       <li>${mark(check.extra === 0)} Countries that are not neighbours never touch: ${check.extra} false borders.</li>
-      <li>${mark(check.worst < 0.01)} Each country's area is its share of the world's people, within ${pct}%.</li>
+      <li>${mark(check.worst < 0.01)} Each country's area is its share of ${world.result.measure ? 'all the ' + escapeHtml(world.result.measure) : 'the world\'s people'}, within ${pct}%.</li>
     </ul>
+    ${world.result.measure && !ok ? '<p>Not every graph can be drawn by these rules: one with many links to a node, or one node linked to very many, runs out of room.</p>' : ''}
     <p>${exclaves.length} exclaves: no flat map can give every pair of neighbours a border, so ${exclaves.length} borders are made by a detached piece of one country touching the other, like Kaliningrad.</p>
     <p>World ${seed}${which}${ms ? `, drawn in ${(ms / 1000).toFixed(1)} s` : ''}. Each world number draws the same countries differently.` +
     (edits.length && !showingBefore && edited && edited.scratch ? ' Drawn from scratch: the last change didn’t fit into the map as it was, so countries moved.' : '') + `</p>
@@ -1412,6 +1428,8 @@ function paintSelection(item, want) {
 // change highlight (a redraw keeping the selection); how.focus moves focus to the panel (search,
 // keyboard, a neighbour followed from the panel); how.view false leaves the view to the caller.
 function select(item, how = {}) {
+  // (while another graph is being drawn, the map on screen is only looked at)
+  if (item && world.result.graph !== graphKey) return;
   let info = document.getElementById('info');
   let changed = item !== selected;
   if (!how.quiet) {
@@ -1438,7 +1456,7 @@ function select(item, how = {}) {
   if (how.quiet) return;
   if (how.focus) info.querySelector('h2').focus({preventScroll: true});
   let c = item.country, n = world.neighbours[item.index].length;
-  if (changed) announce(`${c.name}: ${c.continent}, ${c.population.toLocaleString('en-US')} people, ` +
+  if (changed) announce(`${c.name}: ${c.continent ? c.continent + ', ' : ''}${sizeText(c)}, ` +
     (n ? `borders ${n} ${n > 1 ? 'countries' : 'country'}.` : 'no neighbours.'));
   if (changed && how.view !== false) requestAnimationFrame(() => ensureVisible(item));
 }
@@ -1460,6 +1478,12 @@ function targetNeighbours(id) {
   return set;
 }
 const itemOfId = id => items.find(it => it.country.id === id) || null;
+// A country's size in words: its people, or what the nodes of a dropped graph are sized by
+function sizeText(c) {
+  let measure = world.result.measure;
+  if (!measure) return c.population.toLocaleString('en-US') + ' people';
+  return measure + ' ' + (c.value >= 1000 ? Math.round(c.value).toLocaleString('en-US') : String(+c.value.toPrecision(3)));
+}
 
 // The country panel: who it borders, and the controls that change that. A border being drawn
 // shows as pending, with a way to call it off; borders removed by an edit stay listed with a way
@@ -1477,12 +1501,11 @@ function renderPanel(item) {
   let original = originalNear.get(c.id) || new Set();
   let rows = Array.from(new Set([...drawnIds, ...target])).map(id => ({id, name: nameOf(id),
     state: !target.has(id) ? 'pending-cut' : !drawnSet.has(id) ? 'pending-add' : !original.has(id) ? 'added' : ''}))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => byName(a.name, b.name));
   let removed = editable ? Array.from(original).filter(id => !target.has(id) && !drawnSet.has(id))
-    .map(id => ({id, name: nameOf(id)})).sort((a, b) => a.name.localeCompare(b.name)) : [];
+    .map(id => ({id, name: nameOf(id)})).sort((a, b) => byName(a.name, b.name)) : [];
   let own = world.exclaves.filter(e => e.owner === c.id).map(e => nameOf(e.host) + (e.host2 ? ' and ' + nameOf(e.host2) : ''));
   let hosted = world.exclaves.filter(e => e.host === c.id || e.host2 === c.id).map(e => nameOf(e.owner));
-  let people = c.population.toLocaleString('en-US');
   let n = rows.filter(r => r.state !== 'pending-cut').length;
   let esc = escapeHtml, cn = esc(c.name);
   let row = r => {
@@ -1504,7 +1527,7 @@ function renderPanel(item) {
   info.classList.toggle('open', sheetOpen);
   info.classList.toggle('picking-mode', !!pickPart);
   info.innerHTML = `<button type="button" class="close" aria-label="Close ${cn}" data-key="close">×</button><h2 id="info-title" tabindex="-1"></h2>
-    <div class="meta">${esc(c.continent)} · ${people} people</div>
+    <div class="meta">${esc((c.continent ? c.continent + ' · ' : '') + sizeText(c))}</div>
     <div class="sec"><span>${n ? `Borders ${n} ${n > 1 ? 'countries' : 'country'}` : 'No neighbours: an island.'}</span>
       ${editable ? `<button type="button" class="mini sheet-toggle" aria-expanded="${info.classList.contains('open')}" data-sheet data-key="sheet">${info.classList.contains('open') ? 'Less' : 'Change borders'}</button>` : ''}</div>
     ${pickPart}
@@ -1581,10 +1604,10 @@ function findCountry(text) {
   if (starts.length === 1) return {item: starts[0]};
   let has = items.filter(it => norm(it.country.name).includes(q));
   if (has.length === 1) return {item: has[0]};
-  let code = q.length === 2 && items.find(it => it.country.id.toLowerCase() === q);
+  let code = !graphKey && q.length === 2 && items.find(it => it.country.id.toLowerCase() === q);
   if (code) return {item: code};
   let many = starts.length ? starts : has;
-  return {item: null, many: many.length ? many.sort((a, b) => a.country.name.localeCompare(b.country.name)) : null};
+  return {item: null, many: many.length ? many.sort((a, b) => byName(a.country.name, b.country.name)) : null};
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1615,7 +1638,7 @@ function toggleBorder(a, b) {
   if (isPhone()) sheetOpen = false;
   location.hash = linkOf(seed, next);
 }
-function nameOfId(id) { let row = doc.nodes.find(r => r[0] === id); return row ? row[1] : id; }
+function nameOfId(id) { let row = doc && doc.nodes.find(r => r[0] === id); return row ? row[1] : id; }
 function describe(e) { return `${nameOfId(e.a)} – ${nameOfId(e.b)}`; }
 // UX: an edit in words: "the France–Spain border"
 function borderName(e) { return `the ${nameOfId(e.a)}–${nameOfId(e.b)} border`; }
@@ -1800,8 +1823,8 @@ function hover(e) {
   if (e.pointerType !== 'mouse' || !world) { tip.hidden = true; return; }
   let item = itemAt(e.clientX, e.clientY);
   if (!item) { tip.hidden = true; return; }
-  tip.textContent = picking ? pickingTip(item) : `${item.country.name} · ${item.country.population.toLocaleString('en-US')} people` +
-    (html.classList.contains('ux-explored') ? '' : ' · click for its borders');   // UX: until the first pick
+  tip.textContent = picking ? pickingTip(item) : `${item.country.name} · ${sizeText(item.country)}` +
+    (html.classList.contains('ux-explored') || world.result.graph !== graphKey ? '' : ' · click for its borders');   // UX: until the first pick
   tip.style.left = e.clientX + 'px';
   tip.style.top = e.clientY + 'px';
   tip.hidden = false;
@@ -1879,7 +1902,7 @@ function suggestMatches(typed) {
     else if (q.length >= 3) has.push(hit);
   }
   let list = starts.concat(words, has);
-  let code = q.length === 2 && items.find(it => it.country.id.toLowerCase() === q);
+  let code = !graphKey && q.length === 2 && items.find(it => it.country.id.toLowerCase() === q);
   if (code && !list.some(h => h.name === code.country.name)) list.unshift({name: code.country.name, code: code.country.id});
   return list;
 }
@@ -1983,7 +2006,16 @@ window.addEventListener('hashchange', () => {
   // a link that names another style (typed in, or Back after a style was picked)
   let style = next.style || (location.hash ? DEFAULT_STYLE : currentStyle);
   if (style !== currentStyle) setStyle(style, {link: false, remember: false}).catch(failed);
-  if (hashOf(next.seed, next.edits) === hashOf(seed, edits)) return;
+  if (next.graph !== graphKey) {
+    if (next.graph && !droppedGraphs.has(next.graph) && !storedGraph(next.graph)) {
+      // a dropped graph this tab doesn't have (a link from elsewhere, typed in): the map stays
+      history.replaceState(null, '', linkOf(seed, edits));
+      if (world) showStatus(LOST_GRAPH, '', {error: true});
+      announce(LOST_GRAPH);
+      return;
+    }
+    switchGraph(next.graph);
+  } else if (hashOf(next.seed, next.edits) === hashOf(seed, edits)) return;
   seed = next.seed;
   edits = next.edits;
   // UX: the panel and the list show the change as being drawn at once
@@ -2191,9 +2223,10 @@ function hideStatus() {
 }
 $('status-close').addEventListener('click', hideStatus);
 // Cancel: back to the address of the map on screen, which is drawn already
-let cancelNote = '';
+let noteWhenShown = null;   // {text, error}: said once the map asked for is on screen
 $('status-cancel').addEventListener('click', () => {
-  cancelNote = 'Cancelled: the map is as it was.';
+  if (graphKey && !plain) { leaveGraph('Cancelled: the map is as it was.', false); return; }
+  noteWhenShown = {text: 'Cancelled: the map is as it was.'};
   location.hash = linkOf(plain ? plain.seed : seed, plain && plain.seed === seed ? lastGood : edits);
 });
 // what a build is about, in words
@@ -2298,7 +2331,127 @@ window.addEventListener('resize', () => {
 });
 
 // ---------------------------------------------------------------------------------------------
-let doc = null;
+// Which graph. The world's countries; or a graph of your own: a DOT (Graphviz) file dropped on
+// the page is drawn in their place, its nodes as countries and its links as borders (dot.js reads
+// it and gives every node a size; nothing among the page's controls says so). The address names
+// such a graph by a key made from the file's text, and the text is kept for this tab
+// (sessionStorage), so reloading, Back and Forward work. The file is not in the link: anywhere
+// else the link opens the countries, with a word on why. The maps a graph has drawn in this visit
+// are kept (graphMaps: the countries', and those of the last two files), so going back to one
+// draws nothing again. While a new graph is being drawn the map on screen stays, to look at only.
+let doc = null;             // the graph the address names: the document buildWorld draws
+let countriesDoc = null;
+const droppedGraphs = new Map();   // key → the document made from a dropped file
+const graphMaps = new Map();       // key → {doc, original, originalNear, plain, edited, lastGood, drawn}
+let cameFrom = '';          // the address of the last map drawn before the graph changed
+let refit = false;          // the next map shown is of another graph: true for a view of its own, or the view it was left at
+const LOST_GRAPH = 'That link is to a map drawn from a file dropped on this page. The file is not part of the link: drop it here to see its map.';
+function storedGraph(key) {
+  try { return JSON.parse(sessionStorage.getItem('peopled-graph-' + key)); } catch (e) { return null; }
+}
+async function droppedDoc(key) {
+  if (droppedGraphs.has(key)) return droppedGraphs.get(key);
+  let kept = storedGraph(key);
+  if (!kept) return null;
+  try {
+    let {graphFromDot} = await import('./dot.js');
+    droppedGraphs.set(key, graphFromDot(kept.text, kept.name));
+  } catch (e) { return null; }
+  return droppedGraphs.get(key);
+}
+function setDoc(next) {
+  doc = next;
+  original = new Set();
+  originalNear = new Map();
+  for (let i = 0; i < doc.links.length; i += 2) {
+    let a = doc.nodes[doc.links[i]][0], b = doc.nodes[doc.links[i + 1]][0];
+    original.add(pairKey(a, b));
+    if (!originalNear.has(a)) originalNear.set(a, new Set());
+    if (!originalNear.has(b)) originalNear.set(b, new Set());
+    originalNear.get(a).add(b);
+    originalNear.get(b).add(a);
+  }
+}
+// The address names another graph: what this one has drawn is put by, and what that one has is
+// taken out again
+function switchGraph(key) {
+  if (plain) cameFrom = linkOf(plain.seed, lastGood);
+  if (doc) {
+    graphMaps.delete(graphKey);
+    graphMaps.set(graphKey, {doc, original, originalNear, plain, edited, lastGood, drawn: [...drawnMaps.values()], view: {...state}, touched});
+    for (let k of graphMaps.keys()) { if (graphMaps.size <= 3) break; if (k && k !== key) graphMaps.delete(k); }
+  }
+  select(null);
+  graphKey = key;
+  let kept = graphMaps.get(key);
+  ({doc, original, originalNear, plain, edited, lastGood} = kept || {doc: null, original: null, originalNear: null, plain: null, edited: null, lastGood: []});
+  drawnMaps.clear();
+  if (kept) kept.drawn.forEach(remember);
+  // (a graph whose map never left the screen, another's being cancelled: the view stays)
+  refit = world && world.result.graph === key ? false : kept && kept.plain ? {view: kept.view, touched: kept.touched} : true;
+}
+// A dropped graph that was not drawn (it can't be, or was cancelled): back to the map there was
+function leaveGraph(text, error = true) {
+  noteWhenShown = {text, error};
+  let back = cameFrom || linkOf(1, [], '');
+  cameFrom = '';
+  location.hash = back;
+}
+// DOT text as the graph to draw: read, kept for this tab, and the address sent to its first map.
+// Throws what is wrong with the text.
+function keyOfText(text) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; ++i) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(36);
+}
+async function openDot(text, name) {
+  let {graphFromDot} = await import('./dot.js');
+  let made = graphFromDot(text, name), key = keyOfText(text);
+  droppedGraphs.set(key, made);
+  try { sessionStorage.setItem('peopled-graph-' + key, JSON.stringify({name, text})); }
+  catch (e) { /* no storage, or no room in it: the graph lasts until the page is reloaded */ }
+  if (key === graphKey) {
+    if (plain && world) showStatus(`${name} is the map on screen.`, '', {hideAfter: 5000});
+    return key;
+  }
+  location.hash = linkOf(1, [], key);
+  return key;
+}
+// What a build gave, marked with what the page says about it later, whichever graph is current then
+function tagged(result) {
+  if (!result) return result;
+  result.graph = graphKey;
+  result.measure = doc.measure || null;
+  if (doc.measure) result.countries.forEach(c => { c.value = doc.nodes[c.index][5]; });
+  return result;
+}
+// The title card, the credit and the map's name say which graph is drawn
+const HOME = {title: document.title, name: document.querySelector('header h1').textContent, lede: document.querySelector('header .lede').textContent,
+  credit: $('credit').innerHTML, map: svg.getAttribute('aria-label'), shown: ''};
+function graphTexts() {
+  if (HOME.shown === graphKey) return;
+  HOME.shown = graphKey;
+  let own = !!graphKey, credit = $('credit');
+  document.title = own ? `${doc.title} · ${HOME.title}` : HOME.title;
+  document.querySelector('header h1').textContent = own ? doc.title : HOME.name;
+  document.querySelector('header .lede').textContent = own
+    ? `Every node is a country, as large as its ${doc.measure}. Linked nodes share a border; nodes that are not linked never touch.` : HOME.lede;
+  svg.setAttribute('aria-label', own ? `Map of ${doc.title}: ${doc.about}` : HOME.map);
+  if (!own) credit.innerHTML = HOME.credit;
+  else {
+    let home = Object.assign(document.createElement('a'), {href: linkOf(1, [], ''), textContent: 'The world’s countries'});
+    // (to the countries' map as it was left, and in the style on now)
+    home.addEventListener('click', e => {
+      e.preventDefault();
+      let kept = graphMaps.get('');
+      location.hash = kept && kept.plain ? linkOf(kept.plain.seed, kept.lastGood, '') : linkOf(1, [], '');
+    });
+    credit.replaceChildren(doc.about[0].toUpperCase() + doc.about.slice(1) + ' · ', home);
+  }
+  // (a link to this map opens it in this tab only: nothing to share)
+  shareButton.hidden = own;
+  if (own && !shareBox.hidden) { shareBox.hidden = true; shareButton.setAttribute('aria-expanded', 'false'); }
+}
 let plain = null;    // {seed, world}: the world without edits
 let edited = null;   // {key, world, scratch, changes}: the same world with the edits, when there are any
 let showingBefore = false;
@@ -2348,21 +2501,22 @@ async function chart() {
   busy.chart = true;
   syncReady();
   if (!doc) {
-    doc = await fetch('./countries.json').then(r => {
+    let next = graphKey ? await droppedDoc(graphKey) : null;
+    if (stale()) return;
+    if (graphKey && !next) {
+      // the address names a dropped graph this tab doesn't have: the countries, and a word on why
+      graphKey = '';
+      edits = [];
+      history.replaceState(null, '', linkOf(seed, edits));
+      showEdits();
+      noteWhenShown = {text: LOST_GRAPH, error: true};
+    }
+    if (!next) next = countriesDoc || (countriesDoc = await fetch('./countries.json').then(r => {
       if (!r.ok) throw new Error('the countries graph did not load (' + r.status + ')');
       return r.json();
-    });
-    original = new Set();
-    originalNear = new Map();
-    for (let i = 0; i < doc.links.length; i += 2) {
-      let a = doc.nodes[doc.links[i]][0], b = doc.nodes[doc.links[i + 1]][0];
-      original.add(pairKey(a, b));
-      if (!originalNear.has(a)) originalNear.set(a, new Set());
-      if (!originalNear.has(b)) originalNear.set(b, new Set());
-      originalNear.get(a).add(b);
-      originalNear.get(b).add(a);
-    }
+    }));
     if (stale()) return;
+    setDoc(next);
   }
   let fresh = false, from = plain && plain.seed === seed ? lastGood.slice() : [];
   let newSeed = !!plain && plain.seed !== seed, entry = null;
@@ -2370,9 +2524,12 @@ async function chart() {
     if (!plain || plain.seed !== seed) {
       select(null);
       let then = edits.length ? `, then your ${edits.length} change${edits.length > 1 ? 's' : ''}` : '';
-      startJob(`${world ? `Charting world ${seed}` : seed === 1 ? 'Charting the world' : `Charting world ${seed}`}${then}…`, plain ? plain.ms : 0, !!world);
+      let what = graphKey ? (seed === 1 ? '' : `world ${seed} of `) + doc.title : world ? `world ${seed}` : seed === 1 ? 'the world' : `world ${seed}`;
+      startJob(`Charting ${what}${then}…`, plain ? plain.ms : 0, !!world);
       let t0 = performance.now();
-      let result = await build(doc, seed, jobProgress);
+      // (a graph from a file may be one the generator never finishes: three minutes, then no more)
+      let result = tagged(doc.build ? await buildWithin(180000, doc, seed, jobProgress) : await build(doc, seed, jobProgress));
+      if (!result) throw new Error('drawing it took more than three minutes');
       endJob();
       // (drawn in slices: the map on screen, if any, stays usable meanwhile)
       let next = await locked(() => drawWorld(result, null, stale));
@@ -2389,13 +2546,15 @@ async function chart() {
         startJob(fresh ? `Adding your ${edits.length} change${edits.length > 1 ? 's' : ''} to world ${seed}…` : jobText(lastGood, edits), plain.ms, true);
         // first from the map as it is; a change too big for that (a border across an ocean, say)
         // breaks a rule there or takes too long, and the changed graph is drawn from scratch
-        let result = await buildWithin(Math.max(20000, 3 * plain.ms), editedDoc(), seed, jobProgress, plain.world.result.layout);
+        let result = tagged(await buildWithin(Math.max(20000, 3 * plain.ms), editedDoc(), seed, jobProgress, plain.world.result.layout));
         endJob();
-        let check = result && selfCheck(result);
-        let scratch = !check || check.missing > 0 || check.extra > 0 || check.worst >= 0.01;
+        // (the rules as the map without the change keeps them: the countries' keeps all three; a
+        // graph from a file may not)
+        let check = result && selfCheck(result), was = checkOf(plain.world);
+        let scratch = !check || check.missing > was.missing || check.extra > was.extra || check.worst >= Math.max(0.01, 1.5 * was.worst);
         if (scratch) {
           startJob('That change doesn’t fit into the map as it was: drawing the changed world afresh…', plain.ms, true);
-          result = await build(editedDoc(), seed, jobProgress);
+          result = tagged(await build(editedDoc(), seed, jobProgress));
           endJob();
         }
         await locked(async () => {
@@ -2411,6 +2570,8 @@ async function chart() {
   } catch (error) {
     if (error.message === 'cancelled' || stale()) return;   // something newer was asked for
     endJob();
+    // a graph from a file that could not be drawn: back to the map there was
+    if (graphKey && !plain) { running = null; leaveGraph(`${doc.title} could not be drawn as a map: ${error.message}.`); return; }
     if (!edits.length || !plain || plain.seed !== seed) throw error;
     // the generator could not draw this edit: back to the map before it
     running = null;
@@ -2435,22 +2596,27 @@ async function chart() {
     if (edits.length) edited.world = await inStyle(edited.world, stale);
     let current = edits.length ? edited.world : plain.world;
     // a new world's view, and its lines at the detail that view needs, worked out ahead in slices
-    let view = fresh ? fitView() : {...state};
+    // a new world, or a graph not drawn before: a view of its own; a graph come back to: the
+    // view it was left at
+    let back = !fresh && refit && refit !== true ? refit : null, own = fresh || refit === true;
+    let view = own ? fitView() : back ? back.view : {...state};
     if (!await prepare(current, view, stale) || stale()) return null;
     showingBefore = false;
-    if (fresh) { touched = false; Object.assign(state, view); }
+    if (own || back) { touched = own ? false : back.touched; Object.assign(state, view); }
+    refit = false;
     show(current);
+    graphTexts();
     showChecks(checkOf(current), current.result.exclaves, performance.now() - started);
     lastGood = edits.slice();
     showEdits();
     $('loading').hidden = true;
-    if (cancelNote) { showStatus(cancelNote, '', {hideAfter: 5000}); announce(cancelNote); cancelNote = ''; }
+    if (noteWhenShown) { showStatus(noteWhenShown.text, '', noteWhenShown.error ? {error: true} : {hideAfter: 5000}); announce(noteWhenShown.text); noteWhenShown = null; }
     else if (fresh && !newSeed && edits.length && openedWithEdits) reportDone([], edits, edited, 'link');
     else if (fresh && newSeed && edits.length) reportDone(edits, edits, edited, 'world');
     else if (edits.length || from.length) reportDone(from, edits, edited, '');
     else hideStatus();
     // UX: fitted once the dock shows what it will (a link's changes), so no panel covers the map
-    if (fresh) fit();
+    if (own) fit();
     else applyView();
     return current;
   });
@@ -2564,6 +2730,8 @@ async function setStyle(name, how = {}) {
       if (stale()) return null;
       // the maps on hand, drawn again (the page's part, in slices, while the old style stays on screen)
       let maps = [plain, edited].filter(m => m && m.world);
+      // (a map of the graph before this one, on screen until this one is drawn)
+      if (world && !maps.some(m => m.world === world)) maps.push({world});
       let again = [];
       for (let m of maps) again.push(await render(m.world.result, m.world.beforeColours && {colours: m.world.beforeColours}, stale));
       // the switch itself: the old style out, the new one in, the new maps dressed and shown
@@ -2708,7 +2876,40 @@ window.peopledMap = {
   setView(view, rest) { Object.assign(state, view); if (rest) previewView(rest); else applyView(); },
   abbreviate,
   leftovers,   // what styles left behind when they were unmounted (taken away by the page)
+  // a graph of your own, as DOT text, drawn in the countries' place (as a dropped file is)
+  openDot: (text, name = 'graph.dot') => openDot(text, name),
+  get graph() { return graphKey; },
 };
+
+// A DOT file dropped anywhere on the page. While a file is held over it, a line says what a drop does.
+const dropHint = $('drop-hint');
+let dropTimer = 0;
+const carriesFiles = e => !!e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+window.addEventListener('dragover', e => {
+  if (!carriesFiles(e)) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+  dropHint.hidden = false;
+  // (no dragover for a while: the file has left the page)
+  clearTimeout(dropTimer);
+  dropTimer = setTimeout(() => { dropHint.hidden = true; }, 700);
+});
+window.addEventListener('drop', async e => {
+  if (!carriesFiles(e)) return;
+  e.preventDefault();
+  clearTimeout(dropTimer);
+  dropHint.hidden = true;
+  let file = e.dataTransfer.files[0];
+  if (!file) return;
+  try {
+    if (file.size > 2e6) throw new Error('it is larger than 2 MB');
+    await openDot(await file.text(), file.name);
+  } catch (error) {
+    let text = `${file.name} could not be drawn as a map: ${error.message}.`;
+    if (world) showStatus(text, 'The page reads DOT, the language of Graphviz files (.dot, .gv).', {error: true});
+    announce(text);
+  }
+});
 
 chart().catch(failed);
 // the title card grows once its font arrives: fit again then, if the map was not moved yet

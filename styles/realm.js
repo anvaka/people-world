@@ -616,6 +616,8 @@ function markerNames(world, state, selected) {
 // The legend: on this map area stands for people, so its key is a square and how many live in it
 const NUMBERS = [];
 for (let e = 2; e <= 9; ++e) for (let m of [1, 2.5, 5]) NUMBERS.push(m * 10 ** e);
+const SHARES = [];   // per cent
+for (let e = -4; e <= 1; ++e) for (let m of [1, 2.5, 5]) SHARES.push(+(m * 10 ** e).toPrecision(2));
 const WORDS = n => {
   if (n >= 1e9) return (n / 1e9) + ' billion';
   if (n >= 1e6) return (n / 1e6) + ' million';
@@ -626,18 +628,22 @@ let legend = null;
 function scale(world, k) {
   if (!legend) return;
   let perPerson = world.realm.land / world.realm.people;
+  // (a graph from a file is sized by something else than people: the square is a share of it)
+  let measure = world.result.measure;
+  let sizes = measure ? SHARES.map(p => ({n: p / 100 * world.realm.people, words: p + '% of it'})) : NUMBERS.map(n => ({n, words: WORDS(n) + ' people'}));
   let best = null;
-  for (let n of NUMBERS) {
-    let side = k * Math.sqrt(n * perPerson);
+  for (let size of sizes) {
+    let side = k * Math.sqrt(size.n * perPerson);
     let fit = Math.abs(Math.log(side / 24));
-    if (side <= 34 && (!best || fit < best.fit)) best = {n, side, fit};
+    if (side <= 34 && (!best || fit < best.fit)) best = {...size, side, fit};
   }
-  if (!best) best = {n: NUMBERS[0], side: k * Math.sqrt(NUMBERS[0] * perPerson)};
+  if (!best) best = {...sizes[0], side: k * Math.sqrt(sizes[0].n * perPerson)};
   let s = Math.max(2, Math.min(34, best.side));
   legend.square.style.width = legend.square.style.height = s + 'px';
   legend.box.hidden = false;
-  let words = WORDS(best.n) + ' people';
-  if (legend.text.textContent !== words) legend.text.textContent = words;
+  let cap = 'Land is ' + (measure || 'people');
+  if (legend.cap.textContent !== cap) legend.cap.textContent = cap;
+  if (legend.text.textContent !== best.words) legend.text.textContent = best.words;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -678,7 +684,7 @@ function mount() {
     box.hidden = true;
     box.innerHTML = `<div class="sq-wrap" aria-hidden="true"><div class="sq"></div></div><div><div class="cap">Land is people</div><div class="val">this square holds <span></span></div></div>`;
     document.body.insertBefore(box, document.getElementById('credit'));
-    legend = {box, square: box.querySelector('.sq'), text: box.querySelector('.val span')};
+    legend = {box, square: box.querySelector('.sq'), cap: box.querySelector('.cap'), text: box.querySelector('.val span')};
   }
   // a theme change repaints the land; so does anything else moving the map by rewriting its
   // transform (a test harness, say)
