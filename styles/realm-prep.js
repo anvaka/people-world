@@ -97,6 +97,25 @@ function rasterize(countries, nx, ny, x0, y0, s) {
   }
   return ids;
 }
+// Pockets of no country inside the land (see prepareWorld): each of up to 'most' cells, not joined
+// to the grid's edge, takes the value fill(cells) gives it
+function fillPockets(ids, w, h, most, fill) {
+  const seen = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; ++i) {
+    if (ids[i] !== -1 || seen[i]) continue;
+    let stack = [i], cells = [], open = false;
+    seen[i] = 1;
+    while (stack.length) {
+      let j = stack.pop(), x = j % w, y = (j - x) / w;
+      cells.push(j);
+      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) open = true;
+      for (let k of [x > 0 ? j - 1 : -1, x < w - 1 ? j + 1 : -1, y > 0 ? j - w : -1, y < h - 1 ? j + w : -1]) {
+        if (k >= 0 && ids[k] === -1 && !seen[k]) { seen[k] = 1; stack.push(k); }
+      }
+    }
+    if (!open && cells.length <= most) { let v = fill(cells); for (let j of cells) ids[j] = v; }
+  }
+}
 // Marks the texels a polyline passes through (steps of a third of a texel)
 function markLine(grid, nx, ny, x0, y0, s, pts) {
   for (let k = 1; k < pts.length; ++k) {
@@ -111,10 +130,14 @@ function markLine(grid, nx, ny, x0, y0, s, pts) {
 
 // Rivers. Rain falls evenly on the land and runs downhill to the sea: the "hill" is the distance
 // inland, raised along the mountain belts and roughened by noise, so rivers rise in the mountains and
-// the heart of each land and wind to the nearest coast. A priority flood from the sea gives every
-// cell a way down without pits; the flow gathered on the way picks the rivers, and their width grows
-// with it. Polylines in world coordinates (SVG orientation), smoothed, each with its flow.
-function makeRivers(inside, mask, belt, nx, ny, x0, y0, s, seed) {
+// the heart of each land and wind to the nearest coast. Every border stands on a low ridge of its
+// own, higher where three meet (or a border meets the sea): a river keeps off the borders and crosses
+// one at a saddle, square on and away from the corners, rather than running along it, where it would
+// be taken for the border. A priority flood from the sea gives every cell a way down without pits;
+// the flow gathered on the way picks the rivers, and their width grows with it. Polylines in world
+// coordinates (SVG orientation), smoothed, each with its flow.
+const RIDGE_CELLS = 3, RIDGE_HEIGHT = 7;
+function makeRivers(inside, mask, belt, borderD, junctionD, nx, ny, x0, y0, s, seed) {
   let n = nx * ny;
   let vh = (x, y, k) => { let h = Math.imul(x * 374761393 + y * 668265263 + k * 2246822519 + Math.floor(seed * 1e9), 1274126177); h ^= h >>> 13; h = Math.imul(h, 1103515245); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
   let vnoise = (x, y, k) => {
@@ -128,6 +151,9 @@ function makeRivers(inside, mask, belt, nx, ny, x0, y0, s, seed) {
     let i = y * nx + x;
     if (mask[i] < 0.5) { elev[i] = -1; continue; }
     elev[i] = Math.sqrt(inside[i]) * 2 + 8 * belt[i] + 9 * vnoise(x / 26, y / 26, 1) + 4 * vnoise(x / 9, y / 9, 2) + 1.5 * vnoise(x / 3.5, y / 3.5, 3);
+    let t = 1 - borderD[i] / RIDGE_CELLS, u = 1 - junctionD[i] / (2 * RIDGE_CELLS);
+    if (t > 0) elev[i] += RIDGE_HEIGHT * t * t;
+    if (u > 0) elev[i] += RIDGE_HEIGHT * u * u;
   }
   // priority flood (binary heap on elevation) from the sea cells next to land
   let down = new Int32Array(n).fill(-2), fill = new Float32Array(n), heap = [], hv = [];
@@ -171,8 +197,25 @@ function makeRivers(inside, mask, belt, nx, ny, x0, y0, s, seed) {
   let heads = [];
   for (let i = 0; i < n; ++i) if (isRiver(i) && !hasUp[i]) heads.push(i);
   heads.sort((a, b) => flow[b] - flow[a] || a - b);
+  // A river whose flow reaches the threshold by a border (water gathered over a border's saddle)
+  // would begin on the border, as if cut off by it: it begins upstream instead, up its largest
+  // stream, at the first cell clear of every border (or, if the stream keeps close to borders, the
+  // one furthest from them), so it is seen to cross
+  let upBest = new Int32Array(n).fill(-1);
+  for (let i = 0; i < n; ++i) { let d = down[i]; if (d >= 0 && elev[i] >= 0 && (upBest[d] < 0 || flow[i] > flow[upBest[d]])) upBest[d] = i; }
   for (let head of heads) {
-    let path = [head], f = [flow[head]];
+    let source = [];
+    if (borderD[head] < RIDGE_CELLS) {
+      let walk = [], best = -1;
+      for (let u = upBest[head]; u >= 0 && !taken[u] && flow[u] >= MIN / 4 && walk.length < 4 * RIDGE_CELLS; u = upBest[u]) {
+        walk.push(u);
+        if (best < 0 || borderD[u] > borderD[walk[best]]) best = walk.length - 1;
+        if (borderD[u] >= RIDGE_CELLS) break;
+      }
+      if (best >= 0 && borderD[walk[best]] > borderD[head]) source = walk.slice(0, best + 1).reverse();
+    }
+    let path = [...source, head], f = path.map(j => flow[j]);
+    source.forEach(j => { taken[j] = 1; });
     let i = head;
     taken[i] = 1;
     while (down[i] >= 0) {
@@ -244,6 +287,16 @@ export function prepareWorld(data) {
   let nx = FIELD_W, s = nx / w, ny = Math.ceil(h * s), n = nx * ny;
   let svg = r => r.map(([x, y]) => [x, -y]);
   let ids = rasterize(data.items.map(it => ({id: it.index, rings: it.rings.map(svg)})), nx, ny, x0, y0, s);
+  // a few cells of no country inside the land, where borders meet: lakes where rivers would end, at
+  // a border. Pockets of up to eight cells not joined to the open sea go to the country most round them
+  fillPockets(ids, nx, ny, 8, cells => {
+    let count = new Map(), best = -1, most = 0;
+    for (let j of cells) for (let k of [j - 1, j + 1, j - nx, j + nx]) {
+      let o = ids[k];
+      if (o >= 0) { let c = (count.get(o) || 0) + 1; count.set(o, c); if (c > most) { most = c; best = o; } }
+    }
+    return best;
+  });
   let mask = new Float32Array(n);
   for (let i = 0; i < n; ++i) mask[i] = ids[i] >= 0 ? 1 : 0;
   let byIndex = new Map(data.items.map(it => [it.index, it]));
@@ -291,7 +344,20 @@ export function prepareWorld(data) {
     f2[4 * i + 3] = 255;
   }
   let tRivers = Date.now();
-  let rivers = makeRivers(inside, mask, belt, nx, ny, x0, y0, s, hashStr('rivers' + seed));
+  // where borders meet: three countries, or two and the sea, within two cells of a border cell
+  let junctionD = new Float64Array(n).fill(1e20);
+  for (let y = 2; y < ny - 2; ++y) for (let x = 2; x < nx - 2; ++x) {
+    let i = y * nx + x;
+    if (borderD[i] > 1.5) continue;
+    let a = -3, b = -3;
+    for (let dy = -2; dy <= 2 && junctionD[i]; ++dy) for (let dx = -2; dx <= 2; ++dx) {
+      let o = ids[i + dy * nx + dx];
+      if (o === a || o === b) continue;
+      if (a === -3) a = o; else if (b === -3) b = o; else { junctionD[i] = 0; break; }
+    }
+  }
+  edt(junctionD, nx, ny);
+  let rivers = makeRivers(inside, mask, belt, borderD, junctionD, nx, ny, x0, y0, s, hashStr('rivers' + seed));
   // rivers as GPU segments (ax, ay, bx, by, half width, -1, -1), coordinates normalised to the world
   let rv = [];
   rivers.forEach(r => {

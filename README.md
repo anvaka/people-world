@@ -16,20 +16,19 @@ up, so each world number gives a different map of the same graph.
 
 - Drag, pinch, scroll or double-click to move around; the buttons at the right edge zoom in, out
   and back to the whole world. Tap a country to see its neighbours. **Find a country** takes a
-  name, the start of one or a two-letter code.
-- **Another world** draws the same graph again with the next world number.
+  name, the start of one or a two-letter code, and lists the countries that match as you type.
 - **Change borders.** In a country's panel, **Remove** takes a border away and the field below (or
   "pick it on the map") adds one. The map is then redrawn starting from the world as it was, so the
   countries an edit doesn't touch stay where they were. While it is redrawn the old map stays in
-  use, and a note at the bottom right says what is being drawn and can cancel it. Afterwards the
-  map lights the countries you edited and fades those that kept their shape.
+  use, and a note at the bottom right says what is being drawn and can cancel it.
 - **Show before** switches between the map before your changes and after; holding it (or the B
-  key) shows the map before only while held. Every change can be undone on its own; Undo, Ctrl+Z
-  and the browser's Back are instant for the last few maps drawn.
-- **Style** draws the map as Ink (a book's endpapers: pen, parchment, hatched coasts, mountains and
-  woods), Realm (a painted game world: terrain, shallows and rivers under the countries) or
-  Kinpeki (a gold-leaf folding screen: flat mineral colours on a sea of gold waves). Switching
-  doesn't build the world again. The browser remembers the choice.
+  key) shows the map before only while held. Each change in the list has its own Undo (Ctrl+Z
+  undoes the last); undoing, and the browser's Back, are instant for the last few maps drawn.
+- **Style** opens a menu: the map as Ink (a book's endpapers: pen, parchment, hatched coasts,
+  mountains and woods) or Realm (a painted game world: terrain, shallows and rivers under the
+  countries), and the theme: Light, Dark, or Auto (as the device is set). Switching doesn't build
+  the world again, and the menu closes once the map is drawn in the new style. The browser
+  remembers both choices.
 - **Share a map.** The address holds the world number and the edits, so a link opens the same
   map. `#world-1-cut-FR-ES-add-JP-KR` is world 1 without the France–Spain border and with a
   Japan–South Korea one. Countries are named by their two-letter codes. Past four edits the link
@@ -106,9 +105,8 @@ Switching styles draws the worlds on hand (and the map before your edits, when t
 again from what the generator returned, at the same view and with the same country picked.
 
 The heavy work of each style runs off the page's thread: Ink draws its terrain and seas in a
-worker, in tiles kept per zoom level (one worker on a phone, two elsewhere); Kinpeki traces its
-waves in a worker and draws them with WebGL; Realm prepares its terrain in a worker and paints it
-with WebGL 2. On a software renderer (no GPU) Realm keeps its flat colours, which is what headless
+worker, in tiles kept per zoom level (one worker on a phone, two elsewhere); Realm prepares its
+terrain in a worker and paints it with WebGL 2. On a software renderer (no GPU) Realm keeps its flat colours, which is what headless
 test browsers show; `?realm-gl` in the address paints anyway.
 
 ## What makes it fast
@@ -148,7 +146,7 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 | file | what it does |
 | --- | --- |
 | `index.html` | the page: drawing, pan and zoom, border editing, the style picker |
-| `styles/` | the three styles: `ink`, `realm`, `kinpeki` (`.css`, `.js`, `.fonts` and helpers) |
+| `styles/` | the two styles: `ink` and `realm` (`.css`, `.js`, `.fonts` and helpers) |
 | `worker.js` | runs the generator off the main thread |
 | `world.js` | the pipeline, `buildWorld(graph, {seed, base})` |
 | `layout.js` | country discs: stress majorization and constraint projection |
@@ -172,8 +170,7 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
   Jonathan Shewchuk's predicates, public domain (Unlicense).
 - [earcut](https://github.com/mapbox/earcut) by Mapbox, ISC license (`vendor/LICENSE-earcut`).
 - Fonts from [Google Fonts](https://fonts.google.com/), SIL Open Font License: Eagle Lake,
-  Fondamento and Sorts Mill Goudy (Ink), Alegreya and Alegreya SC (Realm), Shippori Mincho B1
-  (Kinpeki).
+  Fondamento and Sorts Mill Goudy (Ink), Alegreya and Alegreya SC (Realm).
 
 ## License
 
