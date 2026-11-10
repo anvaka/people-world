@@ -1,0 +1,12 @@
+{
+  "name": "people-world",
+  "version": "1.0.0",
+  "description": "A fantasy world map drawn from the graph of the world's countries: neighbours share a border, other countries never touch, and every country is as large as its population.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 8080",
+    "check": "node tools/check.mjs"
+  },
+  "license": "MIT"
+}
