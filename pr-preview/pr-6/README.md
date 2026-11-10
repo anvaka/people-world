@@ -10,7 +10,7 @@ border. The map keeps three rules:
 Nothing else comes from the real world. Where countries sit, their shapes and the coasts are made
 up, so each world number gives a different map of the same graph.
 
-![World 1](docs/world-1.jpg)
+[![World 1](docs/world-1.jpg)](https://anvaka.github.io/people-world/)
 
 ## Using the map
 
