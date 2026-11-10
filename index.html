@@ -28,6 +28,8 @@
     --land-4: #b9cba9;
     --land-5: #ecd68e;
     --land-6: #d2b38e;
+    --swatch-ink: linear-gradient(135deg, #efe4c8 0 48%, #2b2118 48% 56%, #efe4c8 56% 70%, #9b2d20 70% 78%, #d9e2df 78%);
+    --swatch-realm: linear-gradient(135deg, #f3efe2 0 18%, #6f8f42 18% 52%, #b9a35f 52% 62%, #2f6f9a 62%);
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
@@ -51,6 +53,8 @@
       --land-4: #4f6045;
       --land-5: #766b38;
       --land-6: #6b5035;
+      --swatch-ink: linear-gradient(135deg, #514255 0 48%, #eadfc4 48% 56%, #294f57 56% 70%, #e9b85a 70% 78%, #121a27 78%);
+      --swatch-realm: radial-gradient(circle at 34% 58%, #ffd27a 0 1.5px, transparent 2.5px), radial-gradient(circle at 22% 72%, #ffd27a 0 1px, transparent 2px), linear-gradient(135deg, #3a4048 0 52%, #565a5e 52% 62%, #10203a 62%);
       color-scheme: dark;
     }
   }
@@ -74,6 +78,8 @@
     --land-4: #4f6045;
     --land-5: #766b38;
     --land-6: #6b5035;
+    --swatch-ink: linear-gradient(135deg, #514255 0 48%, #eadfc4 48% 56%, #294f57 56% 70%, #e9b85a 70% 78%, #121a27 78%);
+    --swatch-realm: radial-gradient(circle at 34% 58%, #ffd27a 0 1.5px, transparent 2.5px), radial-gradient(circle at 22% 72%, #ffd27a 0 1px, transparent 2px), linear-gradient(135deg, #3a4048 0 52%, #565a5e 52% 62%, #10203a 62%);
     color-scheme: dark;
   }
   html, body { margin: 0; height: 100%; background: var(--sea); color: var(--ink); overflow: hidden; }
@@ -175,7 +181,7 @@
      UX (round 3): title card, the dock (build status, your changes, the country panel), sharing,
      comparing before and after, keyboard and screen-reader support. Built only from the tokens
      and type above, so a new palette or typeface carries over. Layout and controls only: nothing
-     here draws the map itself, except .ux-ghost / .ux-edit (the edited borders, at the end).
+     here draws the map itself, except .hot (the border a neighbour's row points at, at the end).
      ========================================================================================= */
   .sr-only { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);
     clip-path: inset(50%); white-space: nowrap; }
@@ -188,11 +194,26 @@
   :root.ux-explored header .hint { display: none; }
   header #find { margin-top: 10px; flex-wrap: nowrap; }
   header #search { flex: 1 1 auto; min-width: 0; width: auto; }
-  header #reroll { flex: none; }
   button.quiet { height: 28px; padding: 0 9px; font-size: 13px; }
   #card-more { display: none; width: 28px; padding: 0; font-style: italic; }
   .note { font-style: italic; font-size: 13px; margin-top: 6px; }
   #find-note { color: var(--accent); }
+  /* the country suggestions under a name field (a style dresses them further) */
+  .suggest { position: fixed; z-index: 20; margin: 0; padding: 4px; list-style: none; box-sizing: border-box;
+    overflow-y: auto; overscroll-behavior: contain; background: var(--menu, var(--panel)); color: var(--ink);
+    border: 1px solid var(--ink-soft); box-shadow: 0 10px 28px var(--shadow); font-size: 15px; line-height: 1.25; }
+  .suggest li { padding: 7px 10px; cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+  .suggest li:hover { background: var(--control-hover); }
+  .suggest li[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); }
+  .suggest mark { background: none; color: inherit; text-decoration: underline; text-decoration-color: var(--accent);
+    text-decoration-thickness: 2px; text-underline-offset: 3px; }
+  .suggest .code { margin-left: auto; font-size: 12px; opacity: 0.65; letter-spacing: 0.06em; }
+  @media (pointer: coarse) { .suggest li { padding: 10px 12px; } }
+  /* the search field's clear button, in the field's own ink */
+  input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; width: 12px; height: 12px;
+    margin-left: 6px; cursor: pointer; background: currentColor; opacity: 0.55;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 2l8 8M10 2l-8 8' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 2l8 8M10 2l-8 8' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat; }
   /* the rules and how this map was checked: one line, details on demand */
   details#about { margin-top: 8px; font-size: 13px; line-height: 1.35; }
   details#about summary { cursor: pointer; list-style: none; padding: 2px 0; }
@@ -291,12 +312,7 @@
     border: 2px solid var(--accent); border-radius: 50%; pointer-events: none; }
   #stage.picking { cursor: crosshair; }
 
-  /* on the map: edited borders. Removed ones as a dashed ghost, added ones in the accent colour;
-     shown even where the zoom hides lines around small countries */
-  .lines .ux-edit.hidden { display: inline; }
-  .border.ux-edit { stroke-width: 3; }
-  .ux-ghost { fill: none; stroke: var(--accent); stroke-width: 3; stroke-dasharray: 1 5; stroke-linecap: round;
-    stroke-linejoin: round; vector-effect: non-scaling-stroke; pointer-events: none; }
+  /* on the map: the border a neighbour's row in the panel points at */
   .border.hot { stroke: var(--accent); stroke-width: 5; stroke-dasharray: none; opacity: 1; display: inline; }
 
   @media (max-width: 600px) {
@@ -339,21 +355,38 @@
   /* a style's script is running for the first time: the map waits for it out of sight */
   html.restyling #plate { visibility: hidden; }
 
-  /* the style picker: a row of three in the title card, under the tools */
-  #style-box { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--ink-soft); font-size: 14px; }
-  #style-box .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  #style-box .choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
-  #style-box button.choice { height: auto; padding: 7px 6px 6px; display: flex; flex-direction: column; align-items: center; gap: 5px;
-    text-align: center; line-height: 1.15; min-width: 0; }
-  #style-box button.choice .nm { font-size: 15px; }
-  #style-box button.choice .ds { font-size: 11.5px; font-style: italic; opacity: 0.8; }
-  #style-box button.choice[aria-checked="true"] { outline: 2px solid var(--accent); outline-offset: 1px; }
-  #style-box button.choice[aria-busy="true"] .nm::after { content: ' …'; }
-  .swatch { display: block; width: 44px; height: 24px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
-  .swatch.ink { background: linear-gradient(135deg, #efe4c8 0 48%, #2b2118 48% 56%, #efe4c8 56% 70%, #9b2d20 70% 78%, #d9e2df 78%); }
-  .swatch.realm { background: linear-gradient(135deg, #f3efe2 0 18%, #6f8f42 18% 52%, #b9a35f 52% 62%, #2f6f9a 62%); }
-  .swatch.kinpeki { background: linear-gradient(135deg, #1d3046 0 34%, #d4ae55 34% 46%, #1d3046 46% 60%, #c8442c 60% 74%, #e9dfc4 74%); }
-  #style-note { min-height: 0; }
+  /* the Style menu: a dropdown under its button, the styles (each with a swatch of its look in the
+     theme shown now) and the theme: light, dark, or as the device is set */
+  .menu-anchor { position: relative; }
+  #style-button .caret { display: inline-block; width: 0; height: 0; margin-left: 6px; vertical-align: 2px;
+    border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid currentColor; opacity: 0.75; }
+  #style-button[aria-expanded="true"] .caret { transform: rotate(180deg); }
+  #style-box.menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 5; width: 250px; box-sizing: border-box;
+    padding: 8px; background: var(--menu, var(--panel)); color: var(--ink); border: 1px solid var(--ink-soft);
+    box-shadow: 0 10px 28px var(--shadow); font-size: 14px; text-align: left; line-height: 1.25; }
+  #style-box .menu-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.65; padding: 4px 6px 5px; }
+  #style-box .menu-label + .choices, #style-box .menu-label + .themes { margin-top: 0; }
+  #style-box .choices { display: flex; flex-direction: column; gap: 2px; }
+  #style-box .choices + .menu-label { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--ink-soft); }
+  #style-box button.choice { display: flex; align-items: center; gap: 10px; width: 100%; height: auto; min-height: 44px;
+    padding: 6px 8px; border: 1px solid transparent; background: transparent; text-align: left; letter-spacing: normal; }
+  #style-box button.choice:hover { background: var(--control-hover); border-color: transparent; }
+  #style-box button.choice[aria-checked="true"] { background: var(--control-hover); border-color: var(--ink-soft); }
+  #style-box button.choice[aria-checked="true"]::after { content: '✓'; margin-left: auto; padding-left: 8px; color: var(--accent); font-size: 15px; }
+  #style-box button.choice[aria-busy="true"]::after { content: '…'; }
+  #style-box .txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+  #style-box .nm { font-size: 15px; }
+  #style-box .ds { font-size: 12.5px; font-style: italic; opacity: 0.8; font-variant: normal; letter-spacing: normal; }
+  #style-box .themes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 2px 2px; border: 1px solid var(--ink-soft); }
+  #style-box .themes button { height: 32px; padding: 0 4px; border: 0; border-radius: 0; background: transparent; font-size: 14px; }
+  #style-box .themes button + button { border-left: 1px solid var(--ink-soft); }
+  #style-box .themes button:hover { background: var(--control-hover); }
+  #style-box .themes button[aria-checked="true"], #style-box .themes button[aria-checked="true"]:hover { background: var(--ink); color: var(--paper); }
+  #style-box .themes button:focus-visible { outline-offset: -3px; }
+  #style-note { margin: 6px 6px 0; }
+  .swatch { display: block; flex: none; width: 40px; height: 28px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
+  .swatch.ink { background: var(--swatch-ink); }
+  .swatch.realm { background: var(--swatch-realm); }
   #style-button .ico { display: none; }
 
   /* zoom in, zoom out, the whole world: a column at the right edge, under the compass */
@@ -378,7 +411,7 @@
     #style-button .lbl { display: none; }
     #style-button .ico { display: block; width: 18px; height: 18px; margin: auto; stroke: currentColor; fill: none; stroke-width: 1.5; }
     #style-button { width: 32px; padding: 0; }
-    #style-box button.choice .ds { display: none; }
+    #style-button .caret { display: none; }
     html.dock-open #credit { visibility: hidden; }
     /* (the dock already stops 130 px under the card: room for the controls) */
     #dock { max-height: calc(100% - var(--card-bottom, 120px) - 130px); }
@@ -389,13 +422,18 @@
 // first paint: a style named at the end of the link (#world-1-realm), else the one this browser
 // chose last time, else ink. Only that style's files load now; the others when first picked.
 (function () {
-  var names = ['ink', 'realm', 'kinpeki'], name = 'ink', html = document.documentElement;
-  var m = /-(ink|realm|kinpeki)$/.exec(decodeURIComponent(location.hash));
+  // (a style that was retired, named in an old link or kept as a choice, gives way to ink)
+  var names = ['ink', 'realm'], name = 'ink', html = document.documentElement;
+  var m = /-(ink|realm)$/.exec(decodeURIComponent(location.hash));
   var saved = null;
   try { saved = localStorage.getItem('peopled-style'); } catch (e) { /* no storage: the default */ }
   if (m) name = m[1];
   else if (names.indexOf(saved) >= 0) name = saved;
   html.setAttribute('data-style', name);
+  // light or dark: as the device is set, unless this browser picked one (in the Style menu)
+  var theme = null;
+  try { theme = localStorage.getItem('peopled-theme'); } catch (e) { /* no storage: as the device */ }
+  if (theme === 'light' || theme === 'dark') html.setAttribute('data-theme', theme);
   // the stylesheet holds the first paint (no flash of another look); the script is fetched now
   // and run by the page once it has set things up
   var css = document.createElement('link');
@@ -412,8 +450,7 @@
   window.peopledFonts = function (name) {
     var known = {   // (until a style ships its .fonts file)
       ink: 'https://fonts.googleapis.com/css2?family=Eagle+Lake&family=Fondamento:ital@0;1&family=Sorts+Mill+Goudy:ital@0;1&display=swap',
-      realm: 'https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&family=Alegreya:ital,wght@0,400;0,500;1,500&display=swap',
-      kinpeki: 'https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@500;600;700&display=swap'
+      realm: 'https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&family=Alegreya:ital,wght@0,400;0,500;1,500&display=swap'
     };
     if (document.querySelector('link[data-style-fonts="' + name + '"]')) return;
     var add = function (url) {
@@ -438,7 +475,23 @@
   <div class="title-row">
     <h1>The Peopled World</h1>
     <div class="tools">
-      <button id="style-button" class="quiet" aria-label="Map style" aria-expanded="false" aria-controls="style-box" title="Draw the map in another style"><span class="lbl">Style</span><svg class="ico" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5a7.5 7.5 0 1 0 0 15c1.1 0 1.6-.7 1.6-1.5 0-1.3-1.2-1.5-1.2-2.6 0-.9.7-1.4 1.6-1.4h2.1c1.9 0 3.4-1.4 3.4-3.6C17.5 5.4 14.2 2.5 10 2.5z"/><circle cx="6.2" cy="9" r="1.1"/><circle cx="8.6" cy="5.9" r="1.1"/><circle cx="12.4" cy="6" r="1.1"/></svg></button>
+      <div class="menu-anchor">
+        <button id="style-button" class="quiet" aria-label="Map style" aria-haspopup="true" aria-expanded="false" aria-controls="style-box" title="Style, light or dark"><span class="lbl">Style</span><span class="caret" aria-hidden="true"></span><svg class="ico" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5a7.5 7.5 0 1 0 0 15c1.1 0 1.6-.7 1.6-1.5 0-1.3-1.2-1.5-1.2-2.6 0-.9.7-1.4 1.6-1.4h2.1c1.9 0 3.4-1.4 3.4-3.6C17.5 5.4 14.2 2.5 10 2.5z"/><circle cx="6.2" cy="9" r="1.1"/><circle cx="8.6" cy="5.9" r="1.1"/><circle cx="12.4" cy="6" r="1.1"/></svg></button>
+        <div id="style-box" class="menu" hidden>
+          <div class="menu-label" id="style-head">Style</div>
+          <div class="choices" role="radiogroup" aria-labelledby="style-head">
+            <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="ink"><span class="swatch ink" aria-hidden="true"></span><span class="txt"><span class="nm">Ink</span><span class="ds">a book's endpapers</span></span></button>
+            <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="realm"><span class="swatch realm" aria-hidden="true"></span><span class="txt"><span class="nm">Realm</span><span class="ds">a painted game world</span></span></button>
+          </div>
+          <div class="menu-label" id="theme-head">Theme</div>
+          <div class="themes" role="radiogroup" aria-labelledby="theme-head">
+            <button type="button" role="radio" aria-checked="false" data-pick-theme="light">Light</button>
+            <button type="button" role="radio" aria-checked="false" data-pick-theme="dark">Dark</button>
+            <button type="button" role="radio" aria-checked="false" data-pick-theme="auto" title="As your device is set">Auto</button>
+          </div>
+          <div id="style-note" class="note" role="status" hidden></div>
+        </div>
+      </div>
       <button id="share" class="quiet" aria-expanded="false" aria-controls="share-box" title="Copy or share a link to this map">Share</button>
       <button id="card-more" class="quiet" aria-expanded="false" aria-label="About this map">?</button>
     </div>
@@ -446,20 +499,9 @@
   <p class="lede">Every country is as large as its people. Neighbours share a border; countries that are not neighbours never touch.</p>
   <p class="hint" id="hint"><b>Pick a country</b> to see its neighbours and change its borders.</p>
   <form class="row" id="find" role="search">
-    <input id="search" type="search" list="names" placeholder="Find a country" aria-label="Find a country" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="search">
-    <datalist id="names"></datalist>
-    <button type="button" id="reroll" title="Draw the same countries again as a different world">Another world</button>
+    <input id="search" type="search" placeholder="Find a country" aria-label="Find a country" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="search">
   </form>
   <div id="find-note" class="note" role="status" hidden></div>
-  <div id="style-box" hidden>
-    <div class="head"><span id="style-head">Draw the map as</span><button type="button" id="style-close" class="close-x" aria-label="Close styles">×</button></div>
-    <div class="choices" role="radiogroup" aria-labelledby="style-head">
-      <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="ink"><span class="swatch ink" aria-hidden="true"></span><span class="nm">Ink</span><span class="ds">a book's endpapers</span></button>
-      <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="realm"><span class="swatch realm" aria-hidden="true"></span><span class="nm">Realm</span><span class="ds">a painted game world</span></button>
-      <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="kinpeki"><span class="swatch kinpeki" aria-hidden="true"></span><span class="nm">Kinpeki</span><span class="ds">a gold-leaf screen</span></button>
-    </div>
-    <div id="style-note" class="note" role="status" hidden></div>
-  </div>
   <div id="share-box" hidden>
     <div class="head"><span id="share-what"></span><button type="button" id="share-close" class="close-x" aria-label="Close sharing">×</button></div>
     <div class="row">
@@ -500,7 +542,6 @@
     <div class="status-main">
       <span id="status-text"></span>
       <span class="actions">
-        <button type="button" id="status-undo" class="mini" hidden>Undo</button>
         <button type="button" id="status-cancel" class="mini" hidden>Cancel</button>
         <button type="button" id="status-close" class="close-x" aria-label="Dismiss" hidden>×</button>
       </span>
@@ -512,14 +553,13 @@
     <div class="edits-head">
       <h2><button type="button" id="edits-toggle" aria-expanded="true" aria-controls="edits-body">Your changes</button></h2>
       <div class="tools">
-        <button type="button" id="undo-last" class="mini" title="Undo the last change (Ctrl+Z)">Undo</button>
+        <button type="button" id="undo-last" class="mini" data-key="undo-last" title="Undo the last change (Ctrl+Z)" hidden>Undo</button>
         <button type="button" id="flip" class="mini" aria-pressed="false" title="Hold to see the map before your changes, or click to switch (B)">Show before</button>
       </div>
     </div>
     <div id="edits-body">
       <ul id="edits-list"></ul>
       <div class="more">
-        <button type="button" id="marks" class="mini" aria-pressed="false" title="Fade what did not change; mark the borders you changed">Highlight changes</button>
         <button type="button" id="clear" class="mini">Undo all</button>
       </div>
       <div id="clear-confirm" role="group" aria-label="Undo all changes?" hidden>
@@ -567,12 +607,15 @@ function unpackEdit(text) {
   return {add, a: codeOf(Math.floor(v / 676)), b: codeOf(v % 676)};
 }
 const packable = e => /^[A-Z]{2}$/.test(e.a) && /^[A-Z]{2}$/.test(e.b);
-const STYLES = ['ink', 'realm', 'kinpeki'], DEFAULT_STYLE = 'ink';
-const styleSuffix = new RegExp('-(' + STYLES.join('|') + ')$');
+const STYLES = ['ink', 'realm'], DEFAULT_STYLE = 'ink';
+// styles there were once: an old link that names one keeps its world and edits and shows them in ink
+const RETIRED_STYLES = ['kinpeki'];
+const styleSuffix = new RegExp('-(' + STYLES.concat(RETIRED_STYLES).join('|') + ')$');
 function readHash() {
   let hash = decodeURIComponent(location.hash);
   let style = (styleSuffix.exec(hash) || [])[1] || null;
   if (style) hash = hash.slice(0, -style.length - 1);
+  if (RETIRED_STYLES.includes(style)) style = DEFAULT_STYLE;
   let list = [];
   let match = /^#world-(\d+)((?:-(?:cut|add)-[A-Za-z0-9]+-[A-Za-z0-9]+)*)$/.exec(hash);
   if (match) {
@@ -1223,7 +1266,6 @@ function dress(world) {
 }
 
 // Puts a rendered world on the page in place of the one shown, keeping the selected country
-let namesListed = '';
 function show(next) {
   let keep = selected && selected.country.id;
   selected = null;
@@ -1231,18 +1273,8 @@ function show(next) {
   world = next;
   items = next.items;
   html.classList.add('map-shown');
-  // the names to search: the same in the maps before and after an edit, so made once per graph
-  let names = document.getElementById('names');
-  let list = next.names || (next.names = items.map(it => it.country.name).sort(new Intl.Collator().compare));
-  if (namesListed !== list.join('|')) {
-    names.textContent = '';
-    list.forEach(name => {
-      let o = document.createElement('option');
-      o.value = name;
-      names.appendChild(o);
-    });
-    namesListed = list.join('|');
-  }
+  // the names to suggest: the same in the maps before and after an edit, so made once per graph
+  if (!next.names) next.names = items.map(it => it.country.name).sort(new Intl.Collator().compare);
   // (its lines keep the detail they were last drawn with, and get the current zoom's if it differs)
   updateDetail();
   updateMarkers();
@@ -1342,11 +1374,8 @@ function showChecks(check, exclaves, ms) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// UX: what the map lights up. Either the selected country with its neighbours and their borders,
-// or, after an edit, what the edits changed: the edited countries lit, the ones that changed shape
-// as they are, the rest faded; the borders you added in the accent colour and the ones you
-// removed as a dashed ghost where they were. Only classes and one small group of ghost lines.
-let marksOn = false;      // the map shows what changed (rather than the selection)
+// UX: what the map lights up: the selected country with its neighbours and their borders. (What an
+// edit changed is seen with Show before, not marked on the map.) Only classes.
 let picking = null;       // {from: item}: the next country picked on the map gets a border with it
 let sheetOpen = false;    // phone: the country panel shows its border list, not just a peek
 let panelOpener = null;   // where focus goes back to when the panel closes
@@ -1354,12 +1383,8 @@ let panelOpener = null;   // where focus goes back to when the panel closes
 // the browser restyle that element.)
 function paint() {
   if (!world) return;
-  let ghosts = world.root.querySelector('#ux-marks');
-  if (ghosts) ghosts.remove();
   let want = {lit: new Set(), dim: new Set(), line: new Map()};
-  let changes = marksOn ? changesShown() : null;
-  if (changes) paintChanges(changes, want);
-  else if (selected) paintSelection(selected, want);
+  if (selected) paintSelection(selected, want);
   items.forEach(it => {
     let lit = want.lit.has(it), dim = !lit && want.dim.has(it);
     if (it.path.classList.contains('lit') !== lit) it.path.classList.toggle('lit', lit);
@@ -1368,7 +1393,7 @@ function paint() {
   });
   world.lineItems.forEach(line => {
     let w = want.line.get(line) || '', list = line.node.classList;
-    for (let cls of ['lit', 'ux-edit', 'hot']) if (list.contains(cls) !== (w === cls || (cls === 'lit' && w === 'ux-edit'))) list.toggle(cls);
+    for (let cls of ['lit', 'hot']) if (list.contains(cls) !== (w === cls)) list.toggle(cls);
   });
 }
 function paintSelection(item, want) {
@@ -1381,83 +1406,6 @@ function paintSelection(item, want) {
     if (line.kind === 'border' && (line.a === item.index || line.b === item.index)) want.line.set(line, 'lit');
   });
 }
-// the changes of the edited map, while either it or the map before it is shown
-function changesShown() {
-  if (!edited || !edited.changes || !plain) return null;
-  return world === edited.world || world === plain.world ? edited.changes : null;
-}
-const samePair = (pairs, a, b) => pairs.some(([p, q]) => (p === a && q === b) || (p === b && q === a));
-function paintChanges(changes, want) {
-  let after = world === edited.world;
-  let fade = changes.moved && changes.moved.size < 0.6 * items.length;   // a world drawn afresh: nothing to fade
-  items.forEach(it => {
-    if (changes.edited.has(it.index)) want.lit.add(it);
-    else if (fade && !changes.moved.has(it.index)) want.dim.add(it);
-  });
-  let here = after ? changes.adds : changes.cuts, gone = after ? changes.cuts : changes.adds;
-  world.lineItems.forEach(line => {
-    if (line.kind === 'border' && samePair(here, line.a, line.b)) want.line.set(line, 'ux-edit');
-  });
-  let other = after ? plain.world : edited.world;
-  let lines = other.lineItems.filter(line => line.kind === 'border' && samePair(gone, line.a, line.b));
-  if (!lines.length) return;
-  let g = el('g', {id: 'ux-marks'});
-  lines.forEach(line => el('path', {class: 'ux-ghost', d: lineToD(line.points)}, g));
-  world.root.insertBefore(g, world.root.querySelector('#labels'));
-}
-// What an edited map changed against the map without edits: the countries edited, the borders
-// removed and added (country indices), and which countries changed shape. Shape: both maps are
-// rasterised with one colour per country (about 1000 px wide); a country changed when more than a
-// fifth of its inside pixels are no longer its own. ~80 ms on a laptop, once per edited map.
-function changesBetween(before, after, list) {
-  let index = new Map(after.items.map(it => [it.country.id, it.index]));
-  let cuts = [], adds = [], editedSet = new Set();
-  list.forEach(e => {
-    if (!index.has(e.a) || !index.has(e.b)) return;
-    let pair = [index.get(e.a), index.get(e.b)];
-    (e.add ? adds : cuts).push(pair);
-    pair.forEach(i => editedSet.add(i));
-  });
-  let moved = null;
-  try { moved = shapeChanges(before, after); } catch (e) { console.warn('change detection skipped', e); }
-  return {cuts, adds, edited: editedSet, moved};
-}
-function shapeChanges(before, after) {
-  let box = before.box, W = 1000;
-  let s = W / (box.maxX - box.minX), H = Math.max(2, Math.min(1400, Math.ceil((box.maxY - box.minY) * s)));
-  let raster = w => {
-    let canvas = document.createElement('canvas');
-    canvas.width = W; canvas.height = H;
-    let ctx = canvas.getContext('2d', {willReadFrequently: true});
-    ctx.setTransform(s, 0, 0, s, -box.minX * s, -box.minY * s);
-    w.items.forEach(it => {
-      ctx.fillStyle = `rgb(${(it.index + 1) & 255},${(it.index + 1) >> 8},0)`;
-      ctx.fill(new Path2D(it.path.getAttribute('d')), 'evenodd');
-    });
-    let px = ctx.getImageData(0, 0, W, H).data, out = new Int32Array(W * H);
-    for (let i = 0; i < W * H; ++i) out[i] = px[i * 4 + 3] === 255 && px[i * 4 + 2] === 0 ? px[i * 4] + 256 * px[i * 4 + 1] : 0;
-    return out;
-  };
-  let A = raster(before), B = raster(after);
-  let n = Math.max(...before.items.map(it => it.index), ...after.items.map(it => it.index)) + 2;
-  let nA = new Float64Array(n), nB = new Float64Array(n), same = new Float64Array(n);
-  // inside pixels only: an edge pixel blends two colours and may read as a third country
-  for (let y = 1; y < H - 1; ++y) for (let x = 1; x < W - 1; ++x) {
-    let i = y * W + x, a = A[i], b = B[i];
-    let inA = a && A[i - 1] === a && A[i + 1] === a && A[i - W] === a && A[i + W] === a;
-    let inB = b && B[i - 1] === b && B[i + 1] === b && B[i - W] === b && B[i + W] === b;
-    if (inA) nA[a]++;
-    if (inB) nB[b]++;
-    if (inA && inB && a === b) same[a]++;
-  }
-  let moved = new Set();
-  for (let k = 1; k < n; ++k) {
-    let m = Math.max(nA[k], nB[k]);
-    if (m >= 12 && 1 - same[k] / m > 0.2) moved.add(k - 1);
-  }
-  return moved;
-}
-
 // ---------------------------------------------------------------------------------------------
 // Selection: a country, its neighbours and the borders between them
 // UX: select(item, how): how.quiet re-renders without announcing, moving the view or ending the
@@ -1468,7 +1416,7 @@ function select(item, how = {}) {
   let changed = item !== selected;
   if (!how.quiet) {
     if (changed) picking = null;
-    if (item) { marksOn = false; html.classList.add('ux-explored'); }
+    if (item) html.classList.add('ux-explored');
     if (item && changed && info.hidden) panelOpener = document.activeElement;
   }
   selected = item;
@@ -1548,7 +1496,7 @@ function renderPanel(item) {
   let addPart = !editable ? `<div class="note">This is the map before your changes. <button type="button" class="mini" data-after>Back to now</button></div>`
     : picking ? ''
     : `<div class="add"><form class="join"><label for="join-input">Add a border with</label><div class="row">
-         <input id="join-input" list="names" placeholder="Country name" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" data-key="join"><button data-key="join-add">Add</button></div></form>
+         <input id="join-input" placeholder="Country name" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" data-key="join"><button data-key="join-add">Add</button></div></form>
          <button type="button" class="pick" data-pick data-key="pick">…or pick it on the map</button></div>
        <div class="note join-note" role="alert" hidden></div>`;
   // picking the other country on the map: a banner in place of the list (a phone shows the map)
@@ -1590,6 +1538,7 @@ function renderPanel(item) {
   let cancel = info.querySelector('[data-pick-cancel]');
   if (cancel) cancel.onclick = () => { picking = null; renderPanel(item); syncPicking(); };
   let join = info.querySelector('.join');
+  if (join) attachSuggest(join.querySelector('input'), () => join.requestSubmit());
   if (join) join.onsubmit = e => {
     e.preventDefault();
     let input = join.querySelector('input');
@@ -1671,18 +1620,23 @@ function describe(e) { return `${nameOfId(e.a)} – ${nameOfId(e.b)}`; }
 // UX: an edit in words: "the France–Spain border"
 function borderName(e) { return `the ${nameOfId(e.a)}–${nameOfId(e.b)} border`; }
 const sameEdit = (e, f) => e.add === f.add && pairKey(e.a, e.b) === pairKey(f.a, f.b);
-// UX: your changes, in the dock. The edits in the address, each with its own undo; the ones not
-// drawn yet marked as such; and the tools: undo the last, hold to see before, highlight, undo all.
+// UX: your changes, in the dock. The edits in the address, each with its own Undo, the one Undo
+// button on the page (Ctrl+Z undoes the last; folded to its title row, the list puts an Undo for
+// the last change there instead); the ones not drawn yet marked as such; Show before; undo all.
 function showEdits() {
   let box = document.getElementById('edits');
   let undoing = lastGood.filter(e => !edits.some(f => sameEdit(e, f)));
+  let inside = box.contains(document.activeElement), focusKey = inside && document.activeElement.dataset.key;
   box.hidden = !edits.length && !undoing.length;
-  if (box.hidden) { document.getElementById('clear-confirm').hidden = true; return; }
-  let focusKey = box.contains(document.activeElement) && document.activeElement.dataset.key;
+  if (box.hidden) {
+    document.getElementById('clear-confirm').hidden = true;
+    if (inside) stage.focus({preventScroll: true});   // the list went with its last change
+    return;
+  }
   let drawnNow = e => lastGood.some(f => sameEdit(e, f));
   let rows = edits.map((e, k) => `<li><span>${e.add ? 'Added' : 'Removed'} ${escapeHtml(describe(e))}` +
       `${drawnNow(e) ? '' : ' <span class="tag">drawing…</span>'}</span>` +
-      `<button type="button" class="mini" data-undo="${k}" data-key="undo-${escapeHtml(pairKey(e.a, e.b))}" aria-label="Undo: ${e.add ? 'added' : 'removed'} ${escapeHtml(borderName(e))}">Undo</button></li>`)
+      `<button type="button" class="mini" data-undo="${k}" data-key="undo-${escapeHtml(pairKey(e.a, e.b))}" aria-label="Undo: ${e.add ? 'added' : 'removed'} ${escapeHtml(borderName(e))}"${k === edits.length - 1 ? ' title="Undo this change (Ctrl+Z)"' : ''}>Undo</button></li>`)
     .concat(undoing.map(e => `<li><span><s>${e.add ? 'Added' : 'Removed'} ${escapeHtml(describe(e))}</s> <span class="tag">undoing…</span></span></li>`));
   document.getElementById('edits-list').innerHTML = rows.join('');
   box.querySelectorAll('[data-undo]').forEach(button => {
@@ -1692,22 +1646,22 @@ function showEdits() {
   document.getElementById('clear').hidden = edits.length < 2;
   if (edits.length < 2) document.getElementById('clear-confirm').hidden = true;
   syncEditsTools();
-  if (focusKey) { let back = box.querySelector(`[data-key="${focusKey}"]`); if (back) back.focus({preventScroll: true}); }
+  // focus stays on the button it was on, or (its change undone) moves to the last Undo left or the title
+  if (focusKey) [box.querySelector(`[data-key="${focusKey}"]`), ...[...box.querySelectorAll('[data-undo], #undo-last')].reverse(),
+    document.getElementById('edits-toggle')].find(el => el && el.offsetParent)?.focus({preventScroll: true});
 }
-// UX: the state of the tools: what can be compared or highlighted with what is drawn now
+// UX: the state of the tools: what can be compared with what is drawn now
 function syncEditsTools() {
-  let flip = document.getElementById('flip'), marks = document.getElementById('marks');
+  let flip = document.getElementById('flip');
   let comparable = !!(edited && plain && (world === edited.world || world === plain.world) && lastGood.length);
   flip.disabled = !comparable;
   flip.setAttribute('aria-pressed', String(showingBefore));
-  marks.disabled = !comparable || !edited.changes;
-  marks.setAttribute('aria-pressed', String(marksOn && comparable));
-  document.getElementById('undo-last').disabled = !edits.length;
   document.getElementById('ux-stamp').hidden = !showingBefore;
   // the list folds to its title row (a phone starts folded)
   let toggle = document.getElementById('edits-toggle');
   let open = toggle.getAttribute('aria-expanded') === 'true';
   document.getElementById('edits-body').hidden = !open;
+  document.getElementById('undo-last').hidden = open || !edits.length;
 }
 
 function escapeHtml(s) { return String(s).replace(/[&<>"]/g, ch => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[ch])); }
@@ -1890,20 +1844,140 @@ function findFromSearch() {
   zoomTo(item);
 }
 $('find').addEventListener('submit', e => { e.preventDefault(); findFromSearch(); });
-// a pick from the list: Chrome and Firefox send an input event without typing, others a change
-searchBox.addEventListener('input', e => {
-  $('find-note').hidden = true;
-  if (e.inputType && e.inputType !== 'insertReplacementText') return;
-  let {item} = findCountry(searchBox.value);
-  if (item && item.country.name.toLowerCase() === searchBox.value.trim().toLowerCase() && item !== selected) findFromSearch();
-});
-searchBox.addEventListener('change', () => {
-  let {item} = findCountry(searchBox.value);
-  if (item && item.country.name.toLowerCase() === searchBox.value.trim().toLowerCase() && item !== selected) findFromSearch();
-});
+searchBox.addEventListener('input', () => { $('find-note').hidden = true; });
 
-// Another world: the next seed goes into the address (with the same edits), which redraws the map
-$('reroll').addEventListener('click', () => { location.hash = linkOf(seed + 1, edits); });
+// Suggestions under a field that takes a country's name: the countries matching what is typed
+// (those starting so first, then those with a word starting so, then, from three letters, any
+// containing it; and a two-letter code), the typed part marked, in the style's own type and colours. The arrows move
+// through them (down on an empty field lists them all), Enter or a click takes one, Escape closes
+// them, and Enter with none marked does what it did. (Not the browser's datalist: its list is in
+// the system's type and colours, and it hangs a ▼ in the field.)
+const suggestList = Object.assign(document.createElement('ul'), {id: 'suggest', className: 'suggest', hidden: true});
+suggestList.setAttribute('role', 'listbox');
+document.body.appendChild(suggestList);
+let suggesting = null;   // {input, pick, list, active}
+// a name without accents or case, and where each of its letters came from in the name
+function folded(name) {
+  let text = '', from = [];
+  Array.from(name).forEach((ch, i, all) => {
+    let at = all.slice(0, i).join('').length;
+    for (let f of ch.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()) { text += f; from.push(at); }
+  });
+  from.push(name.length);
+  return {text, from};
+}
+function suggestMatches(typed) {
+  let q = folded(typed.trim()).text, names = (world && world.names) || [];
+  if (!q) return names.map(name => ({name}));
+  let starts = [], words = [], has = [];
+  for (let name of names) {
+    let f = folded(name), at = f.text.indexOf(q);
+    if (at < 0) continue;
+    let hit = {name, from: f.from[at], to: f.from[at + q.length]};
+    if (at === 0) starts.push(hit);
+    else if (/[\s\-'’(.]/.test(f.text[at - 1])) words.push(hit);
+    else if (q.length >= 3) has.push(hit);
+  }
+  let list = starts.concat(words, has);
+  let code = q.length === 2 && items.find(it => it.country.id.toLowerCase() === q);
+  if (code && !list.some(h => h.name === code.country.name)) list.unshift({name: code.country.name, code: code.country.id});
+  return list;
+}
+function renderSuggest() {
+  let {list, active} = suggesting;
+  suggestList.replaceChildren(...list.map((hit, i) => {
+    let li = document.createElement('li');
+    li.id = 'suggest-' + i;
+    li.setAttribute('role', 'option');
+    li.setAttribute('aria-selected', String(i === active));
+    // (the name in one box: the marked part is not a flex item of its own)
+    let name = document.createElement('span');
+    name.className = 'nm';
+    if (hit.to > hit.from) {
+      let mark = document.createElement('mark');
+      mark.textContent = hit.name.slice(hit.from, hit.to);
+      name.append(hit.name.slice(0, hit.from), mark, hit.name.slice(hit.to));
+    } else name.textContent = hit.name;
+    li.append(name);
+    if (hit.code) { let code = document.createElement('span'); code.className = 'code'; code.textContent = hit.code; li.append(code); }
+    return li;
+  }));
+}
+function placeSuggest() {
+  let input = suggesting.input;
+  if (!input.isConnected) { closeSuggest(); return; }
+  let r = input.getBoundingClientRect(), vh = window.visualViewport ? window.visualViewport.height : innerHeight;
+  let below = vh - r.bottom - 10, above = r.top - 10, up = below < 170 && above > below;
+  let w = Math.min(Math.max(r.width, 220), innerWidth - 16);
+  suggestList.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
+  suggestList.style.width = `${w}px`;
+  suggestList.style.maxHeight = `${Math.max(120, Math.min(320, up ? above : below))}px`;
+  suggestList.style.top = up ? '' : `${r.bottom + 4}px`;
+  suggestList.style.bottom = up ? `${innerHeight - r.top + 4}px` : '';
+}
+function openSuggest(input, pick, all) {
+  let list = suggestMatches(all ? '' : input.value);
+  if (!list.length || (!all && !input.value.trim())) { closeSuggest(); return; }
+  suggesting = {input, pick, list, active: -1};
+  renderSuggest();
+  suggestList.hidden = false;
+  suggestList.scrollTop = 0;
+  placeSuggest();
+  input.setAttribute('aria-expanded', 'true');
+}
+function closeSuggest() {
+  if (!suggesting) return;
+  suggesting.input.setAttribute('aria-expanded', 'false');
+  suggesting.input.removeAttribute('aria-activedescendant');
+  suggesting = null;
+  suggestList.hidden = true;
+}
+function markSuggest(i) {
+  suggesting.active = i;
+  suggestList.querySelectorAll('[aria-selected="true"]').forEach(li => li.setAttribute('aria-selected', 'false'));
+  let li = suggestList.children[i];
+  if (!li) { suggesting.input.removeAttribute('aria-activedescendant'); return; }
+  li.setAttribute('aria-selected', 'true');
+  li.scrollIntoView({block: 'nearest'});
+  suggesting.input.setAttribute('aria-activedescendant', li.id);
+}
+function takeSuggest(i) {
+  let {input, pick, list} = suggesting;
+  input.value = list[i].name;
+  closeSuggest();
+  pick();
+}
+function attachSuggest(input, pick) {
+  if (!input || input.dataset.suggest) return;
+  input.dataset.suggest = 'on';
+  input.setAttribute('role', 'combobox');
+  input.setAttribute('aria-autocomplete', 'list');
+  input.setAttribute('aria-expanded', 'false');
+  input.setAttribute('aria-controls', 'suggest');
+  input.addEventListener('input', () => openSuggest(input, pick, false));
+  input.addEventListener('keydown', e => {
+    let open = !!suggesting && suggesting.input === input;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!open) { openSuggest(input, pick, !input.value.trim()); if (suggesting) markSuggest(0); return; }
+      let n = suggesting.list.length, i = suggesting.active + (e.key === 'ArrowDown' ? 1 : -1);
+      markSuggest(i < 0 ? n - 1 : i >= n ? 0 : i);
+    } else if (e.key === 'Enter' && open && suggesting.active >= 0) { e.preventDefault(); takeSuggest(suggesting.active); }
+    else if (e.key === 'Escape' && open) { e.preventDefault(); e.stopPropagation(); closeSuggest(); }
+    else if (e.key === 'Enter' || e.key === 'Tab') closeSuggest();
+  });
+  input.addEventListener('blur', () => { if (suggesting && suggesting.input === input) closeSuggest(); });
+}
+// a press on the list keeps the focus in the field (so it doesn't close first); the click takes
+suggestList.addEventListener('mousedown', e => e.preventDefault());
+suggestList.addEventListener('click', e => {
+  let li = e.target.closest('li');
+  if (li && suggesting) takeSuggest(Array.prototype.indexOf.call(suggestList.children, li));
+});
+window.addEventListener('scroll', e => { if (suggesting && !suggestList.contains(e.target)) placeSuggest(); }, true);
+window.addEventListener('resize', () => { if (suggesting) placeSuggest(); });
+attachSuggest(searchBox, findFromSearch);
+
 window.addEventListener('hashchange', () => {
   let next = readHash();
   // a link that names another style (typed in, or Back after a style was picked)
@@ -1967,16 +2041,8 @@ flip.addEventListener('pointerup', () => { if (peek) { endPeek(false); swallowCl
 flip.addEventListener('pointercancel', () => endPeek(true));
 flip.addEventListener('contextmenu', e => e.preventDefault());
 flip.addEventListener('click', () => { if (swallowClick) { swallowClick = false; return; } setBefore(!showingBefore); });
-$('marks').addEventListener('click', () => {
-  marksOn = !marksOn;
-  paint();
-  syncEditsTools();
-  if (!marksOn) hideStatus();
-  announce(marksOn ? 'Highlighting what your changes changed.' : 'Highlight off.');
-});
 function undoLast() { if (edits.length) location.hash = linkOf(seed, edits.slice(0, -1)); }
 $('undo-last').addEventListener('click', undoLast);
-$('status-undo').addEventListener('click', undoLast);
 // Undo all: at once for one change; for more, a question in the panel first
 $('clear').addEventListener('click', () => {
   if (edits.length < 2) { location.hash = linkOf(seed, []); return; }
@@ -2067,7 +2133,6 @@ function startJob(text, estimate, cancellable) {
     st.classList.remove('error');
     $('status-text').textContent = text;
     $('status-cancel').hidden = !cancellable;
-    $('status-undo').hidden = true;
     $('status-close').hidden = true;
     $('status-bar').hidden = false;
     st.hidden = false;
@@ -2105,7 +2170,7 @@ function endJob() {
   clearInterval(jobTimer);
   job = null;
 }
-function showStatus(text, sub, {undo = false, error = false, hideAfter = 0} = {}) {
+function showStatus(text, sub, {error = false, hideAfter = 0} = {}) {
   let st = $('status');
   $('loading').hidden = true;
   st.classList.toggle('error', error);
@@ -2113,7 +2178,6 @@ function showStatus(text, sub, {undo = false, error = false, hideAfter = 0} = {}
   $('status-sub').textContent = sub || '';
   $('status-bar').hidden = true;
   $('status-cancel').hidden = true;
-  $('status-undo').hidden = !undo;
   $('status-close').hidden = false;
   st.hidden = false;
   clearTimeout(statusTimer);
@@ -2142,7 +2206,7 @@ function jobText(from, to) {
   if (added.length > 1 && !removed.length && added.length <= 3) return `Redrawing with ${added.length} new changes: ${added.map(e => `${describe(e)} ${e.add ? 'added' : 'removed'}`).join(', ')}…`;
   return `Redrawing with your ${to.length} change${to.length > 1 ? 's' : ''}…`;
 }
-// what came of a build, in words, with the highlight's key
+// what came of a build, in words
 function reportDone(from, to, entry, how) {
   let added = to.filter(e => !from.some(f => sameEdit(e, f)));
   let removed = from.filter(e => !to.some(f => sameEdit(e, f)));
@@ -2154,15 +2218,12 @@ function reportDone(from, to, entry, how) {
   else if (removed.length === 1 && !added.length) text = 'Undone: ' + (removed[0].add ? `${both(removed[0])} no longer share a border.` : `${both(removed[0])} share a border again.`);
   else if (!to.length) text = `Back to world ${seed} as first drawn.`;
   else text = `Your ${to.length} changes are drawn.`;
-  let sub = '', changes = entry && entry.changes;
+  let sub = '';
   if (to.length && entry && entry.scratch) sub = 'It didn’t fit into the map as it was, so the world was drawn afresh: countries moved.';
-  else if (to.length && changes && changes.moved) {
-    let others = Array.from(changes.moved).filter(i => !changes.edited.has(i)).length;
-    sub = `${others} other countr${others === 1 ? 'y' : 'ies'} changed shape; the faded ones did not. Hold “Show before” to compare.`;
-  }
-  showStatus(text, sub, {undo: added.length === 1 && !removed.length && how !== 'link', hideAfter: entry && entry.scratch ? 0 : 15000});
+  else if (to.length) sub = 'Hold “Show before” to compare.';
+  showStatus(text, sub, {hideAfter: entry && entry.scratch ? 0 : 15000});
   if (selected) requestAnimationFrame(() => ensureVisible(selected));
-  announce(text + (sub ? ' ' + sub.replace('Hold “Show before” to compare.', '') : ''));
+  announce((text + ' ' + sub.replace('Hold “Show before” to compare.', '')).trim());
 }
 
 // Keyboard. On the map: arrows move it, + and − zoom, 0 shows the whole world, Enter picks the
@@ -2206,7 +2267,6 @@ function onEscape(e) {
   else if (!styleBox.hidden) closeStyles();
   else if (showingBefore) setBefore(false);
   else if (selected) select(null);
-  else if (marksOn) { marksOn = false; paint(); syncEditsTools(); }
   else return;
   e.preventDefault();
 }
@@ -2342,7 +2402,6 @@ async function chart() {
           let next = await drawWorld(result, plain.world, stale);
           if (stale()) return;
           entry = {key, world: next, scratch};
-          entry.changes = changesBetween(plain.world, entry.world, edits);
           remember(entry);
         });
         if (stale()) return;
@@ -2379,7 +2438,6 @@ async function chart() {
     let view = fresh ? fitView() : {...state};
     if (!await prepare(current, view, stale) || stale()) return null;
     showingBefore = false;
-    marksOn = edits.length > 0;   // UX: after an edit the map shows what it changed
     if (fresh) { touched = false; Object.assign(state, view); }
     show(current);
     showChecks(checkOf(current), current.result.exclaves, performance.now() - started);
@@ -2538,9 +2596,13 @@ async function setStyle(name, how = {}) {
   }
 }
 
-// The picker: three choices in the title card, a radio group (arrow keys move between them)
+// The Style menu: a dropdown under the Style button with two radio groups (the arrow keys move
+// within one, Tab between them): the style, and the theme (light, dark, or as the device is set,
+// kept by this browser; the page's and the styles' colours follow data-theme)
 const styleBox = $('style-box'), styleButton = $('style-button');
-const styleTitle = {ink: 'Ink', realm: 'Realm', kinpeki: 'Kinpeki'};
+const styleTitle = {ink: 'Ink', realm: 'Realm'};
+const THEMES = ['light', 'dark', 'auto'];
+let themeChoice = html.getAttribute('data-theme') || 'auto';
 function syncPicker(pending) {
   styleBox.querySelectorAll('[data-pick-style]').forEach(button => {
     let on = button.dataset.pickStyle === (pending || currentStyle);
@@ -2548,37 +2610,74 @@ function syncPicker(pending) {
     button.tabIndex = on ? 0 : -1;
     button.setAttribute('aria-busy', String(!!pending && on));
   });
+  styleBox.querySelectorAll('[data-pick-theme]').forEach(button => {
+    let on = button.dataset.pickTheme === themeChoice;
+    button.setAttribute('aria-checked', String(on));
+    button.tabIndex = on ? 0 : -1;
+  });
   let note = $('style-note');
   note.hidden = !pending;
   note.textContent = pending ? `Drawing the map in ${styleTitle[pending]}…` : '';
 }
 function openStyles() {
   if (!shareBox.hidden) closeShare();
+  styleBox.style.right = '';
   styleBox.hidden = false;
   styleButton.setAttribute('aria-expanded', 'true');
   syncPicker();
-  styleBox.querySelector('[aria-checked="true"]').focus({preventScroll: true});
+  // (on a narrow phone the menu, hung from the button's right edge, would run off the left)
+  let left = styleBox.getBoundingClientRect().left;
+  if (left < 8) styleBox.style.right = `${left - 8}px`;
+  styleBox.querySelector('[data-pick-style][aria-checked="true"]').focus({preventScroll: true});
 }
-function closeStyles() {
+function closeStyles(refocus = true) {
+  // (the focus goes back to the Style button only from inside the menu: a pick that finishes
+  // while you type elsewhere leaves you there)
+  let inside = styleBox.contains(document.activeElement) || document.activeElement === styleButton || document.activeElement === document.body;
   styleBox.hidden = true;
   styleButton.setAttribute('aria-expanded', 'false');
-  styleButton.focus({preventScroll: true});
+  if (inside && refocus) styleButton.focus({preventScroll: true});
 }
-function pickStyle(name) {
-  setStyle(name).then(done => { if (done && done.ms) announce(`The map is drawn in ${styleTitle[name]}.`); }, failed);
+// A click (or Enter) on a style picks it and closes the menu once the map is drawn in it (until
+// then the menu says what it is drawing); the arrow keys only move the pick, as in any radio group
+function pickStyle(name, fold) {
+  setStyle(name).then(done => {
+    if (!done) return;           // another pick came after this one
+    if (done.ms) announce(`The map is drawn in ${styleTitle[name]}.`);
+    if (fold && !styleBox.hidden) closeStyles();
+  }, failed);
+}
+function setTheme(name) {
+  themeChoice = name;
+  if (name === 'auto') html.removeAttribute('data-theme');
+  else html.setAttribute('data-theme', name);
+  try { if (name === 'auto') localStorage.removeItem('peopled-theme'); else localStorage.setItem('peopled-theme', name); }
+  catch (e) { /* no storage: for this visit only */ }
+  syncPicker();
+  announce(name === 'auto' ? 'Light or dark as your device is set.' : `The map is ${name}.`);
 }
 styleButton.addEventListener('click', () => { if (styleBox.hidden) openStyles(); else closeStyles(); });
-$('style-close').addEventListener('click', closeStyles);
-styleBox.querySelectorAll('[data-pick-style]').forEach(button => {
-  button.addEventListener('click', () => pickStyle(button.dataset.pickStyle));
+// a press anywhere outside the menu and its button closes it
+document.addEventListener('pointerdown', e => {
+  if (!styleBox.hidden && !e.target.closest('.menu-anchor')) closeStyles(false);
+}, true);
+function radioKeys(button, list, attr, pick) {
   button.addEventListener('keydown', e => {
     let step = {ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1}[e.key];
     if (!step) return;
     e.preventDefault();
-    let i = (STYLES.indexOf(button.dataset.pickStyle) + step + STYLES.length) % STYLES.length;
-    styleBox.querySelector(`[data-pick-style="${STYLES[i]}"]`).focus();
-    pickStyle(STYLES[i]);
+    let i = (list.indexOf(button.dataset[attr]) + step + list.length) % list.length;
+    styleBox.querySelector(`[data-${attr === 'pickStyle' ? 'pick-style' : 'pick-theme'}="${list[i]}"]`).focus();
+    pick(list[i]);
   });
+}
+styleBox.querySelectorAll('[data-pick-style]').forEach(button => {
+  button.addEventListener('click', () => pickStyle(button.dataset.pickStyle, true));
+  radioKeys(button, STYLES, 'pickStyle', name => pickStyle(name));
+});
+styleBox.querySelectorAll('[data-pick-theme]').forEach(button => {
+  button.addEventListener('click', () => { setTheme(button.dataset.pickTheme); closeStyles(); });
+  radioKeys(button, THEMES, 'pickTheme', setTheme);
 });
 syncPicker();
 
