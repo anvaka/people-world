@@ -196,7 +196,7 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 
 - Some worlds have long, thin water channels where wide seas would look better.
 - In the most crowded regions (the Balkans, the Caucasus, Central Africa) a few countries come out
-  stretched, and there are 14–18 exclaves per world.
+  stretched, and most worlds have 9 to 16 exclaves.
 - An edit reshapes many countries, not only the ones edited: the warm start is not local.
 - The land is not eroded: a valley is drawn from its river's flow, and there are no lakes.
 - The climate has no seasons, and its belts lie at much the same latitudes in every world: the
