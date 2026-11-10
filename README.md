@@ -201,9 +201,12 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 
 ## Support
 
-If you enjoy the map and would like to support the work, you can sponsor it on
-[GitHub Sponsors](https://github.com/sponsors/anvaka), one time or monthly. The page carries the
-same link, in its credit line and under "more".
+If you enjoy the map and would like to support the work:
+
+- [Buy me a coffee on Ko-fi](https://ko-fi.com/anvaka), a one-time tip;
+- or sponsor it on [GitHub Sponsors](https://github.com/sponsors/anvaka), one time or monthly.
+
+The page carries the Ko-fi link in its credit line and by the link to share, and both under "more".
 
 ## License
 

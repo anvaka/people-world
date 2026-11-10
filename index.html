@@ -185,6 +185,9 @@
   #credit { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(6px + env(safe-area-inset-bottom));
     font-size: 12px; font-style: italic; color: var(--ink-soft); }
   #credit a { color: inherit; }
+  a.support { white-space: nowrap; }
+  a.support .cup { width: 1.15em; height: 1.15em; margin-right: 0.25em; vertical-align: -0.2em; fill: none; stroke: var(--accent);
+    stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
   #credit a.support { font-style: normal; color: var(--accent); }
   /* (the long form of the credit needs a wide window: the dock sits beside it) */
   @media (max-width: 1000px) { #credit .wide { display: none; } }
@@ -252,6 +255,7 @@
   #share-box .row { margin-top: 6px; flex-wrap: nowrap; }
   #share-box input { flex: 1 1 auto; min-width: 0; width: auto; font-size: 13px; }
   #share-box .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  #share-box .thanks a { color: inherit; font-style: normal; }
 
   /* The dock: everything about editing, in one column at the bottom right (a sheet at the bottom
      of a phone): the build in progress, your changes, the country panel */
@@ -529,6 +533,7 @@
       <button type="button" id="share-copy">Copy link</button>
     </div>
     <div id="share-note" class="note" role="status"></div>
+    <div class="note thanks">Like the map? <a class="support" href="https://ko-fi.com/anvaka" target="_blank" rel="noopener"><svg class="cup" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6.5h8v3.6a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="M11 7.6h1a1.7 1.7 0 0 1 0 3.4h-1.1"/><path d="M5.6 2c-.7.9.7 1.5 0 2.5M8.4 2c-.7.9.7 1.5 0 2.5"/></svg>Buy me a coffee</a></div>
   </div>
   <details id="about" hidden>
     <summary><span id="checks"></span></summary>
@@ -554,8 +559,9 @@
   <button type="button" data-zoom="out" aria-label="Zoom out" title="Zoom out (−)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg></button>
   <button type="button" data-zoom="fit" aria-label="Show the whole world" title="The whole world (0)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg></button>
 </div>
-<!-- the credit line: whose data, who made the page (the link is the source), and where to support it -->
-<div id="credit"><span id="credit-data"><span class="wide">Countries, neighbours and populations: </span><a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>, CC BY 4.0</span><span class="by"> · <span class="wide">Made </span>by <a href="https://github.com/anvaka/people-world" target="_blank" rel="noopener" title="The source, on GitHub">anvaka</a></span> · <a class="support" href="https://github.com/sponsors/anvaka" target="_blank" rel="noopener" title="Sponsor the author on GitHub: one time or monthly">Support this map</a></div>
+<!-- the credit line: whose data, who made the page (the link is the source), and where to say thanks
+     with a coffee (Ko-fi takes a card without an account; GitHub Sponsors is under "more") -->
+<div id="credit"><span id="credit-data"><span class="wide">Countries, neighbours and populations: </span><a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>, CC BY 4.0</span><span class="by"> · <span class="wide">Made </span>by <a href="https://github.com/anvaka/people-world" target="_blank" rel="noopener" title="The source, on GitHub">anvaka</a></span> · <a class="support" href="https://ko-fi.com/anvaka" target="_blank" rel="noopener" title="A one-time tip, on Ko-fi"><svg class="cup" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6.5h8v3.6a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="M11 7.6h1a1.7 1.7 0 0 1 0 3.4h-1.1"/><path d="M5.6 2c-.7.9.7 1.5 0 2.5M8.4 2c-.7.9.7 1.5 0 2.5"/></svg>Buy me a coffee</a></div>
 <!-- UX: the dock, bottom right (a sheet at the bottom of a phone): a build in progress, your
      changes, the country panel. #flip and #clear keep their ids and jobs. -->
 <div id="dock">
@@ -1403,7 +1409,7 @@ function showChecks(check, exclaves, ms) {
     <p>World ${seed}${which}${ms ? `, drawn in ${(ms / 1000).toFixed(1)} s` : ''}. Each world number draws the same countries differently.` +
     (edits.length && !showingBefore && edited && edited.scratch ? ' Drawn from scratch: the last change didn’t fit into the map as it was, so countries moved.' : '') + `</p>
     <p>Keys: <kbd>/</kbd> find · arrows, <kbd>+</kbd> <kbd>−</kbd> and <kbd>0</kbd> move the map · <kbd>Enter</kbd> picks the country in the middle · <kbd>B</kbd> before and after · <kbd>Ctrl</kbd> <kbd>Z</kbd> undo · <kbd>Esc</kbd> close.</p>
-    <p>Made by <a href="https://github.com/anvaka" target="_blank" rel="noopener">anvaka</a>; the <a href="https://github.com/anvaka/people-world" target="_blank" rel="noopener">source is on GitHub</a>. If you enjoy the map, you can <a href="https://github.com/sponsors/anvaka" target="_blank" rel="noopener">support the work</a>.</p>`;
+    <p>Made by <a href="https://github.com/anvaka" target="_blank" rel="noopener">anvaka</a>; the <a href="https://github.com/anvaka/people-world" target="_blank" rel="noopener">source is on GitHub</a>. If you enjoy the map, you can <a href="https://ko-fi.com/anvaka" target="_blank" rel="noopener">buy me a coffee</a> or <a href="https://github.com/sponsors/anvaka" target="_blank" rel="noopener">sponsor the work on GitHub</a>.</p>`;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2464,7 +2470,9 @@ function graphTexts() {
       let kept = graphMaps.get('');
       location.hash = kept && kept.plain ? linkOf(kept.plain.seed, kept.lastGood, '') : linkOf(1, [], '');
     });
-    credit.replaceChildren(doc.about[0].toUpperCase() + doc.about.slice(1) + ' · ', home);
+    // (the file's name only in a wide window: the card's title has it too)
+    let about = doc.about[0].toUpperCase() + doc.about.slice(1), cut = about.indexOf(' from ');
+    credit.replaceChildren(cut < 0 ? about : about.slice(0, cut), cut < 0 ? '' : Object.assign(document.createElement('span'), {className: 'wide', textContent: about.slice(cut)}), ' · ', home);
   }
   // (a link to this map opens it in this tab only: nothing to share)
   shareButton.hidden = own;
