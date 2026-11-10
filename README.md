@@ -108,7 +108,9 @@ forks get no preview.
 6. **Geometry.** Cell boundaries become smooth, slightly rough hand-drawn lines. Areas are then
    fitted exactly, and the tiniest countries shrink to their true size.
 7. **Islands.** Countries with no neighbours are blobs of exact area, placed in archipelagos off
-   the coast of their continent.
+   the coast of their continent. A small piece of land of its own (two countries that share an
+   island and no other border, as Britain and Ireland do) is laid out like the large ones and
+   put in the open water nearest the middle of its continent.
 
 **Edited maps** start from the world without edits. Countries start where they were, with a weak
 pull back to that spot. The earlier exclaves are kept, and only the edited links get a new

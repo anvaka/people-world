@@ -154,8 +154,38 @@ export async function buildWorld(doc, options = {}) {
     compBox.push({ids, R, bx0, bx1, by0, by1});
   }
   // place components: the main one at the centre, the second beside it (left or right), the
-  // small ones in the nearest free spot around them
+  // small ones off the coast of their continent, as island countries are (two countries that
+  // share an island and nothing else: Britain and Ireland off Europe)
   const placed = [];
+  const discs = [];                 // the countries placed so far: [x, y, radius, country]
+  // Where a small piece goes: the open water nearest the middle of its continent's countries on
+  // the land placed so far. Open: clear of every country's disc by `gap`, and with a straight way
+  // out to sea from there (not a hole in the middle of the land, which the countries round it
+  // are to grow into). null if its continent has no land yet.
+  const offItsContinent = (cb, ang0) => {
+    const people = new Map();
+    for (const i of cb.ids) people.set(doc.nodes[i][3], (people.get(doc.nodes[i][3]) || 0) + pop[i]);
+    const home = [...people].sort((a, b) => b[1] - a[1])[0][0];
+    let ax = 0, ay = 0, w = 0, far = 0;
+    for (const [x, y, , i] of discs) if (doc.nodes[i][3] === home) { ax += x * meshArea[i]; ay += y * meshArea[i]; w += meshArea[i]; }
+    if (home == null || !(w > 0)) return null;
+    ax /= w; ay /= w;
+    for (const [x, y, r] of discs) far = Math.max(far, hypot(x - ax, y - ay) + r);
+    const gap = 4;
+    const clear = (x, y, g) => { for (const [dx, dy, r] of discs) if (hypot(x - dx, y - dy) < cb.R + 1.15 * r + g) return false; return true; };
+    for (let dist = 0; dist < far + cb.R + gap + 2; dist += 1) {
+      const steps = Math.max(1, Math.ceil(2 * Math.PI * dist / 2));
+      for (let t = 0; t < steps; ++t) {
+        const ang = ang0 + t * Math.PI * 2 / steps, c = Math.cos(ang), s = Math.sin(ang);
+        const x = ax + c * dist, y = ay + s * dist;
+        if (!clear(x, y, gap)) continue;
+        let open = true;
+        for (let out = 2; open && dist + out < far + cb.R; out += 2) open = clear(x + c * out, y + s * out, 0);
+        if (open) return [x, y];
+      }
+    }
+    return null;
+  };
   if (!base) compBox.forEach((cb, k) => {
     let ox = 0, oy = 0;
     if (k === 1) {
@@ -165,7 +195,10 @@ export async function buildWorld(doc, options = {}) {
       oy = (rng() - 0.5) * 0.4 * (m.by1 - m.by0);
     } else if (k > 1) {
       const ang0 = rng() * Math.PI * 2;
-      outer: for (let dist = placed[0].R * 0.5; ; dist += 1.5) {
+      const spot = offItsContinent(cb, ang0);
+      if (spot) [ox, oy] = spot;
+      // (a piece whose continent has no other land: the nearest free spot round the main land)
+      else outer: for (let dist = placed[0].R * 0.5; ; dist += 1.5) {
         for (let t = 0; t < 36; ++t) {
           const ang = ang0 + t * Math.PI * 2 / 36;
           const x = Math.cos(ang) * dist * 1.3, y = Math.sin(ang) * dist * 0.75;
@@ -173,7 +206,7 @@ export async function buildWorld(doc, options = {}) {
         }
       }
     }
-    for (const i of cb.ids) pos[i] = [pos[i][0] + ox, pos[i][1] + oy];
+    for (const i of cb.ids) { pos[i] = [pos[i][0] + ox, pos[i][1] + oy]; discs.push([pos[i][0], pos[i][1], rad[i], i]); }
     placed.push({x: ox, y: oy, R: cb.R, bx0: cb.bx0 + ox, bx1: cb.bx1 + ox, by0: cb.by0 + oy, by1: cb.by1 + oy});
   });
   onProgress({done: 0.15});
