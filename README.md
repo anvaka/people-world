@@ -195,6 +195,9 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 
 - Countries, populations and land neighbours: [GeoNames](https://www.geonames.org/)
   ([countryInfo.txt](https://download.geonames.org/export/dump/countryInfo.txt)), CC BY 4.0.
+  Left out of that list: Serbia and Montenegro and the Netherlands Antilles, which no longer
+  exist and are listed beside the countries that followed them, and the border of Serbia and
+  Albania, which is Kosovo's (the list has Kosovo as a country of its own).
 - [Delaunator](https://github.com/mapbox/delaunator) by Mapbox, ISC license.
 - [robust-predicates](https://github.com/mourner/robust-predicates) by Vladimir Agafonkin, after
   Jonathan Shewchuk's predicates, public domain (Unlicense).
