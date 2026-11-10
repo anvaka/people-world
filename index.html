@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="A fantasy world map drawn from the graph of the world's countries: neighbours share a border, other countries never touch, and every country is as large as its population.">
-<title>The Peopled World</title>
+<title>People World</title>
 <!-- the card a link to the page gets where it is shared (the picture is the README's) -->
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://anvaka.github.io/people-world/">
-<meta property="og:title" content="The Peopled World">
+<meta property="og:title" content="People World">
 <meta property="og:description" content="A fantasy world map drawn from the real one: every country is as large as its population, and neighbours still share a border.">
 <meta property="og:image" content="https://anvaka.github.io/people-world/docs/world-1.jpg">
 <meta property="og:image:width" content="2560">
@@ -28,16 +28,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <style>
   :root {
-    --paper: #efe2c4;
-    --paper-deep: #e2cfa6;
     --ink: #3b2a1a;
-    --ink-soft: rgba(59, 42, 26, 0.55);
     --sea: #b9cfc4;
     --sea-ink: #557a78;
-    --panel: rgba(246, 236, 212, 0.94);
-    --control: #f7eedb;
-    --control-hover: #fff6e2;
-    --shadow: rgba(40, 25, 10, 0.18);
     --accent: #8b2e1a;
     --lit: brightness(1.08) saturate(1.25);
     --land-0: #e3c48f;
@@ -53,16 +46,9 @@
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --paper: #2b241a;
-      --paper-deep: #3d3324;
       --ink: #ecdfc2;
-      --ink-soft: rgba(236, 223, 194, 0.45);
       --sea: #16232a;
       --sea-ink: #79a7a3;
-      --panel: rgba(34, 29, 22, 0.94);
-      --control: #3a3124;
-      --control-hover: #4a3f2e;
-      --shadow: rgba(0, 0, 0, 0.5);
       --accent: #ea8a62;
       --lit: brightness(1.3) saturate(1.2);
       --land-0: #6d5938;
@@ -78,16 +64,9 @@
     }
   }
   :root[data-theme="dark"] {
-    --paper: #2b241a;
-    --paper-deep: #3d3324;
     --ink: #ecdfc2;
-    --ink-soft: rgba(236, 223, 194, 0.45);
     --sea: #16232a;
     --sea-ink: #79a7a3;
-    --panel: rgba(34, 29, 22, 0.94);
-    --control: #3a3124;
-    --control-hover: #4a3f2e;
-    --shadow: rgba(0, 0, 0, 0.5);
     --accent: #ea8a62;
     --lit: brightness(1.3) saturate(1.2);
     --land-0: #6d5938;
@@ -102,7 +81,7 @@
     color-scheme: dark;
   }
   html, body { margin: 0; height: 100%; background: var(--sea); color: var(--ink); overflow: hidden; }
-  body { font-family: 'IM Fell English', Georgia, 'Times New Roman', serif; -webkit-tap-highlight-color: transparent; }
+  body { font-family: var(--ui-font); -webkit-tap-highlight-color: transparent; }
   #stage { position: fixed; inset: 0; touch-action: none; cursor: grab; }
   #stage.dragging { cursor: grabbing; }
   /* its own layer: during a gesture the picture already drawn is moved as one image. The layer is a
@@ -136,206 +115,226 @@
     font-family: 'IM Fell English SC', 'IM Fell English', Georgia, serif; letter-spacing: 0.08em; }
   .label.small { font-family: 'IM Fell English', Georgia, serif; font-style: italic; letter-spacing: 0.02em; }
 
-  header.cartouche {
-    position: fixed; left: calc(16px + env(safe-area-inset-left)); top: calc(14px + env(safe-area-inset-top));
-    max-width: min(420px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)));
-    box-sizing: border-box;
-    background: var(--panel); border: 1px solid var(--ink-soft); outline: 3px double var(--ink-soft); outline-offset: 3px;
-    padding: 10px 14px 10px; box-shadow: 0 2px 10px var(--shadow);
-  }
-  header h1 { margin: 0; font-family: 'IM Fell English SC', Georgia, serif; font-weight: normal; font-size: 26px; letter-spacing: 0.06em; text-wrap: balance; }
-  header p { margin: 2px 0 0; font-style: italic; font-size: 14px; line-height: 1.3; text-wrap: pretty; }
-  header .row { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
-  button, input {
-    font: inherit; font-size: 14px; color: var(--ink); background: var(--control); border: 1px solid var(--ink-soft);
-    border-radius: 3px; padding: 0 10px; height: 34px; box-sizing: border-box; line-height: 1;
-  }
-  input::placeholder { color: var(--ink-soft); }
-  button { cursor: pointer; }
-  button:hover { background: var(--control-hover); }
-  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-  input { width: 150px; }
-  #checks { font-variant-numeric: tabular-nums; }
-  /* UX: #edits moved to the dock: its rules are in the UX block at the end */
-  button.mini { height: 26px; padding: 0 8px; font-size: 13px; flex: none; }
-  #info ul.nbrs { list-style: none; padding-left: 0; }
-  #info ul.nbrs li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; }
-  #info .join { display: flex; gap: 8px; margin-top: 6px; }
-  #info .join input { flex: 1; min-width: 0; width: auto; }
-  /* UX: #info now sits in #dock, which places it (see the UX block at the end) */
-  #info {
-    overflow: auto; box-sizing: border-box;
-    background: var(--panel); border: 1px solid var(--ink-soft); outline: 3px double var(--ink-soft); outline-offset: 3px;
-    padding: 10px 14px; box-shadow: 0 2px 10px var(--shadow); font-size: 15px; line-height: 1.35;
-  }
-  #info[hidden] { display: none; }
-  #info h2 { margin: 0 32px 2px 0; font-family: 'IM Fell English SC', Georgia, serif; font-weight: normal; font-size: 22px; }
-  #info .close { position: absolute; right: 6px; top: 6px; height: 28px; padding: 0 8px; }
-  #info ul { margin: 4px 0 0; padding-left: 18px; }
-  #info .note { font-style: italic; font-size: 13px; margin-top: 6px; }
-  #tip { position: fixed; pointer-events: none; background: var(--panel); border: 1px solid var(--ink-soft);
-    padding: 3px 8px; font-size: 14px; white-space: nowrap; transform: translate(12px, 12px); }
-  #tip[hidden] { display: none; }
-  #loading { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; padding: 0 16px; }
-  #loading .box { background: var(--panel); border: 1px solid var(--ink-soft); padding: 14px 20px; text-align: center; min-width: 220px; max-width: 100%; box-sizing: border-box; }
-  #loading .bar { height: 4px; background: var(--paper-deep); margin-top: 8px; }
-  #loading .bar div { height: 100%; width: 0; background: var(--accent); transition: width 0.2s; }
-  :root[data-map-state="ready"] #loading { display: none; }
-  /* a file held over the page: a DOT file dropped here is drawn as a map */
-  #drop-hint { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; pointer-events: none; padding: 0 16px;
-    outline: 2px dashed var(--ink-soft); outline-offset: -12px; }
-  #drop-hint .box { background: var(--panel); border: 1px solid var(--ink-soft); padding: 14px 20px; text-align: center; max-width: 100%; box-sizing: border-box; }
-  #drop-hint[hidden] { display: none; }
-  #compass { position: fixed; right: calc(16px + env(safe-area-inset-right)); top: calc(14px + env(safe-area-inset-top));
-    width: 74px; height: 74px; opacity: 0.85; pointer-events: none; color: var(--ink); }
-  #compass .ink { fill: currentColor; }
-  #compass .ring { fill: none; stroke: currentColor; }
-  #compass .light { fill: var(--paper); stroke: currentColor; stroke-width: 0.6; }
-  #credit { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(6px + env(safe-area-inset-bottom));
-    font-size: 12px; font-style: italic; color: var(--ink-soft); }
-  #credit a { color: inherit; }
-  a.support { white-space: nowrap; }
-  a.support .cup { width: 1.15em; height: 1.15em; margin-right: 0.25em; vertical-align: -0.2em; fill: none; stroke: var(--accent);
-    stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
-  #credit a.support { font-style: normal; color: var(--accent); }
-  /* (the long form of the credit needs a wide window: the dock sits beside it) */
-  @media (max-width: 1000px) { #credit .wide { display: none; } }
-  @media (max-width: 600px) {
-    header h1 { font-size: 21px; }
-    header p { font-size: 13px; }
-    #compass { display: none; }
-  }
-  @media (prefers-reduced-motion: reduce) { #loading .bar div { transition: none; } }
-
   /* =========================================================================================
-     UX (round 3): title card, the dock (build status, your changes, the country panel), sharing,
-     comparing before and after, keyboard and screen-reader support. Built only from the tokens
-     and type above, so a new palette or typeface carries over. Layout and controls only: nothing
-     here draws the map itself, except .hot (the border a neighbour's row points at, at the end).
+     The controls: the search bar and its panels (top left), the dock (the build in progress,
+     your changes, the country panel: bottom right, a sheet at the bottom of a phone), zoom and
+     the credit. They look the same whichever style draws the map: white, square, sans-serif,
+     and one pink for whatever can be pressed. A style's stylesheet draws the map and leaves
+     these alone; it may only say how far from the window's edge they sit (--edge), when it
+     frames the sheet. Layout and controls only: nothing here draws the map, except .hot (the
+     border a neighbour's row points at, at the end).
      ========================================================================================= */
+  :root {
+    --ui-bg: #fff; --ui-soft: #f5f5f5; --ui-text: rgb(33, 33, 33); --ui-text-2: rgba(0, 0, 0, 0.54);
+    --ui-line: #e9eaed; --ui-accent: #ff4081; --ui-on-accent: #fff;
+    --ui-shadow: 0 2px 4px rgba(0, 0, 0, 0.2), 0 -1px 0 rgba(0, 0, 0, 0.02);
+    --ui-font: 'Avenir', Helvetica, Arial, sans-serif;
+    --edge: 8px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ui-bg: #222; --ui-soft: #2e2e2e; --ui-text: rgba(255, 255, 255, 0.87); --ui-text-2: rgba(235, 235, 235, 0.64);
+      --ui-line: rgba(128, 128, 128, 0.35); --ui-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ui-bg: #222; --ui-soft: #2e2e2e; --ui-text: rgba(255, 255, 255, 0.87); --ui-text-2: rgba(235, 235, 235, 0.64);
+    --ui-line: rgba(128, 128, 128, 0.35); --ui-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  }
   .sr-only { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);
     clip-path: inset(50%); white-space: nowrap; }
   [hidden] { display: none !important; }
-  header.cartouche { z-index: 2; }
-  header .title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-  header .title-row .tools { display: flex; gap: 6px; flex: none; }
-  header .hint { font-style: normal; font-size: 15px; margin-top: 6px; }
-  header .hint b { font-weight: normal; color: var(--accent); }
+
+  button, input {
+    font: inherit; font-size: 14px; line-height: 1; color: var(--ui-text); background: none; border: 0; border-radius: 0;
+    margin: 0; padding: 0; height: 32px; box-sizing: border-box;
+  }
+  input { width: 150px; border-bottom: 1px solid var(--ui-line); }
+  input::placeholder { color: var(--ui-text-2); opacity: 1; }
+  input:focus { outline: none; border-bottom-color: var(--ui-accent); }
+  /* whatever can be pressed is a pink word; under the pointer it is white on pink */
+  button { cursor: pointer; color: var(--ui-accent); padding: 0 8px; }
+  button:hover { background: var(--ui-accent); color: var(--ui-on-accent); }
+  button:focus-visible, a:focus-visible { outline: 1px dashed var(--ui-accent); outline-offset: -1px; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button:disabled:hover { background: none; color: var(--ui-accent); }
+  a { color: var(--ui-accent); text-decoration: none; }
+  a:hover, button.go:hover, button.pick:hover { text-decoration: underline dashed; text-underline-offset: 3px; }
+  /* a quieter word for what undoes or dismisses: grey until it is pointed at */
+  button.mini { height: 28px; padding: 0 6px; font-size: 12px; flex: none; color: var(--ui-text-2); text-transform: lowercase; }
+  button.close-x, #info .close { height: 28px; width: 28px; padding: 0; flex: none; font-size: 20px; color: var(--ui-text-2); }
+  button.mini:hover, button.close-x:hover, #info .close:hover { background: none; color: var(--ui-accent); }
+  button.mini:hover { text-decoration: underline dashed; text-underline-offset: 3px; }
+  button[aria-pressed="true"], button[aria-pressed="true"]:hover { background: var(--ui-accent); color: var(--ui-on-accent); text-decoration: none; }
+  /* a neighbour's name, and the other ways to say which country: links in a line of text */
+  button.go, button.pick { padding: 0; height: auto; min-height: 30px; text-align: left; font-size: 15px; }
+  button.go { flex: 1 1 auto; min-width: 0; }
+  button.go:hover, button.pick:hover { background: none; color: var(--ui-accent); }
+  .note { font-size: 12px; color: var(--ui-text-2); margin-top: 6px; text-wrap: pretty; }
+  kbd { font: inherit; font-size: 11px; border: 1px solid var(--ui-line); padding: 0 4px; background: var(--ui-soft); white-space: nowrap; }
+
+  /* top left: the search bar; under it the panels it opens, and what the page has to say */
+  header.cartouche { position: fixed; z-index: 2; box-sizing: border-box;
+    left: calc(var(--edge) + env(safe-area-inset-left)); top: calc(var(--edge) + env(safe-area-inset-top));
+    width: min(400px, calc(100vw - 2 * var(--edge) - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    color: var(--ui-text); font-size: 14px; line-height: 1.45; }
+  header .bar { display: flex; align-items: stretch; height: 48px; background: var(--ui-bg); box-shadow: var(--ui-shadow); }
+  header #find { flex: 1 1 auto; min-width: 0; display: flex; margin: 0; }
+  header #search { flex: 1 1 auto; min-width: 0; width: auto; height: 100%; padding: 0 4px 0 10px; border: 0; font-size: 16px; cursor: text; }
+  header #search:hover, header #search:focus { background: var(--ui-soft); }
+  header .tools { display: flex; flex: none; }
+  header .tools button { height: 100%; padding: 0 12px; border-left: 1px solid var(--ui-line); }
+  header .tools button[aria-expanded="true"] { background: var(--ui-accent); color: var(--ui-on-accent); }
+  header .panel, header .message { background: var(--ui-bg); box-shadow: var(--ui-shadow); border-top: 1px solid var(--ui-line); }
+  header .message { padding: 6px 10px; font-size: 12px; }
+  header .message p { margin: 0; text-wrap: pretty; }
+  header .message .hint { color: var(--ui-text-2); }
   :root.ux-explored header .hint { display: none; }
-  header #find { margin-top: 10px; flex-wrap: nowrap; }
-  header #search { flex: 1 1 auto; min-width: 0; width: auto; }
-  button.quiet { height: 28px; padding: 0 9px; font-size: 13px; }
-  #card-more { display: none; width: 28px; padding: 0; font-style: italic; }
-  .note { font-style: italic; font-size: 13px; margin-top: 6px; }
-  #find-note { color: var(--accent); }
-  /* the country suggestions under a name field (a style dresses them further) */
-  .suggest { position: fixed; z-index: 20; margin: 0; padding: 4px; list-style: none; box-sizing: border-box;
-    overflow-y: auto; overscroll-behavior: contain; background: var(--menu, var(--panel)); color: var(--ink);
-    border: 1px solid var(--ink-soft); box-shadow: 0 10px 28px var(--shadow); font-size: 15px; line-height: 1.25; }
-  .suggest li { padding: 7px 10px; cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
-  .suggest li:hover { background: var(--control-hover); }
-  .suggest li[aria-selected="true"] { background: color-mix(in srgb, var(--accent) 16%, transparent); }
-  .suggest mark { background: none; color: inherit; text-decoration: underline; text-decoration-color: var(--accent);
-    text-decoration-thickness: 2px; text-underline-offset: 3px; }
-  .suggest .code { margin-left: auto; font-size: 12px; opacity: 0.65; letter-spacing: 0.06em; }
-  @media (pointer: coarse) { .suggest li { padding: 10px 12px; } }
-  /* the search field's clear button, in the field's own ink */
+  header .message.alert { color: var(--ui-accent); }
+  /* (an open panel says more than the welcome under it) */
+  header .panel:not([hidden]) ~ .welcome { display: none; }
+  header .panel { padding: 2px 10px 10px; overflow-y: auto; overscroll-behavior: contain;
+    max-height: calc(100vh - 76px - 2 * var(--edge) - env(safe-area-inset-top) - env(safe-area-inset-bottom)); box-sizing: border-box; }
+  header .panel h3 { margin: 8px 0 4px; font-size: 16px; font-weight: normal; text-align: right; }
+  header .prow { display: flex; margin-top: 4px; min-height: 32px; }
+  header .prow > .plabel { flex: 1; padding-top: 7px; }
+  header .prow > .pval { flex: 2; min-width: 0; }
+  /* the search field's clear button, in the field's own colour */
   input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; width: 12px; height: 12px;
     margin-left: 6px; cursor: pointer; background: currentColor; opacity: 0.55;
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 2l8 8M10 2l-8 8' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat;
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 2l8 8M10 2l-8 8' stroke='black' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center / contain no-repeat; }
-  /* the rules and how this map was checked: one line, details on demand */
-  details#about { margin-top: 8px; font-size: 13px; line-height: 1.35; }
-  details#about summary { cursor: pointer; list-style: none; padding: 2px 0; }
-  details#about summary::-webkit-details-marker { display: none; }
-  details#about summary::after { content: ' · more'; font-style: italic; color: var(--ink-soft); }
-  details#about[open] summary::after { content: ' · less'; }
-  details#about summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  #about-body { padding-top: 4px; }
-  #about-body ul { margin: 2px 0 6px; padding-left: 0; list-style: none; }
-  #about-body li { margin: 2px 0; }
-  #about-body p { margin: 4px 0; }
-  #about-body .ok { color: inherit; }
-  #about-body a { color: inherit; }
-  kbd { font: inherit; font-size: 12px; border: 1px solid var(--ink-soft); border-radius: 3px; padding: 0 4px;
-    background: var(--control); white-space: nowrap; }
-  /* sharing: the link, a copy button and what the link carries */
-  #share-box { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--ink-soft); font-size: 14px; }
-  #share-box .row { margin-top: 6px; flex-wrap: nowrap; }
+  /* the country suggestions under a name field */
+  .suggest { position: fixed; z-index: 20; margin: 0; padding: 0; list-style: none; box-sizing: border-box;
+    overflow-y: auto; overscroll-behavior: contain; background: var(--ui-bg); color: var(--ui-text);
+    border-top: 1px solid var(--ui-line); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2); font-size: 15px; line-height: 1.25; }
+  .suggest li { padding: 8px 10px; cursor: pointer; display: flex; gap: 8px; align-items: baseline; }
+  .suggest li:hover { background: var(--ui-soft); }
+  .suggest li[aria-selected="true"] { background: var(--ui-soft); color: var(--ui-accent); }
+  .suggest mark { background: none; color: inherit; font-weight: bold; }
+  .suggest .code { margin-left: auto; font-size: 12px; color: var(--ui-text-2); }
+  @media (pointer: coarse) { .suggest li { padding: 11px 12px; } }
+
+  /* Customize: the style that draws the map (each with a swatch of its look in the theme shown
+     now), the theme (light, dark, or as the device is set), and what this page is */
+  #style-box .choices { display: flex; gap: 4px; }
+  #style-box button.choice { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 64px; height: auto;
+    padding: 4px 0 3px; font-size: 12px; color: var(--ui-text); }
+  #style-box button.choice:hover { background: none; color: var(--ui-accent); }
+  #style-box button.choice[aria-checked="true"] { color: var(--ui-accent); }
+  #style-box button.choice[aria-checked="true"] .swatch { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+  #style-box button.choice[aria-busy="true"] .nm::after { content: '…'; }
+  .swatch { display: block; flex: none; width: 40px; height: 28px; border: 1px solid var(--ui-line); box-sizing: border-box; }
+  .swatch.ink { background: var(--swatch-ink); }
+  .swatch.realm { background: var(--swatch-realm); }
+  #style-box .themes { display: flex; }
+  #style-box .themes button { height: 32px; padding: 0 10px; }
+  #style-box .themes button[aria-checked="true"], #style-box .themes button[aria-checked="true"]:hover { background: var(--ui-accent); color: var(--ui-on-accent); }
+  #about { font-size: 13px; line-height: 1.5; }
+  #about p { margin: 6px 0; text-wrap: pretty; }
+  #about ul { margin: 6px 0; padding: 0; list-style: none; }
+  #about li { margin: 2px 0; }
+  #checks { font-variant-numeric: tabular-nums; }
+  /* sharing: the link, a word that copies it, and what the link carries */
+  #share-box { font-size: 13px; padding-top: 8px; }
+  #share-box .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+  #share-box .row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
   #share-box input { flex: 1 1 auto; min-width: 0; width: auto; font-size: 13px; }
-  #share-box .head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-  #share-box .thanks a { color: inherit; font-style: normal; }
+  a.support { white-space: nowrap; }
+  a.support .cup { width: 1.15em; height: 1.15em; margin-right: 0.25em; vertical-align: -0.2em; fill: none; stroke: currentColor;
+    stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
 
   /* The dock: everything about editing, in one column at the bottom right (a sheet at the bottom
-     of a phone): the build in progress, your changes, the country panel */
-  #dock { position: fixed; z-index: 2; right: calc(16px + env(safe-area-inset-right));
-    bottom: calc(14px + env(safe-area-inset-bottom) + var(--kb, 0px));
-    width: min(350px, calc(100vw - 32px)); max-height: calc(100% - 118px);
-    display: flex; flex-direction: column; gap: 14px; pointer-events: none; }
+     of a phone): the build in progress, your changes, the country panel. It stops short of the
+     zoom buttons above it. */
+  #dock { position: fixed; z-index: 2; right: calc(var(--edge) + env(safe-area-inset-right));
+    bottom: calc(var(--edge) + env(safe-area-inset-bottom) + var(--kb, 0px));
+    width: min(350px, calc(100vw - 2 * var(--edge))); max-height: calc(100% - 116px - 2 * var(--edge));
+    display: flex; flex-direction: column; gap: 8px; pointer-events: none; color: var(--ui-text); }
   #dock > * { pointer-events: auto; flex: none; box-sizing: border-box; }
   #dock > #info { position: relative; flex: 0 1 auto; min-height: 96px; }
-  .slip { background: var(--panel); border: 1px solid var(--ink-soft); box-shadow: 0 2px 10px var(--shadow);
-    padding: 9px 12px; font-size: 14px; line-height: 1.35; }
+  .slip, #info { background: var(--ui-bg); box-shadow: var(--ui-shadow); padding: 8px 12px; font-size: 14px; line-height: 1.4; }
   #status .status-main { display: flex; align-items: flex-start; gap: 8px; }
   #status-text { flex: 1; text-wrap: pretty; }
-  #status .actions { display: flex; gap: 6px; flex: none; }
-  #status .bar { height: 4px; background: var(--paper-deep); margin-top: 8px; overflow: hidden; }
-  #status .bar div { height: 100%; width: 0; background: var(--accent); transition: width 0.45s linear; }
-  #status-sub { font-size: 13px; font-style: italic; margin-top: 4px; color: var(--ink); opacity: 0.8; }
-  #status.error #status-text { color: var(--accent); }
-  #loading-sub { font-size: 13px; font-style: italic; margin-top: 6px; opacity: 0.8; }
-  #loading[hidden] { display: none; }
-  button.close-x { height: 26px; width: 26px; padding: 0; flex: none; }
+  #status .actions { display: flex; gap: 2px; flex: none; }
+  #status .bar, #loading .bar { height: 2px; background: var(--ui-line); margin-top: 8px; overflow: hidden; }
+  #status .bar div, #loading .bar div { height: 100%; width: 0; background: var(--ui-accent); transition: width 0.45s linear; }
+  #loading .bar div { transition: width 0.2s; }
+  #status-sub, #loading-sub { font-size: 12px; margin-top: 4px; color: var(--ui-text-2); }
+  #status.error #status-text { color: var(--ui-accent); }
 
   /* your changes */
   #edits .edits-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   #edits h2 { margin: 0; font: inherit; flex: 1 1 auto; }
-  #edits-toggle { border: none; background: none; padding: 0; height: 30px; font-family: inherit; font-variant: small-caps;
-    font-size: 16px; letter-spacing: 0.04em; text-align: left; }
-  #edits-toggle::after { content: ' ▾'; font-size: 12px; }
+  #edits-toggle { padding: 0; height: 30px; text-align: left; color: var(--ui-text); }
+  #edits-toggle:hover { background: none; color: var(--ui-accent); }
+  #edits-toggle::after { content: ' ▾'; font-size: 11px; }
   #edits-toggle[aria-expanded="false"]::after { content: ' ▸'; }
-  #edits .tools { display: flex; gap: 6px; }
-  #edits ul { margin: 6px 0 0; padding: 0; list-style: none; max-height: 132px; overflow: auto; }
-  #edits li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; }
-  #edits li .tag, #info .tag { font-style: italic; font-size: 13px; color: var(--accent); white-space: nowrap; }
-  #edits .more { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-  #clear-confirm { margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  #edits .tools { display: flex; gap: 2px; }
+  #edits ul { margin: 4px 0 0; padding: 0; list-style: none; max-height: 132px; overflow: auto; }
+  #edits li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px;
+    border-bottom: 1px solid var(--ui-line); }
+  #edits li .tag, #info .tag { font-size: 12px; color: var(--ui-text-2); white-space: nowrap; }
+  #edits .more { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+  #clear-confirm { margin-top: 6px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   #clear-confirm span { flex: 1 1 100%; }
-  button[aria-pressed="true"] { background: var(--ink); color: var(--paper); border-color: var(--ink); }
-  button[aria-pressed="true"]:hover { background: var(--ink); }
-  button:disabled { opacity: 0.5; cursor: default; }
   #flip { -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
-  button.go { border: none; background: none; padding: 0; height: auto; min-height: 30px; text-align: left; font-size: inherit;
-    flex: 1 1 auto; min-width: 0; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
-  button.go:hover { background: none; text-decoration-color: currentColor; }
-  button.cut { color: var(--ink); }
-  button.cut:hover, button.cut:focus-visible { color: var(--accent); border-color: var(--accent); }
 
   /* the country panel */
-  #info .meta { margin-top: 1px; }
-  #info .sec { margin-top: 8px; display: flex; align-items: center; gap: 8px; }
-  #info .sec span { flex: 1; }
-  #info ul.nbrs { margin-top: 2px; }
-  #info ul.nbrs li { min-height: 34px; }
-  #info li.pending-cut .go { text-decoration: line-through; opacity: 0.6; }
-  #info .add { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--ink-soft); }
-  #info .add label { display: block; font-size: 14px; margin-bottom: 4px; }
-  #info .join { display: block; margin-top: 0; }
-  #info .join .row { display: flex; gap: 8px; }
-  #info .join input { flex: 1 1 auto; min-width: 0; width: auto; }
-  #info button.pick { margin-top: 8px; width: 100%; }
-  #info .picking { margin-top: 8px; padding: 8px 10px; border: 1px dashed var(--accent); display: flex; gap: 8px; align-items: center; }
-  #info .picking span { flex: 1; }
-  #info .removed { margin-top: 6px; font-size: 14px; }
-  #info .removed li { min-height: 32px; }
+  #info { overflow: auto; padding: 10px 12px; }
+  #info h2 { margin: 0 28px 0 0; font-size: 22px; font-weight: normal; line-height: 1.25; }
   #info h2:focus { outline: none; }
-  #info h2:focus-visible { outline: none; text-decoration: underline dotted var(--accent); text-underline-offset: 4px; }
+  #info h2:focus-visible { outline: none; text-decoration: underline dotted var(--ui-accent); text-underline-offset: 4px; }
+  #info .close { position: absolute; right: 4px; top: 6px; }
+  #info .meta, #info .sec, #info .add label, #info .removed { font-size: 13px; color: var(--ui-text-2); }
+  #info .sec { margin-top: 6px; display: flex; align-items: center; gap: 8px; }
+  #info .sec span { flex: 1; }
+  #info ul { margin: 2px 0 0; padding: 0; list-style: none; }
+  #info ul.nbrs li { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px;
+    border-bottom: 1px solid var(--ui-line); }
+  #info ul.nbrs li > span:first-child { flex: 1 1 auto; min-width: 0; font-size: 15px; color: var(--ui-text); }
+  #info li.pending-cut .go { text-decoration: line-through; opacity: 0.6; }
+  #info .add { margin-top: 8px; }
+  #info .add label { display: block; }
+  #info .join { display: block; }
+  #info .join .row { display: flex; gap: 8px; align-items: center; }
+  #info .join input { flex: 1 1 auto; min-width: 0; width: auto; font-size: 15px; }
+  #info button.pick { display: block; margin-top: 4px; font-size: 14px; }
+  #info .picking { margin-top: 8px; padding: 6px 8px; border: 1px dashed var(--ui-accent); display: flex; gap: 8px; align-items: center; }
+  #info .picking span { flex: 1; }
+  #info .removed { margin-top: 8px; }
   #info .sheet-toggle, #info .peek { display: none; }
 
+  /* what the pointer is over; the first build's progress; a file held over the page (a DOT file
+     dropped here is drawn as a map) */
+  #tip { position: fixed; pointer-events: none; background: var(--ui-bg); color: var(--ui-text); box-shadow: var(--ui-shadow);
+    padding: 4px 8px; font-size: 13px; white-space: nowrap; transform: translate(12px, 12px); }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; padding: 0 16px; }
+  #loading .box, #drop-hint .box { background: var(--ui-bg); color: var(--ui-text); box-shadow: var(--ui-shadow); padding: 12px 16px;
+    text-align: center; min-width: 220px; max-width: 100%; box-sizing: border-box; font-size: 14px; }
+  :root[data-map-state="ready"] #loading { display: none; }
+  #drop-hint { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; pointer-events: none; padding: 0 16px;
+    outline: 1px dashed var(--ui-accent); outline-offset: -8px; }
+
+  /* whose data, who made the page */
+  #credit { position: fixed; left: calc(var(--edge) + env(safe-area-inset-left)); bottom: calc(var(--edge) - 4px + env(safe-area-inset-bottom));
+    font-size: 11px; line-height: 1.5; padding: 1px 6px; color: var(--ui-text-2); background: color-mix(in srgb, var(--ui-bg) 85%, transparent); }
+  /* (the long form of the credit needs a wide window: the dock sits beside it) */
+  @media (max-width: 1000px) { #credit .wide { display: none; } }
+
+  /* zoom in, zoom out, the whole world: a column at the top right */
+  #controls { position: fixed; z-index: 1; right: calc(var(--edge) + env(safe-area-inset-right)); top: calc(var(--edge) + env(safe-area-inset-top));
+    display: flex; flex-direction: column; background: var(--ui-bg); box-shadow: var(--ui-shadow); }
+  #controls button { width: 36px; height: 36px; padding: 0; display: grid; place-items: center; color: var(--ui-text); }
+  #controls button + button { border-top: 1px solid var(--ui-line); }
+  #controls button:hover { background: var(--ui-accent); color: var(--ui-on-accent); }
+  #controls svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  html:not(.map-shown) #controls { display: none; }
+
   /* the map before your changes is being shown */
-  #ux-stamp { position: fixed; z-index: 2; top: calc(18px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
-    pointer-events: none; font-family: inherit; font-variant: small-caps; font-size: 18px; letter-spacing: 0.08em;
-    color: var(--accent); background: var(--panel); border: 2px solid var(--accent); padding: 3px 14px; white-space: nowrap; }
+  #ux-stamp { position: fixed; z-index: 2; top: calc(var(--edge) + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+    pointer-events: none; font-size: 14px; line-height: 1.4; color: var(--ui-on-accent); background: var(--ui-accent);
+    box-shadow: var(--ui-shadow); padding: 4px 12px; white-space: nowrap; }
 
   /* the map with keyboard focus: a ring, and a crosshair on the point Enter picks */
   #stage:focus { outline: none; }
@@ -347,108 +346,32 @@
   /* on the map: the border a neighbour's row in the panel points at */
   .border.hot { stroke: var(--accent); stroke-width: 5; stroke-dasharray: none; opacity: 1; display: inline; }
 
-  @media (max-width: 600px) {
-    header.cartouche { left: calc(10px + env(safe-area-inset-left)); right: calc(10px + env(safe-area-inset-right)); max-width: none; padding: 8px 12px; }
-    header .hint { font-size: 14px; }
-    #card-more { display: inline-block; width: 32px; }
-    button.quiet { height: 32px; }
-    /* after the first look around, the card keeps only the title and search; ? opens it again */
-    :root.ux-explored:not(.ux-card-open) header .lede,
-    :root.ux-explored:not(.ux-card-open) header details#about { display: none; }
-    #dock { left: calc(10px + env(safe-area-inset-left)); right: calc(10px + env(safe-area-inset-right)); width: auto;
-      bottom: calc(10px + env(safe-area-inset-bottom) + var(--kb, 0px));
-      max-height: calc(100% - var(--card-bottom, 120px) - 130px); gap: 12px; }
-    .slip { padding: 8px 10px; }
-    #edits .edits-head { flex-wrap: nowrap; }
-    #edits-toggle { font-size: 15px; white-space: nowrap; }
-    button.mini { height: 32px; }
-    /* the country panel is a sheet: a peek (name, people, neighbours in a line), or the border list */
-    #info .sheet-toggle { display: inline-block; flex: none; }
-    #info:not(.open) .peek { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 4px; }
-    #info:not(.open) .full { display: none; }
-    #info:not(.open) .sec span { white-space: nowrap; }
-    #info.picking-mode .full, #info.picking-mode .peek { display: none; }
-    #ux-stamp { top: calc(var(--card-bottom, 100px) + 14px); font-size: 16px; }
-  }
-  @media (prefers-reduced-motion: reduce) { #status .bar div { transition: none; } }
-
-  /* =========================================================================================
-     Styles and map controls. The page places the panels; a style dresses them (colours, type,
-     borders) but does not move them: offsets a style gives #info are for the older page, where the
-     panel stood alone, and are undone here.
-     ========================================================================================= */
-  #dock > #info { inset: auto !important; width: auto !important; margin: 0 !important; }
-  /* the panels' own kinds of button keep their shape whatever a style makes of buttons in general:
-     a neighbour's name is a link, × is a small square, a pressed toggle is inked in */
-  #dock button.go, #dock button.go:hover { border: none; background: none; padding: 0; height: auto; min-height: 30px;
-    text-align: left; font-size: inherit; box-shadow: none; }
-  :is(#dock, header.cartouche) button.close-x { height: 26px; width: 26px; padding: 0; flex: none; line-height: 1; letter-spacing: 0; }
-  #dock button[aria-pressed="true"], #dock button[aria-pressed="true"]:hover { background: var(--ink); color: var(--paper); border-color: var(--ink); }
   /* a style's script is running for the first time: the map waits for it out of sight */
   html.restyling #plate { visibility: hidden; }
 
-  /* the Style menu: a dropdown under its button, the styles (each with a swatch of its look in the
-     theme shown now) and the theme: light, dark, or as the device is set */
-  .menu-anchor { position: relative; }
-  #style-button .caret { display: inline-block; width: 0; height: 0; margin-left: 6px; vertical-align: 2px;
-    border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid currentColor; opacity: 0.75; }
-  #style-button[aria-expanded="true"] .caret { transform: rotate(180deg); }
-  #style-box.menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 5; width: 250px; box-sizing: border-box;
-    padding: 8px; background: var(--menu, var(--panel)); color: var(--ink); border: 1px solid var(--ink-soft);
-    box-shadow: 0 10px 28px var(--shadow); font-size: 14px; text-align: left; line-height: 1.25; }
-  #style-box .menu-label { font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.65; padding: 4px 6px 5px; }
-  #style-box .menu-label + .choices, #style-box .menu-label + .themes { margin-top: 0; }
-  #style-box .choices { display: flex; flex-direction: column; gap: 2px; }
-  #style-box .choices + .menu-label { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--ink-soft); }
-  #style-box button.choice { display: flex; align-items: center; gap: 10px; width: 100%; height: auto; min-height: 44px;
-    padding: 6px 8px; border: 1px solid transparent; background: transparent; text-align: left; letter-spacing: normal; }
-  #style-box button.choice:hover { background: var(--control-hover); border-color: transparent; }
-  #style-box button.choice[aria-checked="true"] { background: var(--control-hover); border-color: var(--ink-soft); }
-  #style-box button.choice[aria-checked="true"]::after { content: '✓'; margin-left: auto; padding-left: 8px; color: var(--accent); font-size: 15px; }
-  #style-box button.choice[aria-busy="true"]::after { content: '…'; }
-  #style-box .txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-  #style-box .nm { font-size: 15px; }
-  #style-box .ds { font-size: 12.5px; font-style: italic; opacity: 0.8; font-variant: normal; letter-spacing: normal; }
-  #style-box .themes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 2px 2px; border: 1px solid var(--ink-soft); }
-  #style-box .themes button { height: 32px; padding: 0 4px; border: 0; border-radius: 0; background: transparent; font-size: 14px; }
-  #style-box .themes button + button { border-left: 1px solid var(--ink-soft); }
-  #style-box .themes button:hover { background: var(--control-hover); }
-  #style-box .themes button[aria-checked="true"], #style-box .themes button[aria-checked="true"]:hover { background: var(--ink); color: var(--paper); }
-  #style-box .themes button:focus-visible { outline-offset: -3px; }
-  #style-note { margin: 6px 6px 0; }
-  .swatch { display: block; flex: none; width: 40px; height: 28px; border-radius: 3px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
-  .swatch.ink { background: var(--swatch-ink); }
-  .swatch.realm { background: var(--swatch-realm); }
-  #style-button .ico { display: none; }
-
-  /* zoom in, zoom out, the whole world: a column at the right edge, under the compass */
-  #controls { position: fixed; z-index: 1; right: calc(16px + env(safe-area-inset-right)); top: calc(102px + env(safe-area-inset-top));
-    display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--ink-soft);
-    box-shadow: 0 2px 8px var(--shadow); }
-  #controls button { width: 36px; height: 36px; padding: 0; border: none; border-radius: 0; background: transparent;
-    display: grid; place-items: center; color: var(--ink); }
-  #controls button + button { border-top: 1px solid var(--ink-soft); }
-  #controls button:hover { background: var(--control-hover); }
-  #controls svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-  html:not(.map-shown) #controls { display: none; }
-  /* (ink's panels are its land's parchment: a box of it over the sea reads as land, to people and
-     to the size check; its buttons' sea-tinted paper doesn't) */
-  html[data-style="ink"] #controls { background: color-mix(in srgb, var(--sea) 60%, var(--paper)); }
-  /* the dock stops short of the controls */
-  #dock { max-height: calc(100% - 236px); }
-
   @media (max-width: 600px) {
-    #controls { top: calc(var(--card-bottom, 100px) + 10px); right: calc(10px + env(safe-area-inset-right)); }
-    #controls button { width: 38px; height: 36px; }
-    #style-button .lbl { display: none; }
-    #style-button .ico { display: block; width: 18px; height: 18px; margin: auto; stroke: currentColor; fill: none; stroke-width: 1.5; }
-    #style-button { width: 32px; padding: 0; }
-    #style-button .caret { display: none; }
+    header .tools button { padding: 0 10px; }
+    /* after the first look around, the bar is all that stays: Customize has the rest */
+    :root.ux-explored header .welcome { display: none; }
+    #dock { left: calc(var(--edge) + env(safe-area-inset-left)); width: auto;
+      max-height: calc(100% - var(--card-bottom, 120px) - 130px); }
+    #edits .edits-head { flex-wrap: nowrap; }
+    #edits-toggle { white-space: nowrap; }
+    button.mini { height: 32px; }
+    /* the country panel is a sheet: a peek (name, people, neighbours in a line), or the border list */
+    #info .sheet-toggle { display: inline-block; flex: none; }
+    #info:not(.open) .peek { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; font-size: 13px; }
+    #info:not(.open) .full { display: none; }
+    #info:not(.open) .sec span { white-space: nowrap; }
+    #info.picking-mode .full, #info.picking-mode .peek { display: none; }
+    #info ul.nbrs li { min-height: 38px; }
+    #ux-stamp { top: calc(var(--card-bottom, 100px) + 10px); }
+    #controls { top: calc(var(--card-bottom, 100px) + 8px); }
+    #controls button { width: 38px; }
     html.dock-open #credit { visibility: hidden; }
     #credit.own .by { display: none; }
-    /* (the dock already stops 130 px under the card: room for the controls) */
-    #dock { max-height: calc(100% - var(--card-bottom, 120px) - 130px); }
   }
+  @media (prefers-reduced-motion: reduce) { #status .bar div, #loading .bar div { transition: none; } }
 </style>
 <script>
 // The map's look is one of a few styles (styles/<name>.css, .js and .fonts), picked before the
@@ -463,7 +386,7 @@
   if (m) name = m[1];
   else if (names.indexOf(saved) >= 0) name = saved;
   html.setAttribute('data-style', name);
-  // light or dark: as the device is set, unless this browser picked one (in the Style menu)
+  // light or dark: as the device is set, unless this browser picked one (in Customize)
   var theme = null;
   try { theme = localStorage.getItem('peopled-theme'); } catch (e) { /* no storage: as the device */ }
   if (theme === 'light' || theme === 'dark') html.setAttribute('data-theme', theme);
@@ -502,40 +425,55 @@
 </script>
 </head>
 <body>
-<!-- UX: the title card comes first, so Tab starts at the search; it says what this is and what one
-     can do in two lines (the rules and how they were checked are one line, details on demand) -->
+<!-- The search bar comes first, so Tab starts at the search. Under it: the panels its two words
+     open (Customize: the style, the theme and what this page is; share: the link), then one
+     sentence that says what this is and one that says what to do. -->
 <header class="cartouche">
-  <div class="title-row">
-    <h1>The Peopled World</h1>
+  <h1 class="sr-only">People World</h1>
+  <div class="bar">
+    <form id="find" role="search">
+      <input id="search" type="search" placeholder="Find a country" aria-label="Find a country" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="search">
+    </form>
     <div class="tools">
-      <div class="menu-anchor">
-        <button id="style-button" class="quiet" aria-label="Map style" aria-haspopup="true" aria-expanded="false" aria-controls="style-box" title="Style, light or dark"><span class="lbl">Style</span><span class="caret" aria-hidden="true"></span><svg class="ico" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 2.5a7.5 7.5 0 1 0 0 15c1.1 0 1.6-.7 1.6-1.5 0-1.3-1.2-1.5-1.2-2.6 0-.9.7-1.4 1.6-1.4h2.1c1.9 0 3.4-1.4 3.4-3.6C17.5 5.4 14.2 2.5 10 2.5z"/><circle cx="6.2" cy="9" r="1.1"/><circle cx="8.6" cy="5.9" r="1.1"/><circle cx="12.4" cy="6" r="1.1"/></svg></button>
-        <div id="style-box" class="menu" hidden>
-          <div class="menu-label" id="style-head">Style</div>
-          <div class="choices" role="radiogroup" aria-labelledby="style-head">
-            <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="ink"><span class="swatch ink" aria-hidden="true"></span><span class="txt"><span class="nm">Ink</span><span class="ds">a book's endpapers</span></span></button>
-            <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="realm"><span class="swatch realm" aria-hidden="true"></span><span class="txt"><span class="nm">Realm</span><span class="ds">a painted game world</span></span></button>
-          </div>
-          <div class="menu-label" id="theme-head">Theme</div>
-          <div class="themes" role="radiogroup" aria-labelledby="theme-head">
-            <button type="button" role="radio" aria-checked="false" data-pick-theme="light">Light</button>
-            <button type="button" role="radio" aria-checked="false" data-pick-theme="dark">Dark</button>
-            <button type="button" role="radio" aria-checked="false" data-pick-theme="auto" title="As your device is set">Auto</button>
-          </div>
-          <div id="style-note" class="note" role="status" hidden></div>
-        </div>
-      </div>
-      <button id="share" class="quiet" aria-expanded="false" aria-controls="share-box" title="Copy or share a link to this map">Share</button>
-      <button id="card-more" class="quiet" aria-expanded="false" aria-label="About this map">?</button>
+      <button type="button" id="style-button" aria-haspopup="true" aria-expanded="false" aria-controls="style-box" title="The map's style, light or dark, and about this website">Customize...</button>
+      <button type="button" id="share" aria-expanded="false" aria-controls="share-box" title="Copy or share a link to this map">share</button>
     </div>
   </div>
-  <p class="lede">Every country is as large as its people. Neighbours share a border; countries that are not neighbours never touch.</p>
-  <p class="hint" id="hint"><b>Pick a country</b> to see its neighbours and change its borders.</p>
-  <form class="row" id="find" role="search">
-    <input id="search" type="search" placeholder="Find a country" aria-label="Find a country" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="search">
-  </form>
-  <div id="find-note" class="note" role="status" hidden></div>
-  <div id="share-box" hidden>
+  <div id="style-box" class="panel" hidden>
+    <h3>Display</h3>
+    <div class="prow">
+      <div class="plabel" id="style-head">Style</div>
+      <div class="pval choices" role="radiogroup" aria-labelledby="style-head">
+        <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="ink" title="Pen and ink on paper"><span class="swatch ink" aria-hidden="true"></span><span class="nm">ink</span></button>
+        <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="realm" title="A painted relief"><span class="swatch realm" aria-hidden="true"></span><span class="nm">realm</span></button>
+      </div>
+    </div>
+    <div class="prow">
+      <div class="plabel" id="theme-head">Theme</div>
+      <div class="pval themes" role="radiogroup" aria-labelledby="theme-head">
+        <button type="button" role="radio" aria-checked="false" data-pick-theme="light">light</button>
+        <button type="button" role="radio" aria-checked="false" data-pick-theme="dark">dark</button>
+        <button type="button" role="radio" aria-checked="false" data-pick-theme="auto" title="As your device is set">auto</button>
+      </div>
+    </div>
+    <div id="style-note" class="note" role="status" hidden></div>
+    <h3 id="about-head" tabindex="-1">About</h3>
+    <div id="about">
+      <p>This website was created by <a href="https://github.com/anvaka" target="_blank" rel="noopener">@anvaka</a>.
+        It takes the graph of the world's land borders and draws a made-up world from it.</p>
+      <p>Three rules hold on every map: neighbours share a border, countries that are not neighbours never touch,
+        and every country is as large as its population.</p>
+      <p>Click a country to see its neighbours. Remove or add a border, and the world is drawn again.
+        You can also drop a Graphviz <code>.dot</code> file onto this page to see your own graph as a map.</p>
+      <div id="about-body"></div>
+      <p>You can find the entire <a href="https://github.com/anvaka/people-world" target="_blank" rel="noopener">source code here</a>.
+        If you love this website you can also <a href="https://ko-fi.com/anvaka" target="_blank" rel="noopener">buy me a coffee</a> or
+        <a href="https://github.com/sponsors/anvaka" target="_blank" rel="noopener">sponsor me on GitHub</a>, but you don't have to.</p>
+      <p>I hope you like it! Please let me know.</p>
+      <p>With passion,<br>Anvaka</p>
+    </div>
+  </div>
+  <div id="share-box" class="panel" hidden>
     <div class="head"><span id="share-what"></span><button type="button" id="share-close" class="close-x" aria-label="Close sharing">×</button></div>
     <div class="row">
       <input id="share-url" readonly aria-label="Link to this map">
@@ -544,10 +482,12 @@
     <div id="share-note" class="note" role="status"></div>
     <div class="note thanks">Like the map? <a class="support" href="https://ko-fi.com/anvaka" target="_blank" rel="noopener"><svg class="cup" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6.5h8v3.6a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="M11 7.6h1a1.7 1.7 0 0 1 0 3.4h-1.1"/><path d="M5.6 2c-.7.9.7 1.5 0 2.5M8.4 2c-.7.9.7 1.5 0 2.5"/></svg>Buy me a coffee</a></div>
   </div>
-  <details id="about" hidden>
-    <summary><span id="checks"></span></summary>
-    <div id="about-body"></div>
-  </details>
+  <div id="find-note" class="message alert" role="status" hidden></div>
+  <div id="checks" class="message alert" role="status" hidden></div>
+  <div class="message welcome">
+    <p class="lede">This website draws a made-up world: every country is as large as its population, and neighbours still share a border. <a href="#about" data-about>Learn more.</a></p>
+    <p class="hint" id="hint">Click a country to see its neighbours and change its borders.</p>
+  </div>
 </header>
 <div id="stage" tabindex="0" role="region" aria-label="Map" aria-describedby="map-help">
   <div id="plate"><svg id="map" role="img" aria-label="Map of the world's countries drawn from their borders graph">
@@ -556,13 +496,6 @@
   </svg></div>
 </div>
 <p id="map-help" class="sr-only">Arrow keys move the map, plus and minus zoom, 0 shows the whole world, Enter picks the country under the ring in the middle. Without the map: find a country by name; its panel lists its neighbours, lets you visit them and change its borders.</p>
-<svg id="compass" viewBox="-50 -50 100 100" aria-hidden="true">
-  <circle class="ring" r="30" stroke-width="1"/>
-  <circle class="ring" r="26" stroke-width="0.5"/>
-  <path class="ink" d="M0 -46 L7 -7 L0 0 Z M0 46 L-7 7 L0 0 Z M-46 0 L-7 -7 L0 0 Z M46 0 L7 7 L0 0 Z"/>
-  <path class="light" d="M0 -46 L-7 -7 L0 0 Z M0 46 L7 7 L0 0 Z M-46 0 L-7 7 L0 0 Z M46 0 L7 -7 L0 0 Z"/>
-  <text class="ink" y="-34" text-anchor="middle" font-size="11" font-family="Georgia, serif" dy="-10">N</text>
-</svg>
 <div id="controls" role="group" aria-label="Zoom">
   <button type="button" data-zoom="in" aria-label="Zoom in" title="Zoom in (+)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg></button>
   <button type="button" data-zoom="out" aria-label="Zoom out" title="Zoom out (−)"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10"/></svg></button>
@@ -610,7 +543,7 @@
 <div id="ux-stamp" hidden>Before your changes</div>
 <div id="sr-live" class="sr-only" aria-live="polite"></div>
 <div id="tip" hidden></div>
-<div id="loading"><div class="box"><div id="loading-text">Charting the world…</div><div class="bar"><div></div></div><div id="loading-sub"></div></div></div>
+<div id="loading"><div class="box"><div id="loading-text">Drawing the world...</div><div class="bar"><div></div></div><div id="loading-sub"></div></div></div>
 <div id="drop-hint" hidden><div class="box">Drop a DOT file to draw its graph as a map</div></div>
 
 <script type="module">
@@ -1108,9 +1041,9 @@ function updateDetail() {
   if (world.style === currentStyle && skin().view) skin().view(world, state, selected);
 }
 
-// UX: the rectangles of the screen that no panel covers (the title card, the dock), largest
+// UX: the rectangles of the screen that no panel covers (the search bar's corner, the dock), largest
 // first. The map is fitted into one, and a picked country is brought into one, so no panel hides
-// it. With only the title card this gives the two options fit() always had: below it or beside it.
+// it. With only the bar's corner this gives the two options fit() always had: below it or beside it.
 function freeRects() {
   let w = mapWidth = svg.clientWidth, h = mapHeight = svg.clientHeight;
   let covers = [document.querySelector('header.cartouche'), document.getElementById('dock')]
@@ -1130,7 +1063,7 @@ function freeRects() {
 }
 
 // The view that fits the world into the part of the screen no panel covers (UX: was beside or
-// below the title card). A phone's narrow screen gets a narrower margin: the world is wide.
+// below the bar's corner). A phone's narrow screen gets a narrower margin: the world is wide.
 function fitView() {
   // the frame of the world without edits, so before and after line up
   let box = (plain ? plain.world : world).box;
@@ -1402,17 +1335,18 @@ function checkOf(world) {
   return checks.get(world.result);
 }
 
-// UX: the rules and how this map was checked. One line in the title card; the details (each rule,
-// the exclaves explained, keys) open under it.
+// UX: the rules and how this map was checked. The details (each rule, the exclaves explained,
+// keys) are in About, in the Customize panel; a broken rule also says so under the search bar.
 function showChecks(check, exclaves, ms) {
   let ok = check.missing === 0 && check.extra === 0 && check.worst < 0.01;
   let pct = (check.worst * 100).toFixed(2);
-  document.getElementById('checks').textContent = `${ok ? '✓ Rules checked' : '✗ A rule is broken'}: ` +
-    `${check.pairs - check.missing} of ${check.pairs} borders, ${check.extra} false, sizes within ${pct}%`;
-  document.getElementById('about').hidden = false;
+  let alert = document.getElementById('checks');
+  alert.hidden = ok;
+  alert.innerHTML = ok ? '' : `A rule is broken on this map: ${check.pairs - check.missing} of ${check.pairs} borders, ` +
+    `${check.extra} false, sizes within ${pct}%. <a href="#about" data-about>Learn more.</a>`;
   let mark = good => `<span class="${good ? 'ok' : ''}">${good ? '✓' : '✗'}</span>`;
   let which = edits.length ? (showingBefore ? ', before your changes' : `, with your ${edits.length} change${edits.length > 1 ? 's' : ''}`) : '';
-  document.getElementById('about-body').innerHTML = `<ul>
+  document.getElementById('about-body').innerHTML = `<p>This map was checked after it was drawn:</p><ul>
       <li>${mark(check.missing === 0)} Neighbours share a border: ${check.pairs - check.missing} of ${check.pairs} pairs do.</li>
       <li>${mark(check.extra === 0)} Countries that are not neighbours never touch: ${check.extra} false borders.</li>
       <li>${mark(check.worst < 0.01)} Each country's area is its share of ${world.result.measure ? 'all the ' + escapeHtml(world.result.measure) : 'the world\'s people'}, within ${pct}%.</li>
@@ -1421,8 +1355,7 @@ function showChecks(check, exclaves, ms) {
     <p>${exclaves.length} exclaves: no flat map can give every pair of neighbours a border, so ${exclaves.length} borders are made by a detached piece of one country touching the other, like Kaliningrad.</p>
     <p>World ${seed}${which}${ms ? `, drawn in ${(ms / 1000).toFixed(1)} s` : ''}. Each world number draws the same countries differently.` +
     (edits.length && !showingBefore && edited && edited.scratch ? ' Drawn from scratch: the last change didn’t fit into the map as it was, so countries moved.' : '') + `</p>
-    <p>Keys: <kbd>/</kbd> find · arrows, <kbd>+</kbd> <kbd>−</kbd> and <kbd>0</kbd> move the map · <kbd>Enter</kbd> picks the country in the middle · <kbd>B</kbd> before and after · <kbd>Ctrl</kbd> <kbd>Z</kbd> undo · <kbd>Esc</kbd> close.</p>
-    <p>Made by <a href="https://github.com/anvaka" target="_blank" rel="noopener">anvaka</a>; the <a href="https://github.com/anvaka/people-world" target="_blank" rel="noopener">source is on GitHub</a>. If you enjoy the map, you can <a href="https://ko-fi.com/anvaka" target="_blank" rel="noopener">buy me a coffee</a> or <a href="https://github.com/sponsors/anvaka" target="_blank" rel="noopener">sponsor the work on GitHub</a>.</p>`;
+    <p>Keys: <kbd>/</kbd> find · arrows, <kbd>+</kbd> <kbd>−</kbd> and <kbd>0</kbd> move the map · <kbd>Enter</kbd> picks the country in the middle · <kbd>B</kbd> before and after · <kbd>Ctrl</kbd> <kbd>Z</kbd> undo · <kbd>Esc</kbd> close.</p>`;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1965,14 +1898,15 @@ function renderSuggest() {
 function placeSuggest() {
   let input = suggesting.input;
   if (!input.isConnected) { closeSuggest(); return; }
-  let r = input.getBoundingClientRect(), vh = window.visualViewport ? window.visualViewport.height : innerHeight;
+  let bar = input.closest('header .bar'), gap = bar ? 0 : 4;
+  let r = (bar || input).getBoundingClientRect(), vh = window.visualViewport ? window.visualViewport.height : innerHeight;
   let below = vh - r.bottom - 10, above = r.top - 10, up = below < 170 && above > below;
   let w = Math.min(Math.max(r.width, 220), innerWidth - 16);
   suggestList.style.left = `${Math.max(8, Math.min(r.left, innerWidth - w - 8))}px`;
   suggestList.style.width = `${w}px`;
   suggestList.style.maxHeight = `${Math.max(120, Math.min(320, up ? above : below))}px`;
-  suggestList.style.top = up ? '' : `${r.bottom + 4}px`;
-  suggestList.style.bottom = up ? `${innerHeight - r.top + 4}px` : '';
+  suggestList.style.top = up ? '' : `${r.bottom + gap}px`;
+  suggestList.style.bottom = up ? `${innerHeight - r.top + gap}px` : '';
 }
 function openSuggest(input, pick, all) {
   let list = suggestMatches(all ? '' : input.value);
@@ -2128,14 +2062,14 @@ $('edits-toggle').addEventListener('click', () => {
 if (isPhone()) $('edits-toggle').setAttribute('aria-expanded', 'false');   // a phone: one line until opened
 // a touch screen: the whole world is small there, so the hint says how to get closer
 if (window.matchMedia('(pointer: coarse)').matches)
-  $('hint').innerHTML = '<b>Tap a country</b> (pinch to zoom) to see its neighbours and change its borders.';
+  $('hint').textContent = 'Tap a country to see its neighbours and change its borders. Pinch to zoom.';
 
 // Sharing: the address holds the world and the edits. Share opens the phone's share sheet where
 // there is one; elsewhere it copies the link at once and shows it, with what it carries.
 const shareBox = $('share-box'), shareButton = $('share');
 function shareSummary() {
   return edits.length ? `World ${seed} with your ${edits.length} change${edits.length > 1 ? 's' : ''}: ` +
-    edits.map(e => (e.add ? 'added ' : 'removed ') + borderName(e)).join('; ') + '.' : `World ${seed} of The Peopled World.`;
+    edits.map(e => (e.add ? 'added ' : 'removed ') + borderName(e)).join('; ') + '.' : `World ${seed} of People World.`;
 }
 function refreshShare() {
   $('share-url').value = location.href;
@@ -2176,12 +2110,6 @@ shareButton.addEventListener('click', async () => {
 $('share-copy').addEventListener('click', copyLink);
 $('share-close').addEventListener('click', closeShare);
 $('share-url').addEventListener('focus', e => e.target.select());
-$('card-more').addEventListener('click', () => {
-  let open = !html.classList.contains('ux-card-open');
-  html.classList.toggle('ux-card-open', open);
-  $('card-more').setAttribute('aria-expanded', String(open));
-  $('about').open = open;
-});
 
 // The build status in the dock: what is being drawn, a bar, the stage and the time left, and a
 // way to call it off; then what came of it. The first visit's build shows the same in the middle.
@@ -2289,10 +2217,10 @@ function reportDone(from, to, entry, how) {
   else text = `Your ${to.length} changes are drawn.`;
   let sub = '';
   if (to.length && entry && entry.scratch) sub = 'It didn’t fit into the map as it was, so the world was drawn afresh: countries moved.';
-  else if (to.length) sub = 'Hold “Show before” to compare.';
+  else if (to.length) sub = 'Hold “show before” to compare.';
   showStatus(text, sub, {hideAfter: entry && entry.scratch ? 0 : 15000});
   if (selected) requestAnimationFrame(() => ensureVisible(selected));
-  announce((text + ' ' + sub.replace('Hold “Show before” to compare.', '')).trim());
+  announce((text + ' ' + sub.replace('Hold “show before” to compare.', '')).trim());
 }
 
 // Keyboard. On the map: arrows move it, + and − zoom, 0 shows the whole world, Enter picks the
@@ -2340,12 +2268,12 @@ function onEscape(e) {
   e.preventDefault();
 }
 
-// The first look around folds the title card on a phone (the ? opens it again)
+// The first look around takes the welcome under the bar away on a phone (Customize has the rest)
 stage.addEventListener('pointerup', () => { if (gesture && gesture.moved) html.classList.add('ux-explored'); });
 stage.addEventListener('wheel', () => html.classList.add('ux-explored'), {passive: true});
 // a gesture during a glide takes over at once
 ['pointerdown', 'wheel'].forEach(type => stage.addEventListener(type, () => { plate.style.transition = ''; }, {capture: true, passive: true}));
-// Where the title card ends (a phone places the "before" stamp under it) and how much of the
+// Where the bar's corner ends (a phone places the "before" stamp under it) and how much of the
 // screen a phone's keyboard covers (the dock moves up above it)
 new ResizeObserver(() => {
   html.style.setProperty('--card-bottom', Math.round(document.querySelector('header.cartouche').getBoundingClientRect().bottom) + 'px');
@@ -2461,8 +2389,8 @@ function tagged(result) {
   if (doc.measure) result.countries.forEach(c => { c.value = doc.nodes[c.index][5]; });
   return result;
 }
-// The title card, the credit and the map's name say which graph is drawn
-const HOME = {title: document.title, name: document.querySelector('header h1').textContent, lede: document.querySelector('header .lede').textContent,
+// The sentence under the bar, the credit and the map's name say which graph is drawn
+const HOME = {title: document.title, name: document.querySelector('header h1').textContent, lede: document.querySelector('header .lede').innerHTML,
   credit: $('credit-data').innerHTML, map: svg.getAttribute('aria-label'), shown: ''};
 function graphTexts() {
   if (HOME.shown === graphKey) return;
@@ -2471,8 +2399,8 @@ function graphTexts() {
   $('credit').classList.toggle('own', own);
   document.title = own ? `${doc.title} · ${HOME.title}` : HOME.title;
   document.querySelector('header h1').textContent = own ? doc.title : HOME.name;
-  document.querySelector('header .lede').textContent = own
-    ? `Every node is a country, as large as its ${doc.measure}. Linked nodes share a border; nodes that are not linked never touch.` : HOME.lede;
+  document.querySelector('header .lede').innerHTML = own
+    ? `This is a map of <b>${escapeHtml(doc.title)}</b>. Every node is a country, as large as its ${escapeHtml(doc.measure)}, and linked nodes share a border. <a href="#about" data-about>Learn more.</a>` : HOME.lede;
   svg.setAttribute('aria-label', own ? `Map of ${doc.title}: ${doc.about}` : HOME.map);
   if (!own) credit.innerHTML = HOME.credit;
   else {
@@ -2483,7 +2411,7 @@ function graphTexts() {
       let kept = graphMaps.get('');
       location.hash = kept && kept.plain ? linkOf(kept.plain.seed, kept.lastGood, '') : linkOf(1, [], '');
     });
-    // (the file's name only in a wide window: the card's title has it too)
+    // (the file's name only in a wide window: the sentence under the bar has it too)
     let about = doc.about[0].toUpperCase() + doc.about.slice(1), cut = about.indexOf(' from ');
     credit.replaceChildren(cut < 0 ? about : about.slice(0, cut), cut < 0 ? '' : Object.assign(document.createElement('span'), {className: 'wide', textContent: about.slice(cut)}), ' · ', home);
   }
@@ -2564,7 +2492,7 @@ async function chart() {
       select(null);
       let then = edits.length ? `, then your ${edits.length} change${edits.length > 1 ? 's' : ''}` : '';
       let what = graphKey ? (seed === 1 ? '' : `world ${seed} of `) + doc.title : world ? `world ${seed}` : seed === 1 ? 'the world' : `world ${seed}`;
-      startJob(`Charting ${what}${then}…`, plain ? plain.ms : 0, !!world);
+      startJob(`Drawing ${what}${then}...`, plain ? plain.ms : 0, !!world);
       let t0 = performance.now();
       // (a graph from a file may be one the generator never finishes: three minutes, then no more)
       let result = tagged(doc.build ? await buildWithin(180000, doc, seed, jobProgress) : await build(doc, seed, jobProgress));
@@ -2718,7 +2646,7 @@ function importStyle(name) {
 mounted.ready = importStyle(currentStyle);
 
 // What a style adds outside the world's svg (a canvas in #plate, a frame or a legend in the body)
-// is its own to take away when another is picked (its unmount), the compass it furnished included.
+// is its own to take away when another is picked (its unmount).
 // Anything it still leaves in the body or #plate is taken away here and listed in leftovers (the
 // switching test expects none).
 const addedBy = new Map();   // style → the elements it added to the body or #plate
@@ -2803,7 +2731,7 @@ async function setStyle(name, how = {}) {
   }
 }
 
-// The Style menu: a dropdown under the Style button with two radio groups (the arrow keys move
+// Customize: a panel under the bar with two radio groups (the arrow keys move
 // within one, Tab between them): the style, and the theme (light, dark, or as the device is set,
 // kept by this browser; the page's and the styles' colours follow data-theme)
 const styleBox = $('style-box'), styleButton = $('style-button');
@@ -2828,17 +2756,23 @@ function syncPicker(pending) {
 }
 function openStyles() {
   if (!shareBox.hidden) closeShare();
-  styleBox.style.right = '';
   styleBox.hidden = false;
+  styleBox.scrollTop = 0;
   styleButton.setAttribute('aria-expanded', 'true');
   syncPicker();
-  // (on a narrow phone the menu, hung from the button's right edge, would run off the left)
-  let left = styleBox.getBoundingClientRect().left;
-  if (left < 8) styleBox.style.right = `${left - 8}px`;
   styleBox.querySelector('[data-pick-style][aria-checked="true"]').focus({preventScroll: true});
 }
+// "Learn more": the same panel, at what this page is
+document.querySelector('header.cartouche').addEventListener('click', e => {
+  if (!e.target.closest('[data-about]')) return;
+  e.preventDefault();
+  if (styleBox.hidden) openStyles();
+  let head = $('about-head');
+  styleBox.scrollTop = head.offsetTop - styleBox.offsetTop - 4;
+  head.focus({preventScroll: true});
+});
 function closeStyles(refocus = true) {
-  // (the focus goes back to the Style button only from inside the menu: a pick that finishes
+  // (the focus goes back to Customize only from inside the panel: a pick that finishes
   // while you type elsewhere leaves you there)
   let inside = styleBox.contains(document.activeElement) || document.activeElement === styleButton || document.activeElement === document.body;
   styleBox.hidden = true;
@@ -2866,7 +2800,7 @@ function setTheme(name) {
 styleButton.addEventListener('click', () => { if (styleBox.hidden) openStyles(); else closeStyles(); });
 // a press anywhere outside the menu and its button closes it
 document.addEventListener('pointerdown', e => {
-  if (!styleBox.hidden && !e.target.closest('.menu-anchor')) closeStyles(false);
+  if (!styleBox.hidden && !e.target.closest('#style-box, #style-button')) closeStyles(false);
 }, true);
 function radioKeys(button, list, attr, pick) {
   button.addEventListener('keydown', e => {
@@ -2951,7 +2885,7 @@ window.addEventListener('drop', async e => {
 });
 
 chart().catch(failed);
-// the title card grows once its font arrives: fit again then, if the map was not moved yet
+// the bar's corner can grow once a font arrives: fit again then, if the map was not moved yet
 if (document.fonts) document.fonts.ready.then(() => { if (world && !touched) { fit(); updateMarkers(); } });
 </script>
 

@@ -7,13 +7,8 @@
 
 /* ---------------------------------------------------------------- tokens: day */
 html[data-style="ink"] {
-  --paper: #f3e8cc;            /* the chosen realm's panel */
-  --card: #c8d4d3;             /* the title's cartouche: a paler pull of the sea (text on it never blends to a land tint) */
   --sea: #afc0be;              /* the sea: a cool wash over the paper */
   --ink: #2b1d12;              /* iron-gall brown-black */
-  --ink-line: rgba(43, 29, 18, 0.62);
-  --ink-soft: rgba(43, 29, 18, 0.5);
-  --ink-faint: rgba(43, 29, 18, 0.2);
   --shore-ink: rgba(33, 45, 48, 0.62);
   --wave-ink: rgba(33, 45, 48, 0.42);
   --rhumb-ink: rgba(33, 45, 48, 0.22);
@@ -23,11 +18,6 @@ html[data-style="ink"] {
   --rubric: #8c2716;           /* the great realms are lettered in red */
   --accent: #a3301e;
   --veil: rgba(226, 222, 208, 0.66);
-  --chosen-wash: rgba(196, 70, 40, 0.12);
-  --panel: #c8d4d3;
-  --control: transparent;
-  --control-hover: rgba(43, 29, 18, 0.07);
-  --shadow: rgba(60, 40, 15, 0.16);
   --lit: none;
   /* the realms' papers (no two neighbours alike, and as far apart as seven parchments go) and, for
      the fine ribbon inside each border, a deeper shade of the same paper */
@@ -43,13 +33,8 @@ html[data-style="ink"] {
 /* ---------------------------------------------------------------- tokens: night */
 @media (prefers-color-scheme: dark) {
   html[data-style="ink"]:not([data-theme="light"]) {
-    --paper: #19222f;
-    --card: #19222f;
     --sea: #121a27;
     --ink: #eadfc4;
-    --ink-line: rgba(234, 223, 196, 0.62);
-    --ink-soft: rgba(234, 223, 196, 0.45);
-    --ink-faint: rgba(234, 223, 196, 0.16);
     --shore-ink: rgba(170, 196, 210, 0.5);
     --wave-ink: rgba(170, 196, 210, 0.34);
     --rhumb-ink: rgba(170, 196, 210, 0.16);
@@ -59,11 +44,6 @@ html[data-style="ink"] {
     --rubric: #e6bd6c;
     --accent: #e9b85a;
     --veil: rgba(14, 20, 32, 0.66);
-    --chosen-wash: rgba(233, 184, 90, 0.1);
-    --panel: #19222f;
-    --control: transparent;
-    --control-hover: rgba(234, 223, 196, 0.08);
-    --shadow: rgba(0, 0, 0, 0.55);
     --land-0: #334d40; --band-0: #164230;   /* sage */
     --land-1: #515c72; --band-1: #3b4e6e;   /* slate */
     --land-2: #514255; --band-2: #47314e;   /* plum */
@@ -75,13 +55,8 @@ html[data-style="ink"] {
   }
 }
 html[data-style="ink"][data-theme="dark"] {
-  --paper: #19222f;
-  --card: #19222f;
   --sea: #121a27;
   --ink: #eadfc4;
-  --ink-line: rgba(234, 223, 196, 0.62);
-  --ink-soft: rgba(234, 223, 196, 0.45);
-  --ink-faint: rgba(234, 223, 196, 0.16);
   --shore-ink: rgba(170, 196, 210, 0.5);
   --wave-ink: rgba(170, 196, 210, 0.34);
   --rhumb-ink: rgba(170, 196, 210, 0.16);
@@ -91,11 +66,6 @@ html[data-style="ink"][data-theme="dark"] {
   --rubric: #e6bd6c;
   --accent: #e9b85a;
   --veil: rgba(14, 20, 32, 0.66);
-  --chosen-wash: rgba(233, 184, 90, 0.1);
-  --panel: #19222f;
-  --control: transparent;
-  --control-hover: rgba(234, 223, 196, 0.08);
-  --shadow: rgba(0, 0, 0, 0.55);
   --land-0: #334d40; --band-0: #164230;   /* sage */
   --land-1: #515c72; --band-1: #3b4e6e;   /* slate */
   --land-2: #514255; --band-2: #47314e;   /* plum */
@@ -107,7 +77,6 @@ html[data-style="ink"][data-theme="dark"] {
 }
 
 /* ---------------------------------------------------------------- the sheet */
-html[data-style="ink"] body { font-family: 'Sorts Mill Goudy', Georgia, 'Times New Roman', serif; }
 /* the ink's tiles (images in the svg): a band fades in over the one before; a tile added to a band
    on screen fades in */
 html[data-style="ink"] .ink-band { opacity: 1; transition: opacity 0.25s ease-out; pointer-events: none; }
@@ -127,7 +96,6 @@ html[data-style="ink"] .ink-seaname {
   font-family: 'Fondamento', Georgia, serif; font-style: italic; fill: var(--sea-name); text-anchor: middle; pointer-events: none;
   stroke: var(--sea); stroke-width: 0.3em; stroke-linejoin: round; paint-order: stroke;   /* the rhumb lines give way */
 }
-html[data-style="ink"] #compass { display: none; }
 /* the sea: its colour and the paper's grain on the map's plate (ink.js pins the grain to the map) */
 html[data-style="ink"] #plate { background-color: var(--sea); }
 html[data-style="ink"] .sea-fill { fill: transparent; }
@@ -186,103 +154,14 @@ html[data-style="ink"] #ink-frame::after {
   content: ''; position: absolute; inset: 0; border: 6px solid var(--sea);
 }
 
-/* ---------------------------------------------------------------- the title, lettered on the sheet */
-/* (the page places the panels; the style only dresses them) */
-html[data-style="ink"] header.cartouche {
-  background: var(--card); color: var(--ink); border: 1px solid var(--ink); outline: 0; border-radius: 1px;
-  box-shadow: inset 0 0 0 3px var(--card), inset 0 0 0 4px var(--ink-soft), 0 3px 14px var(--shadow);
-  padding: 12px 18px 12px;
-}
-html[data-style="ink"] header h1 {
-  font-family: 'Eagle Lake', 'Fondamento', Georgia, serif; font-weight: 400; font-size: 30px; line-height: 1.12; text-wrap: balance;
-  letter-spacing: 0.01em; margin: 0; color: var(--ink); text-align: center;
-}
-html[data-style="ink"] header h1::after {
-  content: ''; display: block; height: 13px; margin: 5px auto 6px; width: min(78%, 270px);
-  background: var(--ink);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 16'%3E%3Cpath d='M 127 7.3 C 160 6.3 198 6.5 220 7.3 C 229 7.7 233.5 5.2 231 3.1 C 229 1.6 225.8 3 227.4 4.7 C 228.6 5.8 230.6 4.9 230.1 3.8 C 233.4 6.4 229.4 9.7 221 8.7 C 198 9.5 160 9.7 127 8.7 Z M 113 7.3 C 80 6.3 42 6.5 20 7.3 C 11 7.7 6.5 5.2 9 3.1 C 11 1.6 14.2 3 12.6 4.7 C 11.4 5.8 9.4 4.9 9.9 3.8 C 6.6 6.4 10.6 9.7 19 8.7 C 42 9.5 80 9.7 113 8.7 Z M 120 2.5 L 125.5 8 L 120 13.5 L 114.5 8 Z M 106.4 8 a 1.6 1.6 0 1 0 3.2 0 a 1.6 1.6 0 1 0 -3.2 0 M 130.4 8 a 1.6 1.6 0 1 0 3.2 0 a 1.6 1.6 0 1 0 -3.2 0' fill='black'/%3E%3C/svg%3E") center / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 16'%3E%3Cpath d='M 127 7.3 C 160 6.3 198 6.5 220 7.3 C 229 7.7 233.5 5.2 231 3.1 C 229 1.6 225.8 3 227.4 4.7 C 228.6 5.8 230.6 4.9 230.1 3.8 C 233.4 6.4 229.4 9.7 221 8.7 C 198 9.5 160 9.7 127 8.7 Z M 113 7.3 C 80 6.3 42 6.5 20 7.3 C 11 7.7 6.5 5.2 9 3.1 C 11 1.6 14.2 3 12.6 4.7 C 11.4 5.8 9.4 4.9 9.9 3.8 C 6.6 6.4 10.6 9.7 19 8.7 C 42 9.5 80 9.7 113 8.7 Z M 120 2.5 L 125.5 8 L 120 13.5 L 114.5 8 Z M 106.4 8 a 1.6 1.6 0 1 0 3.2 0 a 1.6 1.6 0 1 0 -3.2 0 M 130.4 8 a 1.6 1.6 0 1 0 3.2 0 a 1.6 1.6 0 1 0 -3.2 0' fill='black'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
-}
-html[data-style="ink"] header p { font-style: italic; font-size: 14.5px; line-height: 1.38; margin: 0; text-align: center; color: var(--ink); }
-html[data-style="ink"] header .row { justify-content: center; margin-top: 10px; }
-html[data-style="ink"] button,
-html[data-style="ink"] input {
-  font-family: 'Sorts Mill Goudy', Georgia, serif; color: var(--ink); background: var(--control);
-  border: 1px solid var(--ink-soft); border-radius: 2px; height: 32px;
-}
-html[data-style="ink"] header input, html[data-style="ink"] header button { background: transparent; }
-html[data-style="ink"] button { font-family: 'Fondamento', Georgia, serif; font-size: 14px; letter-spacing: 0.03em; padding: 0 12px; }
-html[data-style="ink"] button:hover { background: var(--control-hover); border-color: var(--ink); }
-html[data-style="ink"] input { font-style: italic; font-size: 14.5px; }
-html[data-style="ink"] input::placeholder { color: var(--ink-soft); }
-html[data-style="ink"] button:focus-visible, html[data-style="ink"] input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-html[data-style="ink"] #checks { font-style: italic; font-size: 12.5px; text-align: center; color: var(--ink); opacity: 0.8; margin-top: 8px; }
-html[data-style="ink"] #checks b { color: var(--accent); font-weight: 400; }
-html[data-style="ink"] #edits { border-top: 1px solid var(--ink-faint); font-size: 13.5px; }
-html[data-style="ink"] #edits li span { font-style: italic; }
-html[data-style="ink"] #edits .row { justify-content: center; }
-html[data-style="ink"] button.mini { height: 24px; font-size: 15px; padding: 0 8px; font-family: 'Sorts Mill Goudy', Georgia, serif; }
-/* Fondamento's × is a small tick: the dismiss buttons take Goudy's, as the panel's × does */
-html[data-style="ink"] button.close-x { font-family: 'Sorts Mill Goudy', Georgia, serif; font-size: 19px; }
-
-/* the Style menu and the country suggestions: slips of the title's card, inked round */
-html[data-style="ink"] #style-box.menu,
-html[data-style="ink"] .suggest {
-  background: var(--card); color: var(--ink); border: 1px solid var(--ink); border-radius: 1px;
-  box-shadow: inset 0 0 0 3px var(--card), inset 0 0 0 4px var(--ink-soft), 0 6px 18px var(--shadow);
-}
-html[data-style="ink"] #style-box.menu { padding: 10px; }
-html[data-style="ink"] #style-box .menu-label { font-family: 'Fondamento', Georgia, serif; }
-html[data-style="ink"] #style-box .ds { font-family: 'Sorts Mill Goudy', Georgia, serif; font-size: 13px; }
-html[data-style="ink"] #style-box button.choice { border-radius: 1px; }
-html[data-style="ink"] .suggest { font-family: 'Sorts Mill Goudy', Georgia, serif; padding: 5px; }
-
-/* ---------------------------------------------------------------- the chosen realm's slip, the status
-   slip: the same sea-tinted card as the title (no panel takes a land tint: text on it would blend
-   through one) */
-html[data-style="ink"] #info, html[data-style="ink"] #status {
-  background: var(--card); color: var(--ink); border: 1px solid var(--ink); outline: 0; border-radius: 1px;
-  box-shadow: inset 0 0 0 3px var(--card), inset 0 0 0 4px var(--ink-soft), 0 4px 18px var(--shadow);
-}
-html[data-style="ink"] #info { padding: 14px 18px 12px; font-size: 14.5px; }
-html[data-style="ink"] #info h2 {
-  font-family: 'Fondamento', Georgia, serif; font-weight: 400; font-size: 22px; letter-spacing: 0.12em; text-transform: uppercase;
-  margin-bottom: 2px;
-}
-html[data-style="ink"] #info h2::after {
-  content: ''; display: block; height: 9px; margin: 5px 0 3px; width: 150px; background: var(--ink);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 16'%3E%3Cpath d='M 127 7.3 C 160 6.3 198 6.5 220 7.3 C 229 7.7 233.5 5.2 231 3.1 C 229 1.6 225.8 3 227.4 4.7 C 228.6 5.8 230.6 4.9 230.1 3.8 C 233.4 6.4 229.4 9.7 221 8.7 C 198 9.5 160 9.7 127 8.7 Z M 113 7.3 C 80 6.3 42 6.5 20 7.3 C 11 7.7 6.5 5.2 9 3.1 C 11 1.6 14.2 3 12.6 4.7 C 11.4 5.8 9.4 4.9 9.9 3.8 C 6.6 6.4 10.6 9.7 19 8.7 C 42 9.5 80 9.7 113 8.7 Z M 120 2.5 L 125.5 8 L 120 13.5 L 114.5 8 Z M 106.4 8 a 1.6 1.6 0 1 0 3.2 0 a 1.6 1.6 0 1 0 -3.2 0 M 130.4 8 a 1.6 1.6 0 1 0 3.2 0 a 1.6 1.6 0 1 0 -3.2 0' fill='black'/%3E%3C/svg%3E") left center / 100% 100% no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 16'%3E%3Cpath d='M 127 7.3 C 160 6.3 198 6.5 220 7.3 C 229 7.7 233.5 5.2 231 3.1 C 229 1.6 225.8 3 227.4 4.7 C 228.6 5.8 230.6 4.9 230.1 3.8 C 233.4 6.4 229.4 9.7 221 8.7 C 198 9.5 160 9.7 127 8.7 Z M 113 7.3 C 80 6.3 42 6.5 20 7.3 C 11 7.7 6.5 5.2 9 3.1 C 11 1.6 14.2 3 12.6 4.7 C 11.4 5.8 9.4 4.9 9.9 3.8 C 6.6 6.4 10.6 9.7 19 8.7 C 42 9.5 80 9.7 113 8.7 Z M 120 2.5 L 125.5 8 L 120 13.5 L 114.5 8 Z M 106.4 8 a 1.6 1.6 0 1 0 3.2 0 a 1.6 1.6 0 1 0 -3.2 0 M 130.4 8 a 1.6 1.6 0 1 0 3.2 0 a 1.6 1.6 0 1 0 -3.2 0' fill='black'/%3E%3C/svg%3E") left center / 100% 100% no-repeat;
-}
-html[data-style="ink"] #info .close { border: 0; font-size: 22px; letter-spacing: 0; right: 8px; top: 8px; background: none; font-family: 'Sorts Mill Goudy', Georgia, serif; }
-html[data-style="ink"] #info ul.nbrs li { border-bottom: 1px dotted var(--ink-faint); }
-html[data-style="ink"] #info .note { color: var(--ink); opacity: 0.85; }
-html[data-style="ink"] #tip { background: var(--card); border: 1px solid var(--ink-soft); font-style: italic; font-size: 13.5px; box-shadow: 0 2px 8px var(--shadow); }
-html[data-style="ink"] #loading .box, html[data-style="ink"] #drop-hint .box {
-  background: var(--card); border: 1px solid var(--ink);
-  box-shadow: inset 0 0 0 3px var(--card), inset 0 0 0 4px var(--ink-soft), 0 3px 14px var(--shadow);
-  font-style: italic; padding: 16px 24px;
-}
-html[data-style="ink"] #loading .bar { height: 3px; background: var(--ink-faint); margin-top: 10px; }
-html[data-style="ink"] #loading .bar div { background: var(--ink); }
-html[data-style="ink"] #credit {
-  font-size: 11.5px;
-  color: color-mix(in srgb, var(--ink) 78%, var(--sea)); padding: 1px 6px; background: color-mix(in srgb, var(--sea) 64%, transparent); border-radius: 2px;
-}
-/* (the one link that asks for something is in full ink: the accent is too faint on the sea) */
-html[data-style="ink"] #credit a.support { color: var(--ink); }
+/* ---------------------------------------------------------------- the page's controls */
+/* (the page draws its own controls, the same in every style. The sheet's frame takes the first
+   few pixels of the window, so they sit inside it.) */
+html[data-style="ink"] { --edge: 18px; }
 html:not([data-style="ink"]) #ink-frame { display: none; }
 
 @media (max-width: 600px) {
-  html[data-style="ink"] header.cartouche { padding: 8px 10px 8px; }
-  html[data-style="ink"] header h1 { font-size: 23px; }
-  html[data-style="ink"] header h1::after { height: 10px; margin: 3px auto 4px; }
-  html[data-style="ink"] header p { font-size: 12.5px; }
-  html[data-style="ink"] header .row { margin-top: 7px; }
-  html[data-style="ink"] #checks { font-size: 11.5px; margin-top: 5px; }
+  html[data-style="ink"] { --edge: 12px; }
   html[data-style="ink"] #ink-frame::before { inset: 4px; border-width: 1.5px; box-shadow: 0 0 0 4px var(--sea), inset 0 0 0 2px var(--sea), inset 0 0 0 3px var(--ink); }
   html[data-style="ink"] #ink-frame::after { border-width: 4px; }
-  html[data-style="ink"] #info { padding: 11px 14px 10px; font-size: 14px; }
-  html[data-style="ink"] #info h2 { font-size: 18px; }
-  html[data-style="ink"] #info ul.nbrs li { min-height: 36px; }
-  html[data-style="ink"] button.mini { height: 30px; min-width: 34px; }
-  html[data-style="ink"] #credit { font-size: 10.5px; }
 }
