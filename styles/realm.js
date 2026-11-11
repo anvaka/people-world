@@ -564,7 +564,7 @@ function markerNames(world, state, selected) {
       panelsDue = false;
       if (!active()) return;
       panels = [];
-      for (let sel of ['header.cartouche', '#info', '#compass', '#realm-scale', '#credit']) {
+      for (let sel of ['header.cartouche', '#info', '#realm-scale', '#credit']) {
         let el = document.querySelector(sel), r = el && !el.hidden && el.getBoundingClientRect();
         if (r && r.width) panels.push([r.left - 4, r.top - 4, r.right + 4, r.bottom + 4]);
       }
@@ -630,8 +630,9 @@ function scale(world, k) {
   if (!legend) return;
   let perPerson = world.realm.land / world.realm.people;
   // (a graph from a file is sized by something else than people: the square is a share of it)
-  let measure = world.result.measure;
-  let sizes = measure ? SHARES.map(p => ({n: p / 100 * world.realm.people, words: p + '% of it'})) : NUMBERS.map(n => ({n, words: WORDS(n) + ' people'}));
+  // (and the countries sized by land or GDP come with round amounts of that: result.legend)
+  let measure = world.result.measure, given = world.result.legend;
+  let sizes = given ? given.steps : measure ? SHARES.map(p => ({n: p / 100 * world.realm.people, words: p + '% of it'})) : NUMBERS.map(n => ({n, words: WORDS(n) + ' people'}));
   let best = null;
   for (let size of sizes) {
     let side = k * Math.sqrt(size.n * perPerson);
@@ -642,24 +643,14 @@ function scale(world, k) {
   let s = Math.max(2, Math.min(34, best.side));
   legend.square.style.width = legend.square.style.height = s + 'px';
   legend.box.hidden = false;
-  let cap = 'Land is ' + (measure || 'people');
+  let cap = given ? given.cap : 'Land is ' + (measure || 'people');
   if (legend.cap.textContent !== cap) legend.cap.textContent = cap;
   if (legend.text.textContent !== best.words) legend.text.textContent = best.words;
 }
 
 // ---------------------------------------------------------------------------------------------
-// The furniture: compass star, title, legend
-const COMPASS = `
-<circle class="ring" r="30" stroke-width="1.2"/>
-<circle class="ring thin" r="25.5" stroke-width="0.5"/>
-${Array.from({length: 32}, (_, i) => { let a = i * Math.PI / 16, r0 = i % 4 === 0 ? 26.5 : 28; return `<line class="tick" x1="${(Math.sin(a) * r0).toFixed(2)}" y1="${(-Math.cos(a) * r0).toFixed(2)}" x2="${(Math.sin(a) * 30).toFixed(2)}" y2="${(-Math.cos(a) * 30).toFixed(2)}"/>`; }).join('')}
-${[45, 135, 225, 315].map(d => `<g transform="rotate(${d})"><path class="lite" d="M0 -27 L3.2 -4 L0 0 Z"/><path class="dark" d="M0 -27 L-3.2 -4 L0 0 Z"/></g>`).join('')}
-${[0, 90, 180, 270].map(d => `<g transform="rotate(${d})"><path class="lite" d="M0 -44 L5.4 -5.4 L0 0 Z"/><path class="${d ? 'dark' : 'north'}" d="M0 -44 L-5.4 -5.4 L0 0 Z"/></g>`).join('')}
-<circle class="hub" r="3"/>
-<text class="n" y="-47" text-anchor="middle">N</text>`;
-
-// ---- mounting: the painted layer, the compass star, the legend, and what watches the page
-let saved = null, watchers = [];
+// ---- mounting: the painted layer, the legend, and what watches the page
+let watchers = [];
 function mount() {
   if (mounted || !active()) return;
   mounted = true;
@@ -672,12 +663,6 @@ function mount() {
     let t = createTerrain(plate, svg, {force: /realm-gl/.test(query()), adapt: /realm-adapt/.test(query()), onLost: goFlat});
     if (t && !t.software) terrain = t;
     else { software = t ? t.software : ''; stats.software = software; goFlat(); }
-  }
-  let compass = document.getElementById('compass');
-  if (compass) {
-    saved = {viewBox: compass.getAttribute('viewBox'), html: compass.innerHTML};
-    compass.setAttribute('viewBox', '-50 -58 100 108');
-    compass.innerHTML = COMPASS;
   }
   if (!document.getElementById('realm-scale')) {
     let box = document.createElement('div');
@@ -704,7 +689,7 @@ function mount() {
     () => removeEventListener('resize', onResize)];
 }
 // Leaves the page as if the style had never run: the canvas and its GL context go, the worker
-// stops, the watchers stop, the compass and the legend are as they were
+// stops, the watchers stop, and the legend is as it was
 function unmount() {
   if (!mounted) return;
   mounted = false;
@@ -718,12 +703,6 @@ function unmount() {
   worker = null;
   jobs.forEach(job => job.reject(new Error('the style was switched away')));
   jobs.clear();
-  let compass = document.getElementById('compass');
-  if (compass && saved) {
-    if (saved.viewBox === null) compass.removeAttribute('viewBox'); else compass.setAttribute('viewBox', saved.viewBox);
-    compass.innerHTML = saved.html;
-  }
-  saved = null;
   let box = document.getElementById('realm-scale');
   if (box) box.remove();
   legend = null;
