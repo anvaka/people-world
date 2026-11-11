@@ -75,9 +75,10 @@ node tools/check.mjs
   countries come out stretched. By GDP the first three worlds have 24 to 29.
 - By land area Saint Martin (53 km², half of a small island) is too small to draw to its size:
   it comes out up to twice as large, and the page says so.
-- The World Bank has no GDP figure for 37 countries and territories (North Korea and Taiwan
-  among them). They get an estimate, their population times the median GDP per person, and the
-  page marks it as one. For those two it is far off.
+- The World Bank has no GDP figure for 37 countries and territories. For 22 of them (Taiwan and
+  North Korea among them) the figure is from another source, listed in `gdp.json`. The other 15
+  are small territories with no figure anywhere, or with nobody living there: they get an
+  estimate, their population times the median GDP per person, and the page marks it as one.
 - An edit reshapes many countries, not only the edited ones.
 - At whole-world zoom many countries are smaller than a pixel: populations range from a few dozen
   people to 1.4 billion. A small ring marks each country that is too small to see.
@@ -87,7 +88,10 @@ node tools/check.mjs
 
 - Countries, populations, land areas and land neighbours: [GeoNames](https://www.geonames.org/),
   CC BY 4.0.
-- GDP: [World Bank](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD), CC BY 4.0.
+- GDP: [World Bank](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD), CC BY 4.0. Where it
+  has no figure: Taiwan's and North Korea's statistics as reported, INSEE and IEDOM for the
+  French territories, the UN, and the territories' own statistics offices (each is named in
+  [gdp.json](gdp.json)).
 - [Delaunator](https://github.com/mapbox/delaunator) and [earcut](https://github.com/mapbox/earcut)
   by Mapbox, [robust-predicates](https://github.com/mourner/robust-predicates) by Vladimir
   Agafonkin.

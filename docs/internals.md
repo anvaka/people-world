@@ -48,9 +48,17 @@ generator works at the scale it was made for.
   measure is not drawn: Antarctica has land and no people.
 - **GDP** is in `gdp.json`: current US dollars, the most recent year the World Bank has for each
   country (most are 2025; a few are years older). `node tools/gdp.mjs` makes the file again.
-  For the 37 countries and territories without a figure it puts their population times the
-  median GDP per person, and lists them under `estimated`. That is far off for some: North
-  Korea comes out too large and Taiwan too small.
+  The World Bank has no figure for 37 of the countries and territories here. For 22 of them
+  `tools/gdp-others.json` has one from elsewhere, with its source and year: Taiwan (its
+  statistics office), North Korea (the Bank of Korea's estimate), the French overseas
+  departments and collectivities (INSEE, IEDOM, IEOM), Jersey and Guernsey (the World Bank's
+  figure for the Channel Islands, shared between them), and others from the UN or their own
+  statistics offices. A figure published in euros or pounds is converted at about that year's
+  average rate. The last 15 (Western Sahara, a few small territories, and places nobody lives
+  in) get their population times the median GDP per person, and are listed under `estimated`;
+  the page marks those. France's figure includes its overseas departments and Finland's
+  includes Åland, which are also on the map on their own: about 0.05% of the world's GDP is
+  counted twice.
 - The population map stops when a country can't be drawn to its size. The other two leave it a
   little large and say so in About (`build: {lenient: true}`). By land area that is Saint
   Martin, 53 km² on an island it shares with Sint Maarten: up to twice its size.
@@ -255,12 +263,14 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 | `gdp.json` | each country's GDP (World Bank), for the map sized by it |
 | `vendor/` | Delaunator, the `orient2d` predicate from robust-predicates, earcut (Realm's triangles) |
 | `tools/check.mjs` | builds worlds and checks the rules |
-| `tools/gdp.mjs` | makes `gdp.json` from the World Bank's figures |
+| `tools/gdp.mjs` | makes `gdp.json` from the World Bank's figures and `tools/gdp-others.json` |
+| `tools/gdp-others.json` | GDP figures from other sources, for countries the World Bank has none for |
 
 ## Credits
 
 - GDP: [World Bank](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD) (indicator
-  `NY.GDP.MKTP.CD`), CC BY 4.0.
+  `NY.GDP.MKTP.CD`), CC BY 4.0; for countries it has no figure for, the sources named in
+  `tools/gdp-others.json`.
 - Countries, populations, land areas and land neighbours: [GeoNames](https://www.geonames.org/)
   ([countryInfo.txt](https://download.geonames.org/export/dump/countryInfo.txt)), CC BY 4.0.
   Left out of that list: Serbia and Montenegro and the Netherlands Antilles, which no longer

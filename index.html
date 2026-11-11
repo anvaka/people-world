@@ -2461,7 +2461,8 @@ function graphTexts() {
   if (!own) {
     // whose figures: GeoNames has the people and the land; GDP is the World Bank's
     credit.innerHTML = graphKey === 'gdp' ? HOME.credit.replace(', neighbours and populations', ' and neighbours') +
-        ' · GDP: <a href="https://data.worldbank.org/indicator/NY.GDP.MKTP.CD" target="_blank" rel="noopener">World Bank</a>, CC BY 4.0'
+        ' · GDP: <a href="https://data.worldbank.org/indicator/NY.GDP.MKTP.CD" target="_blank" rel="noopener">World Bank</a>, CC BY 4.0' +
+        '<span class="wide">, and <a href="./gdp.json" target="_blank" rel="noopener" title="Where the figure is from for each country the World Bank has none for">others</a></span>'
       : graphKey === 'land' ? HOME.credit.replace('populations', 'land areas') : HOME.credit;
   } else {
     let home = Object.assign(document.createElement('a'), {href: linkOf(1, [], ''), textContent: 'The world’s countries'});

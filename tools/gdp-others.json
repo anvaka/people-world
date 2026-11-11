@@ -1,0 +1,28 @@
+{
+ "about": "GDP figures for countries and territories the World Bank has none for, each from the source named. Values are US dollars; a figure published in another currency is converted at about that year's average exchange rate, and the entry says so. tools/gdp.mjs reads this file.",
+ "note": "France's World Bank figure includes its five overseas departments (RE, GP, MQ, GF, YT) and Finland's includes Åland (AX). They are on the map on their own as well, so about 0.05% of the world's GDP is counted twice.",
+ "figures": {
+  "TW": {"value": 920000000000, "year": 2025, "source": "DGBAS (Taiwan's statistics office): GDP per person of US$39,477 in 2025, times the population", "url": "https://ocacnews.net/article/418912"},
+  "KP": {"value": 32000000000, "year": 2024, "source": "Bank of Korea estimate of North Korea's nominal gross national income: 44.4 trillion won", "url": "https://www.koreatimes.co.kr/amp/foreignaffairs/northkorea/20250829/n-korean-economy-logs-fastest-growth-in-8-years-in-2024-bok"},
+  "RE": {"value": 25100000000, "year": 2023, "source": "INSEE: 23.2 billion euros, at 1.08 US$ to the euro", "url": "https://www.insee.fr/fr/statistiques/2012723"},
+  "GP": {"value": 11200000000, "year": 2023, "source": "IEDOM: about 10.4 billion euros, at 1.08 US$ to the euro", "url": "https://www.iedom.fr/IMG/pdf/iedom_ra_24_-chiffres-cles.pdf"},
+  "MQ": {"value": 10900000000, "year": 2023, "source": "IEDOM: about 10.1 billion euros, at 1.08 US$ to the euro", "url": "https://www.iedom.fr/IMG/pdf/iedom_ra_24_-chiffres-cles.pdf"},
+  "GF": {"value": 5400000000, "year": 2023, "source": "IEDOM: about 5.0 billion euros, at 1.08 US$ to the euro", "url": "https://www.iedom.fr/IMG/pdf/iedom_ra_24_-chiffres-cles.pdf"},
+  "YT": {"value": 3670000000, "year": 2021, "source": "IEDOM: 3.1 billion euros, at 1.18 US$ to the euro", "url": "https://www.iedom.fr/IMG/pdf/iedom_ra_24_-chiffres-cles.pdf"},
+  "JE": {"value": 8172000000, "year": 2023, "source": "World Bank figure for the Channel Islands (12.51 billion US$), shared by the islands' own GDP: Jersey 6,575 and Guernsey 3,488 million pounds", "url": "https://www.gov.je/News/2024/Pages/MeasuringJerseysEconomy2023.aspx"},
+  "GG": {"value": 4335000000, "year": 2023, "source": "World Bank figure for the Channel Islands (12.51 billion US$), shared by the islands' own GDP: Jersey 6,575 and Guernsey 3,488 million pounds", "url": "https://www.islandfm.com/news/guernsey/guernseys-economy-worth-3-48-billion1/"},
+  "GI": {"value": 3650000000, "year": 2023, "source": "Government of Gibraltar: 2,901 million pounds in 2023/24, at 1.26 US$ to the pound", "url": "https://www.gibraltar.gov.gi/uploads/statistics/2025/National%20Accounts/GDP%20Estimates%202010%20-%2011%20-%202024-25.pdf"},
+  "VG": {"value": 1505900000, "year": 2023, "source": "United Nations national accounts, as republished by Worldometers", "url": "https://www.worldometers.info/gdp/british-virgin-islands-gdp/"},
+  "AX": {"value": 1417000000, "year": 2016, "source": "ÅSUB (Statistics Åland): about 1,280 million euros, at 1.11 US$ to the euro", "url": "https://www.asub.ax/sites/default/files/statistics/bnp_meddelande_2016_.pdf"},
+  "BQ": {"value": 803000000, "year": 2022, "source": "Statistics Netherlands: Bonaire 662, Sint Eustatius 92 and Saba 49 million US$", "url": "https://www.cbs.nl/en-gb/figures/detail/84789ENG"},
+  "BL": {"value": 488000000, "year": 2014, "source": "IEDOM and AFD: 367 million euros, at 1.33 US$ to the euro", "url": "https://www.iedom.fr/IMG/pdf/note_pib_saint-barth-2014_afd_iedom.pdf"},
+  "AI": {"value": 415700000, "year": 2023, "source": "United Nations national accounts, as republished by Worldometers", "url": "https://www.worldometers.info/gdp/anguilla-gdp/"},
+  "FK": {"value": 368000000, "year": 2024, "source": "Falkland Islands Government national accounts: 288 million pounds, at 1.28 US$ to the pound", "url": "https://en.mercopress.com/2025/08/11/falklands-gross-national-income-per-capita-58-749-in-2024-fig-national-accounts"},
+  "CK": {"value": 366200000, "year": 2023, "source": "United Nations national accounts, as republished by Worldometers", "url": "https://www.worldometers.info/gdp/cook-islands-gdp/"},
+  "PM": {"value": 266000000, "year": 2015, "source": "IEDOM and AFD: 240 million euros, at 1.11 US$ to the euro", "url": "https://www.iedom.fr/IMG/pdf/cp_pib_spm.pdf"},
+  "WF": {"value": 212000000, "year": 2019, "source": "IEOM: 22.6 billion CFP francs (189.4 million euros), at 1.12 US$ to the euro", "url": "https://www.ieom.fr/IMG/pdf/cp_pib_wf_2019_vf.pdf"},
+  "MS": {"value": 80400000, "year": 2023, "source": "United Nations national accounts, as republished by Worldometers", "url": "https://www.worldometers.info/gdp/montserrat-gdp/"},
+  "SH": {"value": 52000000, "year": 2024, "source": "St Helena Statistics Office: 40.7 million pounds in 2024/25, at 1.28 US$ to the pound", "url": "https://www.sainthelena.gov.sh/statistical-update-gross-domestic-product-2425/"},
+  "NU": {"value": 31000000, "year": 2019, "source": "Asian Development Bank: 47 million New Zealand dollars, at 0.66 US$ to the dollar", "url": "https://www.adb.org/sites/default/files/institutional-document/752631/niue-country-classification.pdf"}
+ }
+}
