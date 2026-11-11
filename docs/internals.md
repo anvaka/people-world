@@ -141,8 +141,9 @@ moved.
 
 ## Styles
 
-A style draws the map and leaves the page's controls alone: those look the same in every style
-(`--ui-*` in `index.html`). Each style is three files in `styles/`: `<name>.css`, with every rule under
+A style draws the map. The page's controls are built the same in every style; a style may set
+only their colours (`--ui-*` in `index.html`: ink tints the panels like its paper and uses its
+red) and their distance from the window's edge (`--edge`). Each style is three files in `styles/`: `<name>.css`, with every rule under
 `html[data-style="<name>"]`; `<name>.js`, a module that registers `window.mapStyles[<name>]`; and
 `<name>.fonts`, the Google Fonts address it needs. Only the chosen style loads with the page; the
 others load the first time they are picked. The page calls a style's hooks: `render(world)` once

@@ -118,10 +118,11 @@
   /* =========================================================================================
      The controls: the search bar and its panels (top left), the dock (the build in progress,
      your changes, the country panel: bottom right, a sheet at the bottom of a phone), zoom and
-     the credit. They look the same whichever style draws the map: white, square, sans-serif,
-     and one pink for whatever can be pressed. A style's stylesheet draws the map and leaves
-     these alone; it may only say how far from the window's edge they sit (--edge), when it
-     frames the sheet. Layout and controls only: nothing here draws the map, except .hot (the
+     the credit. They are built the same whichever style draws the map: square panels with a
+     soft shadow, sans-serif type, and one colour for whatever can be pressed (white and pink,
+     unless a style says otherwise). A style's stylesheet draws the map; of the controls it may
+     set only their colours (--ui-*) and how far from the window's edge they sit (--edge), when
+     it frames the sheet. Layout and controls only: nothing here draws the map, except .hot (the
      border a neighbour's row points at, at the end).
      ========================================================================================= */
   :root {

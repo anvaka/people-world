@@ -8,6 +8,10 @@
 /* ---------------------------------------------------------------- tokens: day */
 html[data-style="ink"] {
   --sea: #afc0be;              /* the sea: a cool wash over the paper */
+  /* the page's controls on this sheet: panels tinted like its paper, and its red (not the page's
+     pink, which fights the reds of the map) for whatever can be pressed */
+  --ui-bg: #f3efe4; --ui-soft: #e9e4d6; --ui-text: #2b1d12; --ui-text-2: rgba(43, 29, 18, 0.62);
+  --ui-line: rgba(43, 29, 18, 0.14); --ui-accent: #a3301e;
   --ink: #2b1d12;              /* iron-gall brown-black */
   --shore-ink: rgba(33, 45, 48, 0.62);
   --wave-ink: rgba(33, 45, 48, 0.42);
@@ -33,6 +37,7 @@ html[data-style="ink"] {
 /* ---------------------------------------------------------------- tokens: night */
 @media (prefers-color-scheme: dark) {
   html[data-style="ink"]:not([data-theme="light"]) {
+    --ui-accent: #ff4081;       /* (night: the page's dark panels, and its pink: the red is too dark on them) */
     --sea: #121a27;
     --ink: #eadfc4;
     --shore-ink: rgba(170, 196, 210, 0.5);
@@ -55,6 +60,7 @@ html[data-style="ink"] {
   }
 }
 html[data-style="ink"][data-theme="dark"] {
+  --ui-accent: #ff4081;       /* (night: the page's dark panels, and its pink: the red is too dark on them) */
   --sea: #121a27;
   --ink: #eadfc4;
   --shore-ink: rgba(170, 196, 210, 0.5);
@@ -155,8 +161,8 @@ html[data-style="ink"] #ink-frame::after {
 }
 
 /* ---------------------------------------------------------------- the page's controls */
-/* (the page draws its own controls, the same in every style. The sheet's frame takes the first
-   few pixels of the window, so they sit inside it.) */
+/* (the page draws its own controls; this style only tints them, in the tokens at the top. The
+   sheet's frame takes the first few pixels of the window, so they sit inside it.) */
 html[data-style="ink"] { --edge: 18px; }
 html:not([data-style="ink"]) #ink-frame { display: none; }
 
