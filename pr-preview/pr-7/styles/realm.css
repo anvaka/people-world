@@ -1,0 +1,161 @@
+/* The realm: a painted world map. Everything is scoped to html[data-style="realm"]. The land and
+   sea are painted on a canvas under the SVG (styles/realm-terrain.js); the countries' tints multiply
+   over it. By day a sunlit world in full colour; by night the same world under the moon, with the
+   lights of its people. */
+
+/* ---------------------------------------------------------------- tokens: day */
+html[data-style="realm"] {
+  --sea: #1f4d72;
+  --ink: #2a1c10;
+  --label: #24170c;
+  --halo: rgba(252, 246, 232, 0.6);
+  --halo-small: rgba(252, 246, 232, 0.66);
+  --coast: rgba(36, 30, 24, 0.82);
+  --border: #2a1d12;
+  --gold: #e0a93a;
+  --ribbon: rgba(255, 196, 64, 0.62);
+  --accent: #a3271c;
+  --fog: #ebe8e1;
+  --lit: none;
+  --realm-c0: #df8a83; --realm-c1: #aa95d1; --realm-c2: #f2de14; --realm-c3: #c890c4;
+  --realm-c4: #80be9c; --realm-c5: #f2b078; --realm-c6: #e993b6; --realm-c7: #c39f80;
+  --tint: 0.5;
+  /* (the gold is a strong yellow at half strength: lighter golds are the colours of the painted
+     deserts, and the size checker would take sand for gold land) */
+  --legend-land: linear-gradient(135deg, #9cbc62, #5f8a3e);
+  /* flat colours when nothing is painted under the map */
+  --flat-c0: #dc746f; --flat-c1: #9a82cf; --flat-c2: #efc457; --flat-c3: #c07cc0;
+  --flat-c4: #66b58d; --flat-c5: #f4a361; --flat-c6: #e97fae; --flat-c7: #ba8f6a;
+  color-scheme: light;
+}
+/* ---------------------------------------------------------------- tokens: night */
+@media (prefers-color-scheme: dark) {
+  html[data-style="realm"]:not([data-theme="light"]) {
+    --sea: #08131f;
+    --ink: #efe5cf;
+    --label: #f6ecd4;
+    --halo: rgba(6, 12, 22, 0.72);
+    --halo-small: rgba(6, 12, 22, 0.66);
+    --coast: rgba(176, 204, 222, 0.62);
+    --border: rgba(255, 240, 205, 0.72);
+    --gold: #f0c060;
+    --ribbon: rgba(255, 200, 90, 0.4);
+    --tint: 0.36;
+    --accent: #f0b85a;
+    --fog: #b9bcc6;
+    --legend-land: radial-gradient(circle at 60% 40%, #f0c060 0 6%, transparent 12%), linear-gradient(135deg, #3e4c46, #262f33);
+    --realm-c0: #d78b90; --realm-c1: #a695d8; --realm-c2: #e5c77f; --realm-c3: #c291cc;
+    --realm-c4: #7fbba7; --realm-c5: #e9ae86; --realm-c6: #e093bf; --realm-c7: #bd9f8d;
+    --flat-c0: #70484b; --flat-c1: #564d70; --flat-c2: #776742; --flat-c3: #654b6a;
+    --flat-c4: #426157; --flat-c5: #795a46; --flat-c6: #744c63; --flat-c7: #62523b;
+    color-scheme: dark;
+  }
+}
+html[data-style="realm"][data-theme="dark"] {
+  --sea: #08131f;
+  --ink: #efe5cf;
+  --label: #f6ecd4;
+  --halo: rgba(6, 12, 22, 0.72);
+  --halo-small: rgba(6, 12, 22, 0.66);
+  --coast: rgba(176, 204, 222, 0.62);
+  --border: rgba(255, 240, 205, 0.72);
+  --gold: #f0c060;
+  --ribbon: rgba(255, 200, 90, 0.4);
+  --tint: 0.36;
+  --accent: #f0b85a;
+  --fog: #b9bcc6;
+  --legend-land: radial-gradient(circle at 60% 40%, #f0c060 0 6%, transparent 12%), linear-gradient(135deg, #3e4c46, #262f33);
+  --realm-c0: #d78b90; --realm-c1: #a695d8; --realm-c2: #e5c77f; --realm-c3: #c291cc;
+  --realm-c4: #7fbba7; --realm-c5: #e9ae86; --realm-c6: #e093bf; --realm-c7: #bd9f8d;
+  --flat-c0: #70484b; --flat-c1: #564d70; --flat-c2: #776742; --flat-c3: #654b6a;
+  --flat-c4: #426157; --flat-c5: #795a46; --flat-c6: #744c63; --flat-c7: #62523b;
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------- the map */
+html[data-style="realm"], html[data-style="realm"] body { background: var(--sea); }
+html[data-style="realm"] #stage { background: var(--sea); }
+html[data-style="realm"] #realm-terrain { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+html[data-style="realm"] svg#map { position: relative; }
+html[data-style="realm"] .sea-fill { fill: transparent; }
+
+/* the countries: a light tint multiplied over the painted land */
+html[data-style="realm"] #countries { mix-blend-mode: multiply; }
+html[data-style="realm"] .country { stroke: none; fill-opacity: var(--tint); }
+html[data-style="realm"] .realm-c0 { fill: var(--realm-c0); }
+html[data-style="realm"] .realm-c1 { fill: var(--realm-c1); }
+html[data-style="realm"] .realm-c2 { fill: var(--realm-c2); }
+html[data-style="realm"] .realm-c3 { fill: var(--realm-c3); }
+html[data-style="realm"] .realm-c4 { fill: var(--realm-c4); }
+html[data-style="realm"] .realm-c5 { fill: var(--realm-c5); }
+html[data-style="realm"] .realm-c6 { fill: var(--realm-c6); }
+html[data-style="realm"] .realm-c7 { fill: var(--realm-c7); }
+html[data-style="realm"] .country.lit { filter: none; }
+html[data-style="realm"] .country.dim { opacity: 1; fill: var(--fog); }
+/* nothing painted under the map (no WebGL2): flat painted colours */
+html[data-style="realm"].realm-flat #countries { mix-blend-mode: normal; }
+html[data-style="realm"].realm-flat .country { fill-opacity: 1; }
+html[data-style="realm"].realm-flat .realm-c0 { fill: var(--flat-c0); }
+html[data-style="realm"].realm-flat .realm-c1 { fill: var(--flat-c1); }
+html[data-style="realm"].realm-flat .realm-c2 { fill: var(--flat-c2); }
+html[data-style="realm"].realm-flat .realm-c3 { fill: var(--flat-c3); }
+html[data-style="realm"].realm-flat .realm-c4 { fill: var(--flat-c4); }
+html[data-style="realm"].realm-flat .realm-c5 { fill: var(--flat-c5); }
+html[data-style="realm"].realm-flat .realm-c6 { fill: var(--flat-c6); }
+html[data-style="realm"].realm-flat .realm-c7 { fill: var(--flat-c7); }
+html[data-style="realm"].realm-flat .country.dim { opacity: 0.4; }
+html[data-style="realm"].realm-flat #stage {
+  background: radial-gradient(ellipse at 30% 25%, #2f6f96, var(--sea) 70%);
+}
+
+/* coasts and borders */
+html[data-style="realm"] .coast { stroke: var(--coast); stroke-width: 1.15; stroke-linecap: round; }
+html[data-style="realm"] .border { stroke: var(--border); stroke-width: 1.2; stroke-dasharray: none; opacity: 0.9; stroke-linecap: round; }
+html[data-style="realm"] .coast.realm-fine { stroke-width: 0.8; }
+html[data-style="realm"] .border.realm-fine { stroke-width: 0.8; }
+html[data-style="realm"] .border.lit { stroke: var(--border); stroke-width: 1.7; opacity: 1; }
+html[data-style="realm"] .realm-ribbon {
+  fill: none; stroke: var(--ribbon); stroke-width: 7; stroke-linejoin: round; stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+html[data-style="realm"] .realm-ribbons .hidden { display: none; }
+html[data-style="realm"] .marker { stroke: var(--border); stroke-opacity: 0.75; stroke-width: 1; }
+html[data-style="realm"] .marker.lit { stroke: var(--gold); stroke-opacity: 1; stroke-width: 2; }
+
+/* names: strong letters with a soft halo, so they read over any ground */
+html[data-style="realm"] .label.realm-name {
+  font-family: 'Alegreya SC', 'Alegreya', Georgia, serif; font-weight: 700; font-style: normal;
+  fill: var(--label); stroke: var(--halo); stroke-width: 0.1em; stroke-linejoin: round; paint-order: stroke;
+}
+html[data-style="realm"] .label.realm-t2, html[data-style="realm"] .label.realm-t3 { font-weight: 500; }
+html[data-style="realm"] .label.realm-t4 { font-family: 'Alegreya', Georgia, serif; font-style: italic; font-weight: 500; stroke: var(--halo-small); }
+html[data-style="realm"] .label.realm-dim { fill-opacity: 0.5; stroke-opacity: 0.4; }
+html[data-style="realm"] .label.realm-mark {
+  font-family: 'Alegreya', Georgia, serif; font-style: italic; font-weight: 500; fill: var(--label);
+  dominant-baseline: central; stroke: var(--halo-small); stroke-width: 0.26em; stroke-linejoin: round;
+  paint-order: stroke; letter-spacing: 0.02em;
+}
+html[data-style="realm"] .label.realm-mark.lit { fill: var(--accent); }
+html[data-style="realm"] .realm-marks .hidden { display: none; }
+
+/* ---------------------------------------------------------------- the legend */
+/* (the page draws its own controls, the same in every style; the legend is dressed as one of
+   them.) How many people a square of land holds: */
+html[data-style="realm"] #realm-scale {
+  position: fixed; left: calc(var(--edge) + env(safe-area-inset-left)); bottom: calc(var(--edge) + 22px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 8px; pointer-events: none;
+  background: var(--ui-bg); color: var(--ui-text); box-shadow: var(--ui-shadow);
+  padding: 4px 10px 4px 6px; font-size: 12px; line-height: 1.35;
+}
+html[data-style="realm"] #realm-scale[hidden] { display: none; }
+html[data-style="realm"] #realm-scale .sq-wrap { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
+html[data-style="realm"] #realm-scale .sq {
+  background: var(--legend-land); border: 1px solid var(--border); box-sizing: border-box;
+}
+html[data-style="realm"] #realm-scale .val { color: var(--ui-text-2); }
+html:not([data-style="realm"]) #realm-scale, html:not([data-style="realm"]) #realm-terrain { display: none; }
+
+@media (max-width: 600px) {
+  /* the legend gives way to the bottom sheet */
+  html[data-style="realm"].dock-open #realm-scale { display: none; }
+}
