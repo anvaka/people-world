@@ -19,6 +19,7 @@ up.
 
 - Click a country to see its neighbours.
 - Remove or add a border, and the world is drawn again. It takes about 4 seconds on a laptop.
+- Size the countries by something else: `Customize...` has land area and GDP next to population.
 - Switch between two styles, `ink` and `realm`. Both draw the same mountains, rivers and climate.
 - Share a link. The address holds the world and your edits: `#world-1-cut-FR-ES-add-JP-KR` is
   world 1 without the France-Spain border and with a Japan-South Korea one.
@@ -71,7 +72,12 @@ node tools/check.mjs
 ## Limitations
 
 - Most worlds have 9 to 16 exclaves, and in crowded regions (the Balkans, the Caucasus) a few
-  countries come out stretched.
+  countries come out stretched. By GDP the first three worlds have 24 to 29.
+- By land area Saint Martin (53 km², half of a small island) is too small to draw to its size:
+  it comes out up to twice as large, and the page says so.
+- The World Bank has no GDP figure for 37 countries and territories (North Korea and Taiwan
+  among them). They get an estimate, their population times the median GDP per person, and the
+  page marks it as one. For those two it is far off.
 - An edit reshapes many countries, not only the edited ones.
 - At whole-world zoom many countries are smaller than a pixel: populations range from a few dozen
   people to 1.4 billion. A small ring marks each country that is too small to see.
@@ -79,7 +85,9 @@ node tools/check.mjs
 
 ## Credits
 
-- Countries, populations and land neighbours: [GeoNames](https://www.geonames.org/), CC BY 4.0.
+- Countries, populations, land areas and land neighbours: [GeoNames](https://www.geonames.org/),
+  CC BY 4.0.
+- GDP: [World Bank](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD), CC BY 4.0.
 - [Delaunator](https://github.com/mapbox/delaunator) and [earcut](https://github.com/mapbox/earcut)
   by Mapbox, [robust-predicates](https://github.com/mourner/robust-predicates) by Vladimir
   Agafonkin.

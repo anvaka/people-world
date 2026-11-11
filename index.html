@@ -216,8 +216,9 @@
   .suggest .code { margin-left: auto; font-size: 12px; color: var(--ui-text-2); }
   @media (pointer: coarse) { .suggest li { padding: 11px 12px; } }
 
-  /* Customize: the style that draws the map (each with a swatch of its look in the theme shown
-     now), the theme (light, dark, or as the device is set), and what this page is */
+  /* Customize: what the countries are sized by, the style that draws the map (each with a swatch
+     of its look in the theme shown now), the theme (light, dark, or as the device is set), and
+     what this page is */
   #style-box .choices { display: flex; gap: 4px; }
   #style-box button.choice { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 64px; height: auto;
     padding: 4px 0 3px; font-size: 12px; color: var(--ui-text); }
@@ -228,7 +229,7 @@
   .swatch { display: block; flex: none; width: 40px; height: 28px; border: 1px solid var(--ui-line); box-sizing: border-box; }
   .swatch.ink { background: var(--swatch-ink); }
   .swatch.realm { background: var(--swatch-realm); }
-  #style-box .themes { display: flex; }
+  #style-box .themes { display: flex; flex-wrap: wrap; }
   #style-box .themes button { height: 32px; padding: 0 10px; }
   #style-box .themes button[aria-checked="true"], #style-box .themes button[aria-checked="true"]:hover { background: var(--ui-accent); color: var(--ui-on-accent); }
   #about { font-size: 13px; line-height: 1.5; }
@@ -444,6 +445,14 @@
   </div>
   <div id="style-box" class="panel" hidden>
     <h3>Display</h3>
+    <div class="prow" id="size-row">
+      <div class="plabel" id="size-head">Size by</div>
+      <div class="pval themes" role="radiogroup" aria-labelledby="size-head">
+        <button type="button" role="radio" aria-checked="false" data-pick-size="">population</button>
+        <button type="button" role="radio" aria-checked="false" data-pick-size="land">land area</button>
+        <button type="button" role="radio" aria-checked="false" data-pick-size="gdp" title="Gross domestic product, in US dollars">GDP</button>
+      </div>
+    </div>
     <div class="prow">
       <div class="plabel" id="style-head">Style</div>
       <div class="pval choices" role="radiogroup" aria-labelledby="style-head">
@@ -465,7 +474,7 @@
       <p>This website was created by <a href="https://github.com/anvaka" target="_blank" rel="noopener">@anvaka</a>.
         It takes the graph of the world's land borders and draws a made-up world from it.</p>
       <p>Three rules hold on every map: neighbours share a border, countries that are not neighbours never touch,
-        and every country is as large as its population.</p>
+        and every country is as large as its population. Customize can size them by land area or by GDP instead.</p>
       <p>Click a country to see its neighbours. Remove or add a border, and the world is drawn again.
         You can also drop a Graphviz <code>.dot</code> file onto this page to see your own graph as a map.</p>
       <div id="about-body"></div>
@@ -552,6 +561,7 @@
 <script type="module">
 import {buildWorld} from './world.js';
 import {planarSubgraph} from './planar.js';
+import {MEASURES, measureDoc, sizeWords, legendOf} from './measures.js';
 
 const html = document.documentElement;
 html.setAttribute('data-map-state', 'loading');
@@ -565,6 +575,11 @@ html.setAttribute('data-map-state', 'loading');
 // A map of a graph of your own (a DOT file dropped on the page, see "Which graph" below) starts
 // with the graph's key: #graph-1x2y3z-world-1-cut-AA-AB.
 let graphKey = '';   // '' for the countries
+// The countries can be sized by something else than their people (measures.js: land area, GDP).
+// Each such map is a graph of its own to the page, named by its measure where a dropped file's
+// is named by a key: #gdp-world-1-cut-FR-ES. sized(key): the countries, by whatever measure.
+const sized = key => Object.hasOwn(MEASURES, key);
+const sizePrefix = new RegExp('^#(' + Object.keys(MEASURES).filter(Boolean).join('|') + ')-');
 const READABLE_EDITS = 4;
 const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
 // an edit as a number: both two-letter codes (26 × 26 each) and add-or-cut; four base-62 digits
@@ -594,6 +609,7 @@ function readHash() {
   if (RETIRED_STYLES.includes(style)) style = DEFAULT_STYLE;
   let graph = (/^#graph-([0-9a-z]+)-/.exec(hash) || [])[1] || '';
   if (graph) hash = '#' + hash.slice(graph.length + 8);
+  else if ((graph = (sizePrefix.exec(hash) || [])[1] || '')) hash = '#' + hash.slice(graph.length + 2);
   let list = [];
   let match = /^#world-(\d+)((?:-(?:cut|add)-[A-Za-z0-9]+-[A-Za-z0-9]+)*)$/.exec(hash);
   if (match) {
@@ -610,7 +626,7 @@ function readHash() {
   return {seed: match ? Math.max(1, parseInt(match[1], 10)) : 1, edits: list, style, graph};
 }
 function hashOf(seed, edits, graph = graphKey) {
-  let head = '#' + (graph ? 'graph-' + graph + '-' : '') + 'world-' + seed;
+  let head = '#' + (sized(graph) ? graph && graph + '-' : 'graph-' + graph + '-') + 'world-' + seed;
   if (edits.length > READABLE_EDITS && edits.every(packable)) return head + '-e-' + edits.map(packEdit).join('');
   return head + edits.map(e => (e.add ? '-add-' : '-cut-') + e.a + '-' + e.b).join('');
 }
@@ -1323,13 +1339,16 @@ function selfCheck(result) {
   touching.forEach((len, key) => { if (!wanted.has(key)) extra += 1; });
   let people = 0, land = 0;
   countries.forEach(c => { if (c.rings.length) { people += c.population; land += Math.abs(c.rings.reduce((s, r) => s + ringArea(r), 0)); } });
-  let worst = 0;
+  let worst = 0, off = [];
   countries.forEach(c => {
-    if (!c.rings.length) return;
+    if (!c.rings.length || !(c.population > 0)) return;
     let a = Math.abs(c.rings.reduce((s, r) => s + ringArea(r), 0));
-    worst = Math.max(worst, Math.abs(a / (land / people * c.population) - 1));
+    let error = a / (land / people * c.population) - 1;
+    worst = Math.max(worst, Math.abs(error));
+    if (Math.abs(error) >= 0.01) off.push({name: c.name, error});
   });
-  return {pairs: wanted.size, missing, extra, worst};
+  // off: the countries more than 1% from their size, the furthest first
+  return {pairs: wanted.size, missing, extra, worst, off: off.sort((a, b) => Math.abs(b.error) - Math.abs(a.error))};
 }
 // (worked out once per build result: the switch between before and after shows it again)
 const checks = new WeakMap();
@@ -1343,18 +1362,26 @@ function checkOf(world) {
 function showChecks(check, exclaves, ms) {
   let ok = check.missing === 0 && check.extra === 0 && check.worst < 0.01;
   let pct = (check.worst * 100).toFixed(2);
+  let {measure, by} = world.result;
+  let its = by ? MEASURES[by].its : measure ? 'its ' + escapeHtml(measure) : 'its population';
+  // One or two countries off their size while every border is right (by land area, a state too
+  // small to be drawn down to its size): About says which, and the map is not called broken
+  let few = check.missing === 0 && check.extra === 0 && check.off.length > 0 && check.off.length <= 2;
+  let offNote = few ? ' ' + check.off.map(o => `${escapeHtml(o.name)} is drawn ${o.error > 1 ? (o.error + 1).toFixed(1) + ' times' : Math.round(Math.abs(o.error) * 100) + '% ' + (o.error > 0 ? 'above' : 'below')} ${its}`).join(', and ') +
+    ': too small to draw to size.' : '';
   let alert = document.getElementById('checks');
-  alert.hidden = ok;
-  alert.innerHTML = ok ? '' : `A rule is broken on this map: ${check.pairs - check.missing} of ${check.pairs} borders, ` +
+  alert.hidden = ok || few;
+  alert.innerHTML = ok || few ? '' : `A rule is broken on this map: ${check.pairs - check.missing} of ${check.pairs} borders, ` +
     `${check.extra} false, sizes within ${pct}%. <a href="#about" data-about>Learn more.</a>`;
   let mark = good => `<span class="${good ? 'ok' : ''}">${good ? '✓' : '✗'}</span>`;
   let which = edits.length ? (showingBefore ? ', before your changes' : `, with your ${edits.length} change${edits.length > 1 ? 's' : ''}`) : '';
   document.getElementById('about-body').innerHTML = `<p>This map was checked after it was drawn:</p><ul>
       <li>${mark(check.missing === 0)} Neighbours share a border: ${check.pairs - check.missing} of ${check.pairs} pairs do.</li>
       <li>${mark(check.extra === 0)} Countries that are not neighbours never touch: ${check.extra} false borders.</li>
-      <li>${mark(check.worst < 0.01)} Each country's area is its share of ${world.result.measure ? 'all the ' + escapeHtml(world.result.measure) : 'the world\'s people'}, within ${pct}%.</li>
+      <li>${mark(check.worst < 0.01)} Each country's area is its share of ${by ? MEASURES[by].whole : measure ? 'all the ' + escapeHtml(measure) : 'the world\'s people'}` +
+        (few ? `, within 1% but for ${check.off.length === 1 ? 'one' : 'two'}.${offNote}` : `, within ${pct}%.`) + `</li>
     </ul>
-    ${world.result.measure && !ok ? '<p>Not every graph can be drawn by these rules: one with many links to a node, or one node linked to very many, runs out of room.</p>' : ''}
+    ${measure && !by && !ok ? '<p>Not every graph can be drawn by these rules: one with many links to a node, or one node linked to very many, runs out of room.</p>' : ''}
     <p>${exclaves.length} exclaves: no flat map can give every pair of neighbours a border, so ${exclaves.length} borders are made by a detached piece of one country touching the other, like Kaliningrad.</p>
     <p>World ${seed}${which}${ms ? `, drawn in ${(ms / 1000).toFixed(1)} s` : ''}. Each world number draws the same countries differently.` +
     (edits.length && !showingBefore && edited && edited.scratch ? ' Drawn from scratch: the last change didn’t fit into the map as it was, so countries moved.' : '') + `</p>
@@ -1450,10 +1477,12 @@ function targetNeighbours(id) {
   return set;
 }
 const itemOfId = id => items.find(it => it.country.id === id) || null;
-// A country's size in words: its people, or what the nodes of a dropped graph are sized by
+// A country's size in words: its people, its land or its GDP (an estimate says it is one), or
+// what the nodes of a dropped graph are sized by
 function sizeText(c) {
-  let measure = world.result.measure;
-  if (!measure) return c.population.toLocaleString('en-US') + ' people';
+  let {measure, by} = world.result;
+  if (by) return sizeWords(by, c.value, c.estimate);
+  if (!measure) return sizeWords('', c.population);
   return measure + ' ' + (c.value >= 1000 ? Math.round(c.value).toLocaleString('en-US') : String(+c.value.toPrecision(3)));
 }
 
@@ -1499,7 +1528,7 @@ function renderPanel(item) {
   info.classList.toggle('open', sheetOpen);
   info.classList.toggle('picking-mode', !!pickPart);
   info.innerHTML = `<button type="button" class="close" aria-label="Close ${cn}" data-key="close">×</button><h2 id="info-title" tabindex="-1"></h2>
-    <div class="meta">${esc((c.continent ? c.continent + ' · ' : '') + sizeText(c))}</div>
+    <div class="meta">${esc((c.continent ? c.continent + ' · ' : '') + sizeText(c) + (world.result.by && c.people ? ' · ' + sizeWords('', c.people) : ''))}</div>
     <div class="sec"><span>${n ? `Borders ${n} ${n > 1 ? 'countries' : 'country'}` : 'No neighbours: an island.'}</span>
       ${editable ? `<button type="button" class="mini sheet-toggle" aria-expanded="${info.classList.contains('open')}" data-sheet data-key="sheet">${info.classList.contains('open') ? 'Less' : 'Change borders'}</button>` : ''}</div>
     ${pickPart}
@@ -1576,7 +1605,7 @@ function findCountry(text) {
   if (starts.length === 1) return {item: starts[0]};
   let has = items.filter(it => norm(it.country.name).includes(q));
   if (has.length === 1) return {item: has[0]};
-  let code = !graphKey && q.length === 2 && items.find(it => it.country.id.toLowerCase() === q);
+  let code = sized(graphKey) && q.length === 2 && items.find(it => it.country.id.toLowerCase() === q);
   if (code) return {item: code};
   let many = starts.length ? starts : has;
   return {item: null, many: many.length ? many.sort((a, b) => byName(a.country.name, b.country.name)) : null};
@@ -1874,7 +1903,7 @@ function suggestMatches(typed) {
     else if (q.length >= 3) has.push(hit);
   }
   let list = starts.concat(words, has);
-  let code = !graphKey && q.length === 2 && items.find(it => it.country.id.toLowerCase() === q);
+  let code = sized(graphKey) && q.length === 2 && items.find(it => it.country.id.toLowerCase() === q);
   if (code && !list.some(h => h.name === code.country.name)) list.unshift({name: code.country.name, code: code.country.id});
   return list;
 }
@@ -1980,7 +2009,7 @@ window.addEventListener('hashchange', () => {
   let style = next.style || (location.hash ? DEFAULT_STYLE : currentStyle);
   if (style !== currentStyle) setStyle(style, {link: false, remember: false}).catch(failed);
   if (next.graph !== graphKey) {
-    if (next.graph && !droppedGraphs.has(next.graph) && !storedGraph(next.graph)) {
+    if (!sized(next.graph) && !droppedGraphs.has(next.graph) && !storedGraph(next.graph)) {
       // a dropped graph this tab doesn't have (a link from elsewhere, typed in): the map stays
       history.replaceState(null, '', linkOf(seed, edits));
       if (world) showStatus(LOST_GRAPH, '', {error: true});
@@ -2071,8 +2100,9 @@ if (window.matchMedia('(pointer: coarse)').matches)
 // there is one; elsewhere it copies the link at once and shows it, with what it carries.
 const shareBox = $('share-box'), shareButton = $('share');
 function shareSummary() {
-  return edits.length ? `World ${seed} with your ${edits.length} change${edits.length > 1 ? 's' : ''}: ` +
-    edits.map(e => (e.add ? 'added ' : 'removed ') + borderName(e)).join('; ') + '.' : `World ${seed} of People World.`;
+  let by = graphKey && sized(graphKey) ? ', sized by ' + MEASURES[graphKey].name : '';
+  return edits.length ? `World ${seed}${by} with your ${edits.length} change${edits.length > 1 ? 's' : ''}: ` +
+    edits.map(e => (e.add ? 'added ' : 'removed ') + borderName(e)).join('; ') + '.' : `World ${seed} of People World${by}.`;
 }
 function refreshShare() {
   $('share-url').value = location.href;
@@ -2326,6 +2356,21 @@ async function droppedDoc(key) {
   } catch (e) { return null; }
   return droppedGraphs.get(key);
 }
+// The countries sized by a measure: their document, made once (GDP's figures are a file of their own)
+const measureDocs = new Map();
+async function sizedDoc(key) {
+  countriesDoc = countriesDoc || await fetch('./countries.json').then(r => {
+    if (!r.ok) throw new Error('the countries graph did not load (' + r.status + ')');
+    return r.json();
+  });
+  if (!key) return countriesDoc;
+  if (!measureDocs.has(key)) {
+    let file = MEASURES[key].data;
+    let data = file ? await fetch(file).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }) : null;
+    measureDocs.set(key, measureDoc(countriesDoc, key, data));
+  }
+  return measureDocs.get(key);
+}
 function setDoc(next) {
   doc = next;
   original = new Set();
@@ -2369,7 +2414,8 @@ function leaveGraph(text, error = true) {
 function keyOfText(text) {
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; ++i) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);
-  return (h >>> 0).toString(36);
+  let key = (h >>> 0).toString(36);
+  return sized(key) ? key + '0' : key;
 }
 async function openDot(text, name) {
   let {graphFromDot} = await import('./dot.js');
@@ -2389,7 +2435,14 @@ function tagged(result) {
   if (!result) return result;
   result.graph = graphKey;
   result.measure = doc.measure || null;
-  if (doc.measure) result.countries.forEach(c => { c.value = doc.nodes[c.index][5]; });
+  result.by = doc.by || '';
+  if (doc.measure) result.countries.forEach(c => {
+    let row = doc.nodes[c.index];
+    c.value = row[5];
+    if (doc.by) { c.people = row[6]; c.estimate = !!row[7]; }
+  });
+  // (for a style's legend: round amounts of the measure, and their sizes on the map)
+  if (doc.by) result.legend = legendOf(doc);
   return result;
 }
 // The sentence under the bar, the credit and the map's name say which graph is drawn
@@ -2398,15 +2451,19 @@ const HOME = {title: document.title, name: document.querySelector('header h1').t
 function graphTexts() {
   if (HOME.shown === graphKey) return;
   HOME.shown = graphKey;
-  let own = !!graphKey, credit = $('credit-data');
+  let own = !sized(graphKey), m = MEASURES[graphKey], credit = $('credit-data');
   $('credit').classList.toggle('own', own);
-  document.title = own ? `${doc.title} · ${HOME.title}` : HOME.title;
+  document.title = own ? `${doc.title} · ${HOME.title}` : graphKey ? `${HOME.title} by ${m.name}` : HOME.title;
   document.querySelector('header h1').textContent = own ? doc.title : HOME.name;
   document.querySelector('header .lede').innerHTML = own
-    ? `This is a map of <b>${escapeHtml(doc.title)}</b>. Every node is a country, as large as its ${escapeHtml(doc.measure)}, and linked nodes share a border. <a href="#about" data-about>Learn more.</a>` : HOME.lede;
+    ? `This is a map of <b>${escapeHtml(doc.title)}</b>. Every node is a country, as large as its ${escapeHtml(doc.measure)}, and linked nodes share a border. <a href="#about" data-about>Learn more.</a>` : HOME.lede.replace('its population', m.its);
   svg.setAttribute('aria-label', own ? `Map of ${doc.title}: ${doc.about}` : HOME.map);
-  if (!own) credit.innerHTML = HOME.credit;
-  else {
+  if (!own) {
+    // whose figures: GeoNames has the people and the land; GDP is the World Bank's
+    credit.innerHTML = graphKey === 'gdp' ? HOME.credit.replace(', neighbours and populations', ' and neighbours') +
+        ' · GDP: <a href="https://data.worldbank.org/indicator/NY.GDP.MKTP.CD" target="_blank" rel="noopener">World Bank</a>, CC BY 4.0'
+      : graphKey === 'land' ? HOME.credit.replace('populations', 'land areas') : HOME.credit;
+  } else {
     let home = Object.assign(document.createElement('a'), {href: linkOf(1, [], ''), textContent: 'The world’s countries'});
     // (to the countries' map as it was left, and in the style on now)
     home.addEventListener('click', e => {
@@ -2471,9 +2528,9 @@ async function chart() {
   busy.chart = true;
   syncReady();
   if (!doc) {
-    let next = graphKey ? await droppedDoc(graphKey) : null;
+    let next = sized(graphKey) ? null : await droppedDoc(graphKey);
     if (stale()) return;
-    if (graphKey && !next) {
+    if (!sized(graphKey) && !next) {
       // the address names a dropped graph this tab doesn't have: the countries, and a word on why
       graphKey = '';
       edits = [];
@@ -2481,10 +2538,18 @@ async function chart() {
       showEdits();
       noteWhenShown = {text: LOST_GRAPH, error: true};
     }
-    if (!next) next = countriesDoc || (countriesDoc = await fetch('./countries.json').then(r => {
-      if (!r.ok) throw new Error('the countries graph did not load (' + r.status + ')');
-      return r.json();
-    }));
+    if (!next) {
+      try { next = await sizedDoc(graphKey); }
+      catch (error) {
+        if (!graphKey) throw error;
+        // a measure's figures did not load: the map by population, and a word on why
+        noteWhenShown = {text: `The figures for ${MEASURES[graphKey].name} did not load: this is the map by population.`, error: true};
+        graphKey = '';
+        history.replaceState(null, '', linkOf(seed, edits));
+        if (stale()) return;
+        next = await sizedDoc('');
+      }
+    }
     if (stale()) return;
     setDoc(next);
   }
@@ -2753,6 +2818,13 @@ function syncPicker(pending) {
     button.setAttribute('aria-checked', String(on));
     button.tabIndex = on ? 0 : -1;
   });
+  // (a graph from a dropped file has its own sizes)
+  $('size-row').hidden = !sized(graphKey);
+  styleBox.querySelectorAll('[data-pick-size]').forEach(button => {
+    let on = button.dataset.pickSize === graphKey;
+    button.setAttribute('aria-checked', String(on));
+    button.tabIndex = on ? 0 : -1;
+  });
   let note = $('style-note');
   note.hidden = !pending;
   note.textContent = pending ? `Drawing the map in ${styleTitle[pending]}…` : '';
@@ -2811,7 +2883,7 @@ function radioKeys(button, list, attr, pick) {
     if (!step) return;
     e.preventDefault();
     let i = (list.indexOf(button.dataset[attr]) + step + list.length) % list.length;
-    styleBox.querySelector(`[data-${attr === 'pickStyle' ? 'pick-style' : 'pick-theme'}="${list[i]}"]`).focus();
+    styleBox.querySelector(`[data-${{pickStyle: 'pick-style', pickTheme: 'pick-theme', pickSize: 'pick-size'}[attr]}="${list[i]}"]`).focus();
     pick(list[i]);
   });
 }
@@ -2822,6 +2894,17 @@ styleBox.querySelectorAll('[data-pick-style]').forEach(button => {
 styleBox.querySelectorAll('[data-pick-theme]').forEach(button => {
   button.addEventListener('click', () => { setTheme(button.dataset.pickTheme); closeStyles(); });
   radioKeys(button, THEMES, 'pickTheme', setTheme);
+});
+// What the countries are sized by: another map of the same world and edits, at an address of its
+// own (the build's progress shows in the dock; a map drawn before in this visit is shown at once)
+function setSizeBy(key) {
+  if (!sized(key) || key === graphKey) return;
+  location.hash = linkOf(seed, edits, key);
+  announce(`Drawing the countries by ${MEASURES[key].name}.`);
+}
+styleBox.querySelectorAll('[data-pick-size]').forEach(button => {
+  button.addEventListener('click', () => { setSizeBy(button.dataset.pickSize); closeStyles(); });
+  radioKeys(button, Object.keys(MEASURES), 'pickSize', key => { setSizeBy(key); syncPicker(); });
 });
 syncPicker();
 
@@ -2855,6 +2938,9 @@ window.peopledMap = {
   // a graph of your own, as DOT text, drawn in the countries' place (as a dropped file is)
   openDot: (text, name = 'graph.dot') => openDot(text, name),
   get graph() { return graphKey; },
+  // what the countries are sized by: '' (population), 'land' or 'gdp'; null for a dropped graph
+  get sizeBy() { return sized(graphKey) ? graphKey : null; },
+  setSizeBy: key => setSizeBy(key),
 };
 
 // A DOT file dropped anywhere on the page. While a file is held over it, a line says what a drop does.

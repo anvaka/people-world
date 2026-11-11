@@ -15,7 +15,12 @@ step by step, how a style plugs in, and what each file is for.
 - **show before** switches between the map before your changes and after; holding it (or the B
   key) shows the map before only while held. Each change in the list has its own undo (Ctrl+Z
   undoes the last); undoing, and the browser's Back, are instant for the last few maps drawn.
-- **Customize...** opens a panel: the map as ink (pen and ink on paper: hatched coasts,
+- **Size by.** The first row of **Customize...** sizes the countries by population, land area
+  or GDP. Each is a map of its own, built the first time it is picked (5 to 10 seconds) and kept
+  for the visit; the world number and your border edits carry over. The address says which:
+  `#land-world-1`, `#gdp-world-1-cut-FR-ES`. A country's panel and the tooltip give its size in
+  that measure, and an estimated GDP is marked as one.
+- **Customize...** also has the style and the theme: the map as ink (pen and ink on paper: hatched coasts,
   mountains and woods) or realm (a painted relief: terrain, shallows and rivers under the
   countries), the theme (light, dark, or auto: as the device is set), and what the page is.
   Switching doesn't build the world again, and the panel closes once the map is drawn in the new
@@ -31,6 +36,29 @@ step by step, how a style plugs in, and what each file is for.
 
 A world takes about 5 seconds to build on a laptop, longer on a phone; an edit about 4. A link with
 edits first builds the world without them, so it takes about twice as long.
+
+## Sizes
+
+`measures.js` lists what the countries can be sized by and makes the document the generator
+draws for each: the countries' own graph with another number per country, scaled so that the
+sizes add up to the world's people. The world then has the land it has by population, and the
+generator works at the scale it was made for.
+
+- **Population and land area** are in `countries.json` (GeoNames). A country with nothing of a
+  measure is not drawn: Antarctica has land and no people.
+- **GDP** is in `gdp.json`: current US dollars, the most recent year the World Bank has for each
+  country (most are 2025; a few are years older). `node tools/gdp.mjs` makes the file again.
+  For the 37 countries and territories without a figure it puts their population times the
+  median GDP per person, and lists them under `estimated`. That is far off for some: North
+  Korea comes out too large and Taiwan too small.
+- The population map stops when a country can't be drawn to its size. The other two leave it a
+  little large and say so in About (`build: {lenient: true}`). By land area that is Saint
+  Martin, 53 km² on an island it shares with Sint Maarten: up to twice its size.
+- `node tools/check.mjs --by land` and `--by gdp` check the three rules on these maps.
+
+A new measure is an entry in `MEASURES`, its numbers (a file like `gdp.json`), and its wording in
+`sizeWords` and `legendOf`. It has to be a total, something that adds up over countries: GDP per
+person or life expectancy as an area would mislead.
 
 ## A graph of your own
 
@@ -222,13 +250,18 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 | `valleys.js` | addon: the valleys its rivers have cut |
 | `climate.js` | addon: warmth, winds, rain and what grows where |
 | `util.js` | seeded random numbers, noise, polygon helpers |
-| `countries.json` | the graph |
+| `countries.json` | the graph, with each country's population and land area |
+| `measures.js` | what the countries can be sized by, and the document for each |
+| `gdp.json` | each country's GDP (World Bank), for the map sized by it |
 | `vendor/` | Delaunator, the `orient2d` predicate from robust-predicates, earcut (Realm's triangles) |
 | `tools/check.mjs` | builds worlds and checks the rules |
+| `tools/gdp.mjs` | makes `gdp.json` from the World Bank's figures |
 
 ## Credits
 
-- Countries, populations and land neighbours: [GeoNames](https://www.geonames.org/)
+- GDP: [World Bank](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD) (indicator
+  `NY.GDP.MKTP.CD`), CC BY 4.0.
+- Countries, populations, land areas and land neighbours: [GeoNames](https://www.geonames.org/)
   ([countryInfo.txt](https://download.geonames.org/export/dump/countryInfo.txt)), CC BY 4.0.
   Left out of that list: Serbia and Montenegro and the Netherlands Antilles, which no longer
   exist and are listed beside the countries that followed them, and the border of Serbia and

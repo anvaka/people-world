@@ -630,8 +630,9 @@ function scale(world, k) {
   if (!legend) return;
   let perPerson = world.realm.land / world.realm.people;
   // (a graph from a file is sized by something else than people: the square is a share of it)
-  let measure = world.result.measure;
-  let sizes = measure ? SHARES.map(p => ({n: p / 100 * world.realm.people, words: p + '% of it'})) : NUMBERS.map(n => ({n, words: WORDS(n) + ' people'}));
+  // (and the countries sized by land or GDP come with round amounts of that: result.legend)
+  let measure = world.result.measure, given = world.result.legend;
+  let sizes = given ? given.steps : measure ? SHARES.map(p => ({n: p / 100 * world.realm.people, words: p + '% of it'})) : NUMBERS.map(n => ({n, words: WORDS(n) + ' people'}));
   let best = null;
   for (let size of sizes) {
     let side = k * Math.sqrt(size.n * perPerson);
@@ -642,7 +643,7 @@ function scale(world, k) {
   let s = Math.max(2, Math.min(34, best.side));
   legend.square.style.width = legend.square.style.height = s + 'px';
   legend.box.hidden = false;
-  let cap = 'Land is ' + (measure || 'people');
+  let cap = given ? given.cap : 'Land is ' + (measure || 'people');
   if (legend.cap.textContent !== cap) legend.cap.textContent = cap;
   if (legend.text.textContent !== best.words) legend.text.textContent = best.words;
 }
