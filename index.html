@@ -237,11 +237,6 @@
   #about ul { margin: 6px 0; padding: 0; list-style: none; }
   #about li { margin: 2px 0; }
   #checks { font-variant-numeric: tabular-nums; }
-  /* sharing: the link, a word that copies it, and what the link carries */
-  #share-box { font-size: 13px; padding-top: 8px; }
-  #share-box .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-  #share-box .row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
-  #share-box input { flex: 1 1 auto; min-width: 0; width: auto; font-size: 13px; }
   a.support { white-space: nowrap; }
   a.support .cup { width: 1.15em; height: 1.15em; margin-right: 0.25em; vertical-align: -0.2em; fill: none; stroke: currentColor;
     stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
@@ -429,9 +424,9 @@
 </script>
 </head>
 <body>
-<!-- The search bar comes first, so Tab starts at the search. Under it: the panels its two words
-     open (Customize: the style, the theme and what this page is; share: the link), then one
-     sentence that says what this is and one that says what to do. -->
+<!-- The search bar comes first, so Tab starts at the search. Under it: the panel that
+     Customize opens (what the countries are sized by, the style, the theme and what this page
+     is), then one sentence that says what this is and one that says what to do. -->
 <header class="cartouche">
   <h1 class="sr-only">People World</h1>
   <div class="bar">
@@ -440,7 +435,6 @@
     </form>
     <div class="tools">
       <button type="button" id="style-button" aria-haspopup="true" aria-expanded="false" aria-controls="style-box" title="The map's style, light or dark, and about this website">Customize...</button>
-      <button type="button" id="share" aria-expanded="false" aria-controls="share-box" title="Copy or share a link to this map">share</button>
     </div>
   </div>
   <div id="style-box" class="panel" hidden>
@@ -484,15 +478,6 @@
       <p>I hope you like it! Please let me know.</p>
       <p>With passion,<br>Anvaka</p>
     </div>
-  </div>
-  <div id="share-box" class="panel" hidden>
-    <div class="head"><span id="share-what"></span><button type="button" id="share-close" class="close-x" aria-label="Close sharing">×</button></div>
-    <div class="row">
-      <input id="share-url" readonly aria-label="Link to this map">
-      <button type="button" id="share-copy">Copy link</button>
-    </div>
-    <div id="share-note" class="note" role="status"></div>
-    <div class="note thanks">Like the map? <a class="support" href="https://ko-fi.com/anvaka" target="_blank" rel="noopener"><svg class="cup" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6.5h8v3.6a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="M11 7.6h1a1.7 1.7 0 0 1 0 3.4h-1.1"/><path d="M5.6 2c-.7.9.7 1.5 0 2.5M8.4 2c-.7.9.7 1.5 0 2.5"/></svg>Buy me a coffee</a></div>
   </div>
   <div id="find-note" class="message alert" role="status" hidden></div>
   <div id="checks" class="message alert" role="status" hidden></div>
@@ -2024,7 +2009,6 @@ window.addEventListener('hashchange', () => {
   picking = null;
   if (selected && world) select(selected, {quiet: true});
   showEdits();
-  if (!$('share-box').hidden) refreshShare();
   chart().catch(failed);
 });
 
@@ -2096,53 +2080,6 @@ if (isPhone()) $('edits-toggle').setAttribute('aria-expanded', 'false');   // a 
 if (window.matchMedia('(pointer: coarse)').matches)
   $('hint').textContent = 'Tap a country to see its neighbours and change its borders. Pinch to zoom.';
 
-// Sharing: the address holds the world and the edits. Share opens the phone's share sheet where
-// there is one; elsewhere it copies the link at once and shows it, with what it carries.
-const shareBox = $('share-box'), shareButton = $('share');
-function shareSummary() {
-  let by = graphKey && sized(graphKey) ? ', sized by ' + MEASURES[graphKey].name : '';
-  return edits.length ? `World ${seed}${by} with your ${edits.length} change${edits.length > 1 ? 's' : ''}: ` +
-    edits.map(e => (e.add ? 'added ' : 'removed ') + borderName(e)).join('; ') + '.' : `World ${seed} of People World${by}.`;
-}
-function refreshShare() {
-  $('share-url').value = location.href;
-  $('share-what').textContent = 'Link to this map. ' + shareSummary();
-  $('share-copy').textContent = 'Copy link';
-  $('share-note').textContent = '';
-}
-function openShare() {
-  if (!styleBox.hidden) { styleBox.hidden = true; styleButton.setAttribute('aria-expanded', 'false'); }
-  refreshShare(); shareBox.hidden = false; shareButton.setAttribute('aria-expanded', 'true');
-}
-function closeShare() { shareBox.hidden = true; shareButton.setAttribute('aria-expanded', 'false'); shareButton.focus({preventScroll: true}); }
-async function copyLink() {
-  let input = $('share-url'), note = $('share-note');
-  let done = () => { $('share-copy').textContent = 'Copied ✓'; note.textContent = 'Copied. Whoever opens it sees this same map.'; announce('Link copied.'); };
-  try {
-    await navigator.clipboard.writeText(input.value);
-    done();
-  } catch (error) {
-    // no clipboard here (an embedded page, say): select the link, and try the older way
-    input.focus();
-    input.select();
-    let ok = false;
-    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-    if (ok) done();
-    else note.textContent = /Mac|iPhone|iPad/.test(navigator.platform) ? 'The link is selected: press ⌘C to copy it.' : 'The link is selected: press Ctrl+C to copy it.';
-  }
-}
-shareButton.addEventListener('click', async () => {
-  if (!shareBox.hidden) { closeShare(); return; }
-  if (navigator.share && window.matchMedia('(pointer: coarse)').matches) {
-    try { await navigator.share({title: document.title, text: shareSummary(), url: location.href}); return; }
-    catch (error) { if (error.name === 'AbortError') return; openShare(); return; }
-  }
-  openShare();
-  copyLink();
-});
-$('share-copy').addEventListener('click', copyLink);
-$('share-close').addEventListener('click', closeShare);
-$('share-url').addEventListener('focus', e => e.target.select());
 
 // The build status in the dock: what is being drawn, a bar, the stage and the time left, and a
 // way to call it off; then what came of it. The first visit's build shows the same in the middle.
@@ -2290,10 +2227,9 @@ window.addEventListener('keydown', e => {
 window.addEventListener('keyup', e => { if ((e.key === 'b' || e.key === 'B') && peekKey) { peekKey = false; endPeek(false); } });
 function onEscape(e) {
   let t = e.target;
-  if (typing(t) && t.value && t.id !== 'share-url') return;   // a filled field clears itself first
+  if (typing(t) && t.value) return;   // a filled field clears itself first
   if (picking) { picking = null; if (selected) renderPanel(selected); syncPicking(); }
   else if (!$('clear-confirm').hidden) { $('clear-confirm').hidden = true; $('clear').focus(); }
-  else if (!shareBox.hidden) closeShare();
   else if (!styleBox.hidden) closeStyles();
   else if (showingBefore) setBefore(false);
   else if (selected) select(null);
@@ -2476,9 +2412,6 @@ function graphTexts() {
     let about = doc.about[0].toUpperCase() + doc.about.slice(1), cut = about.indexOf(' from ');
     credit.replaceChildren(cut < 0 ? about : about.slice(0, cut), cut < 0 ? '' : Object.assign(document.createElement('span'), {className: 'wide', textContent: about.slice(cut)}), ' · ', home);
   }
-  // (a link to this map opens it in this tab only: nothing to share)
-  shareButton.hidden = own;
-  if (own && !shareBox.hidden) { shareBox.hidden = true; shareButton.setAttribute('aria-expanded', 'false'); }
 }
 let plain = null;    // {seed, world}: the world without edits
 let edited = null;   // {key, world, scratch, changes}: the same world with the edits, when there are any
@@ -2831,7 +2764,6 @@ function syncPicker(pending) {
   note.textContent = pending ? `Drawing the map in ${styleTitle[pending]}…` : '';
 }
 function openStyles() {
-  if (!shareBox.hidden) closeShare();
   styleBox.hidden = false;
   styleBox.scrollTop = 0;
   styleButton.setAttribute('aria-expanded', 'true');

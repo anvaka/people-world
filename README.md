@@ -21,7 +21,7 @@ up.
 - Remove or add a border, and the world is drawn again. It takes about 4 seconds on a laptop.
 - Size the countries by something else: `Customize...` has land area and GDP next to population.
 - Switch between two styles, `ink` and `realm`. Both draw the same mountains, rivers and climate.
-- Share a link. The address holds the world and your edits: `#world-1-cut-FR-ES-add-JP-KR` is
+- Send someone the address. It holds the world and your edits: `#world-1-cut-FR-ES-add-JP-KR` is
   world 1 without the France-Spain border and with a Japan-South Korea one.
 - Drop a Graphviz `.dot` file onto the page to see your own graph as a map. Small graphs that are
   close to planar work best. A graph with large hubs breaks the size rule, and the page tells you.
