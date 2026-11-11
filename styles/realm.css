@@ -7,22 +7,13 @@
 html[data-style="realm"] {
   --sea: #1f4d72;
   --ink: #2a1c10;
-  --ink-soft: rgba(42, 28, 16, 0.5);
   --label: #24170c;
   --halo: rgba(252, 246, 232, 0.6);
   --halo-small: rgba(252, 246, 232, 0.66);
   --coast: rgba(36, 30, 24, 0.82);
   --border: #2a1d12;
-  --gilt: #a87a22;
   --gold: #e0a93a;
   --ribbon: rgba(255, 196, 64, 0.62);
-  --panel: rgba(250, 245, 233, 0.95);
-  --menu: #faf6eb;             /* a menu over the card: solid, or the card's words show through */
-  --panel-ink: #2a1c10;
-  --panel-line: rgba(122, 88, 30, 0.45);
-  --control: rgba(255, 255, 255, 0.55);
-  --control-hover: #fffaf0;
-  --shadow: rgba(10, 25, 40, 0.28);
   --accent: #a3271c;
   --fog: #ebe8e1;
   --lit: none;
@@ -42,23 +33,14 @@ html[data-style="realm"] {
   html[data-style="realm"]:not([data-theme="light"]) {
     --sea: #08131f;
     --ink: #efe5cf;
-    --ink-soft: rgba(239, 229, 207, 0.5);
     --label: #f6ecd4;
     --halo: rgba(6, 12, 22, 0.72);
     --halo-small: rgba(6, 12, 22, 0.66);
     --coast: rgba(176, 204, 222, 0.62);
     --border: rgba(255, 240, 205, 0.72);
-    --gilt: #d9b062;
     --gold: #f0c060;
     --ribbon: rgba(255, 200, 90, 0.4);
     --tint: 0.36;
-    --panel: rgba(12, 19, 31, 0.92);
-    --menu: #0e1623;
-    --panel-ink: #efe5cf;
-    --panel-line: rgba(217, 176, 98, 0.42);
-    --control: rgba(255, 255, 255, 0.06);
-    --control-hover: rgba(255, 255, 255, 0.13);
-    --shadow: rgba(0, 0, 0, 0.55);
     --accent: #f0b85a;
     --fog: #b9bcc6;
     --legend-land: radial-gradient(circle at 60% 40%, #f0c060 0 6%, transparent 12%), linear-gradient(135deg, #3e4c46, #262f33);
@@ -72,23 +54,14 @@ html[data-style="realm"] {
 html[data-style="realm"][data-theme="dark"] {
   --sea: #08131f;
   --ink: #efe5cf;
-  --ink-soft: rgba(239, 229, 207, 0.5);
   --label: #f6ecd4;
   --halo: rgba(6, 12, 22, 0.72);
   --halo-small: rgba(6, 12, 22, 0.66);
   --coast: rgba(176, 204, 222, 0.62);
   --border: rgba(255, 240, 205, 0.72);
-  --gilt: #d9b062;
   --gold: #f0c060;
   --ribbon: rgba(255, 200, 90, 0.4);
   --tint: 0.36;
-  --panel: rgba(12, 19, 31, 0.92);
-  --menu: #0e1623;
-  --panel-ink: #efe5cf;
-  --panel-line: rgba(217, 176, 98, 0.42);
-  --control: rgba(255, 255, 255, 0.06);
-  --control-hover: rgba(255, 255, 255, 0.13);
-  --shadow: rgba(0, 0, 0, 0.55);
   --accent: #f0b85a;
   --fog: #b9bcc6;
   --legend-land: radial-gradient(circle at 60% 40%, #f0c060 0 6%, transparent 12%), linear-gradient(135deg, #3e4c46, #262f33);
@@ -101,7 +74,6 @@ html[data-style="realm"][data-theme="dark"] {
 
 /* ---------------------------------------------------------------- the map */
 html[data-style="realm"], html[data-style="realm"] body { background: var(--sea); }
-html[data-style="realm"] body { font-family: 'Alegreya', Georgia, 'Times New Roman', serif; color: var(--panel-ink); }
 html[data-style="realm"] #stage { background: var(--sea); }
 html[data-style="realm"] #realm-terrain { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
 html[data-style="realm"] svg#map { position: relative; }
@@ -166,115 +138,24 @@ html[data-style="realm"] .label.realm-mark {
 html[data-style="realm"] .label.realm-mark.lit { fill: var(--accent); }
 html[data-style="realm"] .realm-marks .hidden { display: none; }
 
-/* ---------------------------------------------------------------- panels: a game's own */
-html[data-style="realm"] header.cartouche,
-html[data-style="realm"] #info {
-  background: var(--panel); color: var(--panel-ink);
-  border: 1px solid var(--panel-line); outline: none; border-radius: 10px;
-  box-shadow: inset 0 0 0 3px var(--panel), inset 0 0 0 4px var(--panel-line), 0 6px 24px var(--shadow);
-}
-/* (the page owns where the card, #info and the dock sit: the style only dresses them) */
-html[data-style="realm"] header.cartouche { padding: 14px 18px 12px; }
-html[data-style="realm"] header h1 {
-  font-family: 'Alegreya SC', Georgia, serif; font-weight: 700; font-size: 25px; letter-spacing: 0.07em; line-height: 1.1;
-}
-html[data-style="realm"] header h1::after {
-  content: ''; display: block; height: 7px; margin: 7px 0 6px; width: 132px;
-  background:
-    linear-gradient(90deg, transparent, var(--gilt) 30%, var(--gilt) 70%, transparent) center / 100% 1px no-repeat,
-    linear-gradient(45deg, transparent 42%, var(--gilt) 42% 58%, transparent 58%) center / 7px 7px no-repeat;
-}
-html[data-style="realm"] header p { font-size: 14.5px; line-height: 1.35; font-style: normal; opacity: 0.92; }
-html[data-style="realm"] button,
-html[data-style="realm"] input {
-  font-family: 'Alegreya', Georgia, serif; color: var(--panel-ink); background: var(--control);
-  border: 1px solid var(--panel-line); border-radius: 6px; height: 34px; font-size: 14.5px;
-}
-html[data-style="realm"] button { font-family: 'Alegreya SC', Georgia, serif; font-weight: 500; letter-spacing: 0.04em; }
-html[data-style="realm"] button:hover { background: var(--control-hover); border-color: var(--gilt); }
-html[data-style="realm"] input::placeholder { color: var(--ink-soft); font-style: italic; }
-html[data-style="realm"] button:focus-visible, html[data-style="realm"] input:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
-html[data-style="realm"] #checks { font-size: 12.5px; opacity: 0.85; margin-top: 8px; }
-/* the Style menu and the country suggestions: the card's own panel */
-html[data-style="realm"] #style-box.menu,
-html[data-style="realm"] .suggest {
-  background: var(--menu); color: var(--panel-ink); border: 1px solid var(--panel-line); border-radius: 10px;
-  box-shadow: inset 0 0 0 3px var(--menu), inset 0 0 0 4px var(--panel-line), 0 10px 28px var(--shadow);
-}
-html[data-style="realm"] #style-box.menu { padding: 10px; }
-html[data-style="realm"] #style-box .menu-label { font-family: 'Alegreya SC', Georgia, serif; letter-spacing: 0.1em; }
-html[data-style="realm"] #style-box button.choice { border-radius: 6px; }
-html[data-style="realm"] #style-box .ds { font-family: 'Alegreya', Georgia, serif; font-weight: 400; }
-html[data-style="realm"] #style-box .themes { border-color: var(--panel-line); border-radius: 6px; overflow: hidden; }
-html[data-style="realm"] #style-box .themes button + button { border-left-color: var(--panel-line); }
-html[data-style="realm"] #style-box .choices + .menu-label { border-top-color: var(--panel-line); }
-html[data-style="realm"] .suggest { font-family: 'Alegreya', Georgia, serif; padding: 6px; }
-html[data-style="realm"] #checks b { color: var(--accent); font-weight: 500; }
-html[data-style="realm"] #edits { border-top: 1px solid var(--panel-line); }
-html[data-style="realm"] button.mini { height: 26px; font-size: 12.5px; }
-html[data-style="realm"] #info { padding: 14px 18px 12px; font-size: 14.5px; }
-html[data-style="realm"] #info h2 { font-family: 'Alegreya SC', Georgia, serif; font-weight: 700; font-size: 22px; letter-spacing: 0.05em; }
-html[data-style="realm"] #info .close { border: 0; background: transparent; font-size: 20px; right: 8px; top: 8px; }
-html[data-style="realm"] #info ul.nbrs li { border-bottom: 1px solid var(--panel-line); }
-html[data-style="realm"] #info .note { opacity: 0.85; }
-html[data-style="realm"] #tip {
-  background: var(--panel); color: var(--panel-ink); border: 1px solid var(--panel-line); border-radius: 6px;
-  font-size: 13.5px; box-shadow: 0 3px 10px var(--shadow);
-}
-html[data-style="realm"] #loading .box, html[data-style="realm"] #drop-hint .box {
-  background: var(--panel); color: var(--panel-ink); border: 1px solid var(--panel-line); border-radius: 10px;
-  box-shadow: 0 6px 24px var(--shadow); padding: 16px 24px; font-family: 'Alegreya SC', Georgia, serif; letter-spacing: 0.04em;
-}
-html[data-style="realm"] #loading .bar { height: 4px; background: var(--panel-line); border-radius: 2px; overflow: hidden; }
-html[data-style="realm"] #loading .bar div { background: linear-gradient(90deg, var(--gilt), var(--gold)); }
-html[data-style="realm"] #credit {
-  font-size: 11.5px; color: var(--panel-ink); background: var(--panel); padding: 2px 8px; border-radius: 6px; opacity: 0.88;
-}
-
-/* the compass star */
-html[data-style="realm"] #compass {
-  width: 84px; height: 90px; right: calc(22px + env(safe-area-inset-right)); top: calc(18px + env(safe-area-inset-top));
-  opacity: 0.95; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
-}
-html[data-style="realm"] #compass .ring { fill: none; stroke: var(--gold); }
-html[data-style="realm"] #compass .ring.thin { stroke: #fff6e0; stroke-opacity: 0.7; }
-html[data-style="realm"] #compass .tick { stroke: var(--gold); stroke-width: 0.6; }
-html[data-style="realm"] #compass .lite { fill: #fbf3df; stroke: #3a2a18; stroke-width: 0.4; }
-html[data-style="realm"] #compass .dark { fill: #3a2a18; stroke: #3a2a18; stroke-width: 0.4; }
-html[data-style="realm"] #compass .north { fill: #b3261c; stroke: #3a2a18; stroke-width: 0.4; }
-html[data-style="realm"] #compass .hub { fill: var(--gold); stroke: #3a2a18; stroke-width: 0.5; }
-html[data-style="realm"] #compass .n { fill: #fbf3df; stroke: #3a2a18; stroke-width: 2.4; paint-order: stroke; font: 700 12px 'Alegreya SC', Georgia, serif; }
-
-/* the legend: how many people a square of land holds */
+/* ---------------------------------------------------------------- the legend */
+/* (the page draws its own controls, the same in every style; the legend is dressed as one of
+   them.) How many people a square of land holds: */
 html[data-style="realm"] #realm-scale {
-  position: fixed; left: calc(14px + env(safe-area-inset-left)); bottom: calc(40px + env(safe-area-inset-bottom));
-  display: flex; align-items: center; gap: 10px; pointer-events: none;
-  background: var(--panel); color: var(--panel-ink); border: 1px solid var(--panel-line); border-radius: 8px;
-  padding: 6px 12px 6px 8px; box-shadow: 0 3px 12px var(--shadow);
+  position: fixed; left: calc(var(--edge) + env(safe-area-inset-left)); bottom: calc(var(--edge) + 22px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 8px; pointer-events: none;
+  background: var(--ui-bg); color: var(--ui-text); box-shadow: var(--ui-shadow);
+  padding: 4px 10px 4px 6px; font-size: 12px; line-height: 1.35;
 }
 html[data-style="realm"] #realm-scale[hidden] { display: none; }
 html[data-style="realm"] #realm-scale .sq-wrap { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
 html[data-style="realm"] #realm-scale .sq {
   background: var(--legend-land); border: 1px solid var(--border); box-sizing: border-box;
 }
-html[data-style="realm"] #realm-scale .cap { font-family: 'Alegreya SC', Georgia, serif; font-weight: 700; letter-spacing: 0.06em; font-size: 12px; }
-html[data-style="realm"] #realm-scale .val { font-style: italic; font-size: 13px; }
+html[data-style="realm"] #realm-scale .val { color: var(--ui-text-2); }
 html:not([data-style="realm"]) #realm-scale, html:not([data-style="realm"]) #realm-terrain { display: none; }
 
 @media (max-width: 600px) {
-  html[data-style="realm"] header.cartouche { padding: 11px 13px 10px; }
-  html[data-style="realm"] header h1 { font-size: 19px; }
-  html[data-style="realm"] header h1::after { margin: 4px 0 3px; width: 100px; }
-  html[data-style="realm"] header p { font-size: 12.5px; line-height: 1.3; }
-  html[data-style="realm"] header .row { margin-top: 6px; }
-  html[data-style="realm"] button, html[data-style="realm"] input { height: 32px; font-size: 14px; }
-  html[data-style="realm"] #checks { font-size: 11.5px; margin-top: 5px; line-height: 1.3; }
-  html[data-style="realm"] #info ul.nbrs li { min-height: 36px; }
-  html[data-style="realm"] button.mini { height: 30px; min-width: 34px; }
-  html[data-style="realm"] #realm-scale { left: calc(12px + env(safe-area-inset-left)); bottom: calc(36px + env(safe-area-inset-bottom)); padding: 4px 10px 4px 6px; gap: 6px; }
-  html[data-style="realm"] #realm-scale .cap { font-size: 11px; }
-  html[data-style="realm"] #realm-scale .val { font-size: 11.5px; }
-  html[data-style="realm"] #credit { font-size: 10.5px; }
   /* the legend gives way to the bottom sheet */
   html[data-style="realm"].dock-open #realm-scale { display: none; }
 }

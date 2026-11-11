@@ -10,21 +10,28 @@
 //                                              edits, drawn from it as the page does
 //   node tools/check.mjs --dot graph.dot 1 2   a graph of your own in place of the countries, as
 //                                              the page draws a DOT file dropped on it
+//   node tools/check.mjs --by gdp 1 2          the countries sized by GDP (or --by land: by land
+//                                              area), as the page's "Size by" draws them
 // Exits with 1 when a rule fails.
 import {readFileSync} from 'node:fs';
 import {buildWorld} from '../world.js';
 import {planarSubgraph} from '../planar.js';
 import {graphFromDot} from '../dot.js';
+import {MEASURES, measureDoc} from '../measures.js';
 
 const args = process.argv.slice(2);
 const at = args.indexOf('--edits');
 const editsArg = at >= 0 ? args.splice(at, 2)[1] || '' : '';
 const dotAt = args.indexOf('--dot');
 const dotFile = dotAt >= 0 ? args.splice(dotAt, 2)[1] : '';
+const byAt = args.indexOf('--by');
+const by = byAt >= 0 ? args.splice(byAt, 2)[1] || '' : '';
+if (by && !MEASURES[by]) { console.error(`--by: expected one of ${Object.keys(MEASURES).filter(Boolean).join(', ')}`); process.exit(2); }
 const seeds = args.length ? args.map(Number) : dotFile ? [1] : [1, 2, 3];
+const json = name => JSON.parse(readFileSync(new URL('../' + name, import.meta.url), 'utf8'));
 const doc = dotFile ? graphFromDot(readFileSync(dotFile, 'utf8'), dotFile.replace(/^.*[\\/]/, ''))
-  : JSON.parse(readFileSync(new URL('../countries.json', import.meta.url), 'utf8'));
-if (dotFile) console.log(`${doc.title}: ${doc.about}, sized by ${doc.measure}`);
+  : measureDoc(json('countries.json'), by, MEASURES[by] && MEASURES[by].data ? json(MEASURES[by].data) : null);
+if (dotFile || by) console.log(`${doc.title}: ${dotFile ? doc.about + ', ' : ''}sized by ${doc.measure}`);
 
 function parseEdits(text) {
   const words = text.split('-').filter(Boolean), list = [];
