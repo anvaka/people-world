@@ -319,6 +319,39 @@
   /* (the long form of the credit needs a wide window: the dock sits beside it) */
   @media (max-width: 1000px) { #credit .wide { display: none; } }
 
+  /* The years: a bar like a video player's, bottom left over the credit. The line is the years
+     from 1960 to now: played up to the year shown, in the accent; from there, faint where the
+     frames are still being worked out and darker where they are in. */
+  #player { position: fixed; z-index: 2; box-sizing: border-box; left: calc(var(--edge) + env(safe-area-inset-left));
+    bottom: calc(var(--edge) + 22px + env(safe-area-inset-bottom));
+    width: min(400px, calc(100vw - 2 * var(--edge) - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    background: var(--ui-bg); color: var(--ui-text); box-shadow: var(--ui-shadow); --played: 100%; --ready: 100%; }
+  #player input[type="range"] { -webkit-appearance: none; appearance: none; display: block; width: 100%; height: 16px; margin: 0; padding: 0;
+    border: 0; background: none; cursor: pointer; }
+  #player input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: linear-gradient(to right, var(--ui-accent) 0 var(--played),
+    var(--ui-line) var(--played) var(--ready), color-mix(in srgb, var(--ui-text) 32%, var(--ui-bg)) var(--ready) 100%); }
+  #player input[type="range"]::-moz-range-track { height: 4px; background: linear-gradient(to right, var(--ui-accent) 0 var(--played),
+    var(--ui-line) var(--played) var(--ready), color-mix(in srgb, var(--ui-text) 32%, var(--ui-bg)) var(--ready) 100%); }
+  #player input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px; margin-top: -4px;
+    border: 0; border-radius: 50%; background: var(--ui-accent); }
+  #player input[type="range"]::-moz-range-thumb { width: 12px; height: 12px; border: 0; border-radius: 50%; background: var(--ui-accent); }
+  #player input[type="range"]:hover::-webkit-slider-runnable-track, #player input[type="range"]:focus-visible::-webkit-slider-runnable-track { height: 6px; }
+  #player input[type="range"]:hover::-webkit-slider-thumb, #player input[type="range"]:focus-visible::-webkit-slider-thumb { margin-top: -3px; }
+  #player input[type="range"]:focus { outline: none; border: 0; }
+  #player input[type="range"]:focus-visible { outline: 1px dashed var(--ui-accent); outline-offset: -1px; }
+  #player .row { display: flex; align-items: center; gap: 4px; height: 32px; padding: 0 10px 2px 2px; }
+  #play { width: 34px; height: 30px; padding: 0; display: grid; place-items: center; flex: none; color: var(--ui-text); }
+  #play:hover { background: none; color: var(--ui-accent); }
+  #play svg { width: 16px; height: 16px; fill: currentColor; grid-area: 1 / 1; }
+  #play .i-pause, #play .i-wait, #player.playing #play .i-play, #player.waiting #play .i-play { display: none; }
+  #player.playing #play .i-pause { display: block; }
+  #player.waiting #play .i-wait { display: block; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-dasharray: 22 40; animation: turn 0.9s linear infinite; transform-origin: 50% 50%; }
+  @keyframes turn { to { transform: rotate(360deg); } }
+  #year-out { font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* a plain frame of another year is on screen: the map itself is out of sight under it */
+  #time-canvas { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+  html.time-flat #plate { visibility: hidden; }
+
   /* zoom in, zoom out, the whole world: a column at the top right */
   #controls { position: fixed; z-index: 1; right: calc(var(--edge) + env(safe-area-inset-right)); top: calc(var(--edge) + env(safe-area-inset-top));
     display: flex; flex-direction: column; background: var(--ui-bg); box-shadow: var(--ui-shadow); }
@@ -368,9 +401,11 @@
     #controls { top: calc(var(--card-bottom, 100px) + 8px); }
     #controls button { width: 38px; }
     html.dock-open #credit { visibility: hidden; }
+    /* (and the years give way to the bottom sheet) */
+    html.dock-open #player { display: none; }
     #credit.own .by { display: none; }
   }
-  @media (prefers-reduced-motion: reduce) { #status .bar div, #loading .bar div { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { #status .bar div, #loading .bar div { transition: none; } #player.waiting #play .i-wait { animation: none; } }
 </style>
 <script>
 // The map's look is one of a few styles (styles/<name>.css, .js and .fonts), picked before the
@@ -470,6 +505,7 @@
       <p>Three rules hold on every map: neighbours share a border, countries that are not neighbours never touch,
         and every country is as large as its population. Customize can size them by land area or by GDP instead.</p>
       <p>Click a country to see its neighbours. Remove or add a border, and the world is drawn again.
+        Press play at the bottom to watch the world grow from 1960 to today.
         You can also drop a Graphviz <code>.dot</code> file onto this page to see your own graph as a map.</p>
       <div id="about-body"></div>
       <p>You can find the entire <a href="https://github.com/anvaka/people-world" target="_blank" rel="noopener">source code here</a>.
@@ -491,6 +527,7 @@
     <rect class="sea-fill" x="-100000" y="-100000" width="200000" height="200000"/>
     <g id="viewport"></g>
   </svg></div>
+  <canvas id="time-canvas" hidden></canvas>
 </div>
 <p id="map-help" class="sr-only">Arrow keys move the map, plus and minus zoom, 0 shows the whole world, Enter picks the country under the ring in the middle. Without the map: find a country by name; its panel lists its neighbours, lets you visit them and change its borders.</p>
 <div id="controls" role="group" aria-label="Zoom">
@@ -500,7 +537,16 @@
 </div>
 <!-- the credit line: whose data, who made the page (the link is the source), and where to say thanks
      with a coffee (Ko-fi takes a card without an account; GitHub Sponsors is under "more") -->
-<div id="credit"><span id="credit-data"><span class="wide">Countries, neighbours and populations: </span><a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>, CC BY 4.0</span><span class="by"> · <span class="wide">Made </span>by <a href="https://github.com/anvaka/people-world" target="_blank" rel="noopener" title="The source, on GitHub">anvaka</a></span> · <a class="support" href="https://ko-fi.com/anvaka" target="_blank" rel="noopener" title="A one-time tip, on Ko-fi"><svg class="cup" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6.5h8v3.6a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="M11 7.6h1a1.7 1.7 0 0 1 0 3.4h-1.1"/><path d="M5.6 2c-.7.9.7 1.5 0 2.5M8.4 2c-.7.9.7 1.5 0 2.5"/></svg>Buy me a coffee</a></div>
+<div id="credit"><span id="credit-data"><span class="wide">Countries, neighbours and populations: </span><a href="https://www.geonames.org/" target="_blank" rel="noopener">GeoNames</a>, CC BY 4.0</span><span id="credit-years" class="wide"> · Past years: <a href="https://data.worldbank.org/indicator/SP.POP.TOTL" target="_blank" rel="noopener">World Bank</a>, CC BY 4.0</span><span class="by"> · <span class="wide">Made </span>by <a href="https://github.com/anvaka/people-world" target="_blank" rel="noopener" title="The source, on GitHub">anvaka</a></span> · <a class="support" href="https://ko-fi.com/anvaka" target="_blank" rel="noopener" title="A one-time tip, on Ko-fi"><svg class="cup" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6.5h8v3.6a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3z"/><path d="M11 7.6h1a1.7 1.7 0 0 1 0 3.4h-1.1"/><path d="M5.6 2c-.7.9.7 1.5 0 2.5M8.4 2c-.7.9.7 1.5 0 2.5"/></svg>Buy me a coffee</a></div>
+<!-- The years: a bar like a video player's, under the map sized by population. The line is the
+     years from 1960 to now (a range input: the arrow keys step a year); Play runs through them. -->
+<div id="player" role="group" aria-label="The world's population since 1960" hidden>
+  <input id="year" type="range" min="1960" max="2024" step="1" value="2024" aria-label="Year">
+  <div class="row">
+    <button type="button" id="play" aria-label="Play from 1960"><svg class="i-play" viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.5v11l9-5.5z"/></svg><svg class="i-pause" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/></svg><svg class="i-wait" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5.5"/></svg></button>
+    <output id="year-out" for="year">2024</output>
+  </div>
+</div>
 <!-- UX: the dock, bottom right (a sheet at the bottom of a phone): a build in progress, your
      changes, the country panel. #flip and #clear keep their ids and jobs. -->
 <div id="dock">
@@ -926,6 +972,7 @@ function applyView() {
   plate.style.transform = '';
   updateDetail();
   updateMarkers();
+  if (TIME.flat && !TIME.playing) drawFlat(TIME.year);
 }
 
 // During a gesture: move and scale the picture already drawn, as one image (the compositor does
@@ -935,6 +982,7 @@ function previewView(rest) {
   plate.style.transform = `translate(${state.x - s * drawn.x}px, ${state.y - s * drawn.y}px) scale(${s})`;
   clearTimeout(settleTimer);
   settleTimer = setTimeout(applyView, rest);
+  if (TIME.flat && !TIME.playing) drawFlat(TIME.year);
 }
 
 // Lines and ripples are drawn from simplified copies of the outlines, never more than 0.4 px off
@@ -1050,7 +1098,7 @@ function updateDetail() {
 // it. With only the bar's corner this gives the two options fit() always had: below it or beside it.
 function freeRects() {
   let w = mapWidth = svg.clientWidth, h = mapHeight = svg.clientHeight;
-  let covers = [document.querySelector('header.cartouche'), document.getElementById('dock')]
+  let covers = [document.querySelector('header.cartouche'), document.getElementById('dock'), document.getElementById('player')]
     .map(node => node.getBoundingClientRect())
     .filter(r => r.width > 0 && r.height > 0)
     .map(r => ({x0: r.left - 8, y0: r.top - 8, x1: r.right + 8, y1: r.bottom + 8}));
@@ -1368,8 +1416,9 @@ function showChecks(check, exclaves, ms) {
     </ul>
     ${measure && !by && !ok ? '<p>Not every graph can be drawn by these rules: one with many links to a node, or one node linked to very many, runs out of room.</p>' : ''}
     <p>${exclaves.length} exclaves: no flat map can give every pair of neighbours a border, so ${exclaves.length} borders are made by a detached piece of one country touching the other, like Kaliningrad.</p>
-    <p>World ${seed}${which}${ms ? `, drawn in ${(ms / 1000).toFixed(1)} s` : ''}. Each world number draws the same countries differently.` +
+    <p>World ${seed}${world.result.year ? ' as it was in ' + world.result.year : ''}${which}${ms ? `, drawn in ${(ms / 1000).toFixed(1)} s` : ''}. Each world number draws the same countries differently.` +
     (edits.length && !showingBefore && edited && edited.scratch ? ' Drawn from scratch: the last change didn’t fit into the map as it was, so countries moved.' : '') + `</p>
+    ${world.result.year ? `<p>A past year is today's map with every country brought to the size it had then. How each population changed since 1960 is from the <a href="https://data.worldbank.org/indicator/SP.POP.TOTL" target="_blank" rel="noopener">World Bank</a> and, for a few places, <a href="./population.json" target="_blank" rel="noopener">other sources</a>.</p>` : ''}
     <p>Keys: <kbd>/</kbd> find · arrows, <kbd>+</kbd> <kbd>−</kbd> and <kbd>0</kbd> move the map · <kbd>Enter</kbd> picks the country in the middle · <kbd>B</kbd> before and after · <kbd>Ctrl</kbd> <kbd>Z</kbd> undo · <kbd>Esc</kbd> close.</p>`;
 }
 
@@ -1467,7 +1516,7 @@ const itemOfId = id => items.find(it => it.country.id === id) || null;
 function sizeText(c) {
   let {measure, by} = world.result;
   if (by) return sizeWords(by, c.value, c.estimate);
-  if (!measure) return sizeWords('', c.population);
+  if (!measure) return sizeWords('', c.population) + (world.result.year ? ' in ' + world.result.year : '');
   return measure + ' ' + (c.value >= 1000 ? Math.round(c.value).toLocaleString('en-US') : String(+c.value.toPrecision(3)));
 }
 
@@ -1482,7 +1531,7 @@ function renderPanel(item) {
   let drawnIds = world.neighbours[item.index].map(i => world.result.countries[i].id);
   let drawnSet = new Set(drawnIds);
   // the borders can be edited on the map as it is now, not on the map before the edits
-  let editable = !showingBefore;
+  let editable = !showingBefore && !world.result.year;
   let target = editable ? targetNeighbours(c.id) : drawnSet;
   let original = originalNear.get(c.id) || new Set();
   let rows = Array.from(new Set([...drawnIds, ...target])).map(id => ({id, name: nameOf(id),
@@ -1502,7 +1551,8 @@ function renderPanel(item) {
     if (r.state === 'pending-add') return `<li class="pending-add">${go}<span class="tag">adding…</span><button type="button" class="mini" data-toggle="${esc(r.id)}" data-key="t-${esc(r.id)}" aria-label="Don't add the border between ${cn} and ${name}">Cancel</button></li>`;
     return `<li>${go}${r.state === 'added' ? '<span class="tag">new</span>' : ''}<button type="button" class="mini cut" data-toggle="${esc(r.id)}" data-key="t-${esc(r.id)}" aria-label="Remove the border between ${cn} and ${name}" title="Remove this border and redraw the map">Remove</button></li>`;
   };
-  let addPart = !editable ? `<div class="note">This is the map before your changes. <button type="button" class="mini" data-after>Back to now</button></div>`
+  let addPart = world.result.year ? `<div class="note">This is the world in ${world.result.year}. Borders are changed on today's map. <button type="button" class="mini" data-today>Back to today</button></div>`
+    : !editable ? `<div class="note">This is the map before your changes. <button type="button" class="mini" data-after>Back to now</button></div>`
     : picking ? ''
     : `<div class="add"><form class="join"><label for="join-input">Add a border with</label><div class="row">
          <input id="join-input" placeholder="Country name" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" data-key="join"><button data-key="join-add">Add</button></div></form>
@@ -1542,6 +1592,8 @@ function renderPanel(item) {
   if (sheet) sheet.onclick = () => { sheetOpen = !info.classList.contains('open'); renderPanel(item); syncEditsTools(); requestAnimationFrame(() => ensureVisible(item)); };
   let after = info.querySelector('[data-after]');
   if (after) after.onclick = () => setBefore(false);
+  let today = info.querySelector('[data-today]');
+  if (today) today.onclick = () => { timeReset(); announce('The world today.'); };
   let pick = info.querySelector('[data-pick]');
   if (pick) pick.onclick = () => { picking = {note: ''}; renderPanel(item); syncPicking(); info.querySelector('[data-pick-cancel]').focus({preventScroll: true}); announce(`Pick on the map the country ${c.name} should border. Escape cancels.`); };
   let cancel = info.querySelector('[data-pick-cancel]');
@@ -1798,6 +1850,8 @@ function itemAt(x, y) {
 let lastTap = 0;
 function tap(e) {
   if (!world) return;
+  // (a plain frame of another year is on screen: a tap stops the years there, as on a video)
+  if (TIME.flat) { if (TIME.playing || TIME.wantPlay) timePause(); return; }
   let now = performance.now();
   if (e.pointerType === 'touch' && now - lastTap < 300) { zoomAt(e.clientX, e.clientY, 2.5); lastTap = 0; return; }
   lastTap = now;
@@ -2032,6 +2086,7 @@ function pickingTip(item) {
 // Before and after the edits: both maps are kept, so the switch is instant. A tap on "Show
 // before" switches; holding it shows the map before only while held (and so does B).
 function setBefore(on) {
+  if (world && world.result.year) timeReset();
   if (!edited || !plain || on === showingBefore || (world !== edited.world && world !== plain.world)) { syncEditsTools(); return; }
   showingBefore = on;
   let shown = on ? plain.world : edited.world;
@@ -2427,8 +2482,8 @@ function remember(entry) {
 }
 // The map is ready (data-map-state) when no world is being built or drawn and no style is being
 // put on
-const busy = {chart: false, style: 0};
-function syncReady() { html.setAttribute('data-map-state', busy.chart || busy.style ? 'loading' : 'ready'); }
+const busy = {chart: false, style: 0, time: false};
+function syncReady() { html.setAttribute('data-map-state', busy.chart || busy.style || busy.time ? 'loading' : 'ready'); }
 // Drawing a world and putting it on screen, and switching styles, take turns: neither starts while
 // the other is part way through (each is a few slices; a build in the worker runs meanwhile)
 let drawLock = Promise.resolve();
@@ -2454,6 +2509,7 @@ let chartGen = 0;
 const openedWithEdits = edits.length > 0;
 async function chart() {
   let gen = ++chartGen, stale = () => gen !== chartGen;
+  timeReset(false);     // (a year of the map there was: the new map starts from today)
   let started = performance.now();
   // UX: a newer request replaces a build still running (its worker stops)
   if (running) running.cancel();
@@ -2574,6 +2630,8 @@ async function chart() {
     if (own || back) { touched = own ? false : back.touched; Object.assign(state, view); }
     refit = false;
     show(current);
+    if (TIME.base && TIME.base.result !== current.result) timeDrop();
+    syncPlayer();
     graphTexts();
     showChecks(checkOf(current), current.result.exclaves, performance.now() - started);
     lastGood = edits.slice();
@@ -2689,6 +2747,8 @@ async function setStyle(name, how = {}) {
   let t0 = performance.now(), gen = ++styleGen, stale = () => gen !== styleGen;
   if (how.remember !== false) { try { localStorage.setItem('peopled-style', name); } catch (e) { /* no storage */ } }
   if (name === currentStyle && !how.force) { syncPicker(); return {ms: 0}; }
+  timeReset();
+  TIME.cache.clear();
   busy.style++;
   syncReady();
   syncPicker(name);
@@ -2874,6 +2934,9 @@ window.peopledMap = {
   // what the countries are sized by: '' (population), 'land' or 'gdp'; null for a dropped graph
   get sizeBy() { return sized(graphKey) ? graphKey : null; },
   setSizeBy: key => setSizeBy(key),
+  // the years: the year on screen (null: today), whether it is playing, the years worked out; play, pause, go to a year
+  get time() { return {year: TIME.year === null ? null : Math.round(TIME.year), playing: TIME.playing, flat: TIME.flat, frames: [...TIME.frames.keys()].sort((a, b) => a - b), ready: timeReady(), ms: TIME.ms, points: TIME.geo && TIME.geo.kept}; },
+  play: () => timePlay(), pause: () => timePause(), toYear: y => timeSeek(y, true),
 };
 
 // A DOT file dropped anywhere on the page. While a file is held over it, a line says what a drop does.
@@ -2905,6 +2968,325 @@ window.addEventListener('drop', async e => {
     announce(text);
   }
 });
+
+// ---------------------------------------------------------------------------------------------
+// The years. Under the map sized by population is a bar like a video player's: the world from
+// 1960 to now. A year's map is the map on screen deformed (time.js, in a worker of its own): the
+// whole world first, evenly, to that year's people, then a flow that swells and shrinks the
+// countries to theirs. It stays one sheet, so every year keeps the borders and the neighbours.
+//   Playing and dragging draw plain frames on a canvas: the countries in their colours, moved a
+//   straight line between years worked out ahead (every eighth, from now back to 1960).
+//   Stopping on a year draws it in full, like any other world: its positions worked out for that
+//   year exactly, its mountains, rivers and climate made for its shapes.
+// Borders are changed on today's map only; a new map (an edit, another world or size, another
+// style) starts again from today.
+const YEARS = {step: 8, perSecond: 5};
+const TIME = {hist: null, asked: null, worker: null, base: null, geo: null, frames: new Map(), year: null, playing: false, wantPlay: false,
+  flat: false, raf: 0, stamp: 0, at: 0, req: 0, cache: new Map(), paint: null, held: null, totals: null};
+const player = $('player'), playButton = $('play'), yearInput = $('year'), yearOut = $('year-out'), timeCanvas = $('time-canvas');
+// the map of today the years are worked out from: the one drawn for the address
+const todayWorld = () => plain && (edits.length && edited ? edited.world : plain.world);
+const timeApplies = () => !!plain && graphKey === '' && !showingBefore;
+function syncPlayer() {
+  let on = timeApplies();
+  player.hidden = !on;
+  $('credit-years').hidden = !on;
+  html.classList.toggle('has-player', on);
+  if (!on) return;
+  let h = TIME.hist, first = h ? h.first : +yearInput.min, last = h ? h.last : +yearInput.max;
+  let y = TIME.year === null ? last : TIME.year, shown = Math.round(y);
+  yearInput.value = shown;
+  let people = TIME.totals ? ` · ${(TIME.totals[shown - first] / 1e9).toFixed(2)} billion people` : '';
+  yearOut.textContent = shown + people;
+  yearInput.setAttribute('aria-valuetext', shown + people);
+  // the line: played up to the year; worked out from the earliest frame on hand to now
+  let ready = last;
+  for (let k of TIME.frames.keys()) ready = Math.min(ready, k);
+  player.style.setProperty('--played', `${(y - first) / (last - first) * 100}%`);
+  player.style.setProperty('--ready', `${(ready - first) / (last - first) * 100}%`);
+  player.classList.toggle('playing', TIME.playing);
+  player.classList.toggle('waiting', TIME.wantPlay && !TIME.playing);
+  playButton.setAttribute('aria-label', TIME.playing ? 'Pause' : y >= last ? `Play from ${first}` : 'Play');
+}
+// Everything worked out for a map that is no longer today's goes
+function timeDrop() {
+  if (TIME.worker) TIME.worker.terminate();
+  cancelAnimationFrame(TIME.raf);
+  Object.assign(TIME, {worker: null, base: null, geo: null, frames: new Map(), playing: false, wantPlay: false, cache: new Map(), req: TIME.req + 1});
+}
+// Back to today, without a word: `redraw` puts today's map on screen if a year's is there
+function timeReset(redraw = true) {
+  cancelAnimationFrame(TIME.raf);
+  TIME.playing = TIME.wantPlay = false;
+  TIME.req++;
+  let today = todayWorld();
+  if (redraw && today && world && world.result.year && world !== today) { show(today); showChecks(checkOf(today), today.result.exclaves, null); }
+  TIME.year = null;
+  timeFlat(false);
+  busy.time = false;
+  syncReady();
+  syncPlayer();
+}
+// The history and the worker, the first time they are wanted; the frames to play through
+async function timeStart() {
+  if (!timeApplies()) return false;
+  if (!TIME.hist) {
+    TIME.asked = TIME.asked || fetch('./population.json').then(r => { if (!r.ok) throw new Error('the population history did not load (' + r.status + ')'); return r.json(); });
+    try { TIME.hist = await TIME.asked; }
+    catch (error) { TIME.asked = null; showStatus(error.message + '.', '', {error: true}); return false; }
+    yearInput.min = TIME.hist.first; yearInput.max = TIME.hist.last;
+  }
+  // the people on the map in each year: its countries' own today, each changed as its history says
+  if (!TIME.totals && plain) {
+    let {series, first, last} = TIME.hist, now = last - first;
+    TIME.totals = TIME.hist.world.map((_, k) => plain.world.result.countries.reduce((sum, c) => sum + (series[c.id] ? c.population * series[c.id][k] / series[c.id][now] : 0), 0));
+  }
+  let today = todayWorld();
+  if (!today || !timeApplies()) return false;
+  if (TIME.base && TIME.base.result === today.result) { TIME.base = today; return true; }
+  let want = TIME.wantPlay;
+  timeDrop();
+  TIME.wantPlay = want;
+  TIME.base = today;
+  let h = TIME.hist, result = today.result;
+  // where each country's name stands rides along with the map
+  let poles = new Float64Array(2 * result.countries.length).fill(NaN);
+  today.items.forEach(it => { poles[2 * it.index] = it.pole.x; poles[2 * it.index + 1] = it.pole.y; });
+  let worker = TIME.worker = new Worker(new URL('./time-worker.js', import.meta.url), {type: 'module'});
+  worker.onmessage = ({data}) => {
+    if (worker !== TIME.worker) return;
+    if (data.type === 'ready') { TIME.geo = {rings: data.rings, lines: data.lines, extraAt: data.extraAt, keep: null, keptAt: 0}; TIME.frames.set(data.year, data.pts); }
+    else if (data.type === 'frame') {
+      TIME.frames.set(data.year, data.pts);
+      if (TIME.wantPlay && timeReady()) timePlay();
+      else if (TIME.flat && !TIME.playing) drawFlat(TIME.year);
+    } else if (data.type === 'world') timeWorld(data);
+    else if (data.type === 'error') { console.error('time:', data.message); timeReset(); showStatus(`That year could not be drawn: ${data.message}.`, '', {error: true}); }
+    syncPlayer();
+  };
+  worker.onerror = event => { event.preventDefault(); console.error('time worker:', event.message); timeReset(); };
+  worker.postMessage({type: 'init', result: {countries: result.countries, lines: result.lines, exclaves: result.exclaves, links: result.links, layout: result.layout},
+    history: {first: h.first, last: h.last, series: h.series, world: h.world}, seed, addons: ADDONS, extra: poles});
+  let years = [];
+  for (let y = h.last - YEARS.step; y > h.first; y -= YEARS.step) years.push(y);
+  years.push(h.first);
+  worker.postMessage({type: 'frames', years});
+  TIME.keys = [h.last, ...years].sort((a, b) => a - b);
+  return true;
+}
+const timeReady = () => !!TIME.geo && !!TIME.keys && TIME.keys.every(y => TIME.frames.has(y));
+
+// Plain frames. While one is on screen the map itself is out of sight (html.time-flat).
+function timeFlat(on) {
+  $('tip').hidden = true;      // (what the pointer was over was another year's)
+  if (TIME.flat === on) return;
+  // (a country picked out greys the others, and its panel tells of the year left behind: it is let
+  // go for the plain frames and picked again in the year they stop on)
+  if (on && selected) { TIME.held = selected.country.id; select(null, {quiet: true}); }
+  TIME.flat = on;
+  html.classList.toggle('time-flat', on);
+  timeCanvas.hidden = !on;
+  if (!on && TIME.held) {
+    let again = items.find(it => it.country.id === TIME.held);
+    TIME.held = null;
+    if (again) select(again, {quiet: true});
+  }
+  if (on) {
+    // the colours the style has on screen: each country's, the coast's, the borders', the names'.
+    // They are read from the map in sight: today's, or the year's the bar was left on
+    let seen = world && world.result.year && world.result.countries.length === TIME.base.result.countries.length ? world : TIME.base;
+    let root = getComputedStyle(html), fills = [];
+    // (a style that tints painted land says what plain land is: --plain-land. The tint is laid
+    // over it as the style lays it over its painting, by multiplying)
+    let rgb = text => { let m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(text.trim()); if (m) return m.slice(1).map(h => parseInt(h, 16));
+      m = /^rgba?\(([^)]+)\)$/.exec(text.trim()); return m ? m[1].split(',').slice(0, 3).map(Number) : null; };
+    let land = rgb(root.getPropertyValue('--plain-land'));
+    seen.items.forEach(it => {
+      let cs = getComputedStyle(it.path), tint = rgb(cs.fill), a = parseFloat(cs.fillOpacity);
+      fills[it.index] = land && tint ? `rgb(${land.map((v, i) => Math.round(v * (1 - a + a * tint[i] / 255))).join(',')})` : cs.fill;
+    });
+    // (a line's colour without what lets the ground through: stroking long lines in a see-through
+    // colour takes a canvas without a graphics card seconds a frame)
+    let solid = colour => { let m = /^rgba?\(([^)]+)\)$/.exec(colour); return m ? `rgb(${m[1].split(',').slice(0, 3).join(',')})` : colour; };
+    let line = kind => { let l = seen.lineItems.find(l => l.kind === kind), cs = l && getComputedStyle(l.node); return cs ? {stroke: solid(cs.stroke), width: parseFloat(cs.strokeWidth) || 1} : null; };
+    // the names on the map now, lettered as its largest country's is; each grows and shrinks with its country
+    let label = seen.bySize.length ? getComputedStyle(seen.bySize[0].label) : null;
+    TIME.paint = {sea: root.getPropertyValue('--sea').trim() || '#89a', fills, coast: line('coast'), border: line('border'),
+      font: label ? label.fontFamily : 'serif', weight: label ? label.fontWeight : '400', ink: label ? label.fill : '#222',
+      names: seen.items.filter(it => !it.label.classList.contains('hidden')).map(it => ({index: it.index,
+        text: it.label.children.length ? [...it.label.children].map(part => part.textContent).join(' ') : it.label.textContent,
+        font: parseFloat(it.label.getAttribute('font-size')) || it.font, area: it.area}))};
+  }
+}
+function drawFlat(y) {
+  let {geo, frames, paint} = TIME, began = performance.now();
+  if (!geo || !paint) return;
+  // the two years on hand around y
+  let lo = null, hi = null;
+  for (let k of frames.keys()) { if (k <= y && (lo === null || k > lo)) lo = k; if (k >= y && (hi === null || k < hi)) hi = k; }
+  if (lo === null) lo = hi;
+  if (hi === null) hi = lo;
+  let A = frames.get(lo), B = frames.get(hi), t = hi === lo ? 0 : (y - lo) / (hi - lo);
+  let w = stage.clientWidth, h = stage.clientHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+  if (timeCanvas.width !== Math.round(w * dpr) || timeCanvas.height !== Math.round(h * dpr)) { timeCanvas.width = Math.round(w * dpr); timeCanvas.height = Math.round(h * dpr); }
+  let g = timeCanvas.getContext('2d'), {k, x: ox, y: oy} = state;
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = paint.sea;
+  g.fillRect(0, 0, w, h);
+  // every ring keeps the points that are more than a pixel apart at this zoom (on today's map, the largest)
+  if (!geo.keep || k > geo.keptAt * 1.5 || k < geo.keptAt / 1.5) {
+    let last = frames.get(Math.max(...frames.keys())), gap = (1 / k) ** 2;
+    let thin = (start, len, closed) => {
+      let out = [start], px = last[2 * start], py = last[2 * start + 1];
+      for (let i = start + 1; i < start + len; ++i) {
+        let dx = last[2 * i] - px, dy = last[2 * i + 1] - py;
+        if (dx * dx + dy * dy >= gap || (!closed && i === start + len - 1)) { out.push(i); px = last[2 * i]; py = last[2 * i + 1]; }
+      }
+      return Int32Array.from(out);
+    };
+    geo.keep = {rings: geo.rings.map(r => thin(r.start, r.len, true)), lines: geo.lines.map(l => thin(l.start, l.len, false))};
+    geo.kept = geo.keep.rings.reduce((n, r) => n + r.length, 0) + geo.keep.lines.reduce((n, l) => n + l.length, 0);
+    geo.keptAt = k;
+  }
+  let X = i => ox + k * (A[2 * i] + (B[2 * i] - A[2 * i]) * t), Y = i => oy - k * (A[2 * i + 1] + (B[2 * i + 1] - A[2 * i + 1]) * t);
+  let paths = new Map(), area = new Map();
+  geo.rings.forEach((r, ri) => {
+    let idx = geo.keep.rings[ri];
+    if (idx.length < 3) return;
+    let p = paths.get(r.country);
+    if (!p) paths.set(r.country, p = new Path2D());
+    let a = 0, px = X(idx[idx.length - 1]), py = Y(idx[idx.length - 1]);
+    for (let j = 0; j < idx.length; ++j) {
+      let qx = X(idx[j]), qy = Y(idx[j]);
+      if (j) p.lineTo(qx, qy); else p.moveTo(qx, qy);
+      a += px * qy - qx * py; px = qx; py = qy;
+    }
+    p.closePath();
+    area.set(r.country, (area.get(r.country) || 0) + a / 2);
+  });
+  paths.forEach((p, c) => { g.fillStyle = paint.fills[c] || '#ccc'; g.fill(p, 'evenodd'); });
+  g.lineJoin = g.lineCap = 'round';
+  for (let kind of ['border', 'coast']) {
+    let look = paint[kind];
+    if (!look) continue;
+    g.strokeStyle = look.stroke; g.lineWidth = look.width;
+    g.beginPath();
+    geo.lines.forEach((l, li) => {
+      if (l.kind !== kind) return;
+      let idx = geo.keep.lines[li];
+      g.moveTo(X(idx[0]), Y(idx[0]));
+      for (let j = 1; j < idx.length; ++j) g.lineTo(X(idx[j]), Y(idx[j]));
+    });
+    g.stroke();
+  }
+  // the names of the countries large enough to hold them, as large as the style would letter them
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = paint.ink;
+  for (let n of paint.names) {
+    let a = Math.abs(area.get(n.index) || 0), i = geo.extraAt + n.index;
+    if (!(a > 0) || !(A[2 * i] === A[2 * i])) continue;
+    let size = n.font * k * Math.sqrt(a / (n.area * k * k));
+    if (size < 7) continue;
+    g.font = `${paint.weight} ${size.toFixed(1)}px ${paint.font}`;
+    g.fillText(n.text, X(i), Y(i));
+  }
+  TIME.ms = performance.now() - began;
+}
+
+// Play: from the first year if the bar is at its end; waits for the frames if they are not all in
+async function timePlay() {
+  TIME.wantPlay = true;
+  syncPlayer();
+  if (!await timeStart() || !TIME.wantPlay) { TIME.wantPlay = false; syncPlayer(); return; }
+  if (!timeReady()) return;                      // (the worker's next frame calls again)
+  let h = TIME.hist;
+  TIME.wantPlay = false;
+  TIME.playing = true;
+  TIME.req++;
+  busy.time = false;
+  if (TIME.year === null || TIME.year >= h.last) TIME.year = h.first;
+  timeFlat(true);
+  TIME.stamp = performance.now();
+  let tick = now => {
+    if (!TIME.playing) return;
+    TIME.year = Math.min(h.last, TIME.year + (now - TIME.stamp) / 1000 * YEARS.perSecond);
+    TIME.stamp = now;
+    drawFlat(TIME.year);
+    syncPlayer();
+    if (TIME.year >= h.last) { TIME.playing = false; timeSettle(h.last); return; }
+    TIME.raf = requestAnimationFrame(tick);
+  };
+  syncReady();
+  announce(`Playing the world from ${Math.round(TIME.year)}.`);
+  TIME.raf = requestAnimationFrame(tick);
+}
+function timePause() {
+  if (TIME.wantPlay && !TIME.playing) { TIME.wantPlay = false; syncPlayer(); return; }
+  if (!TIME.playing) return;
+  TIME.playing = false;
+  cancelAnimationFrame(TIME.raf);
+  timeSettle(Math.round(TIME.year));
+}
+// The bar dragged to a year: plain frames on the way, the year in full once let go
+async function timeSeek(y, done) {
+  TIME.wantPlay = false;
+  if (TIME.playing) { TIME.playing = false; cancelAnimationFrame(TIME.raf); }
+  if (!await timeStart()) return;
+  TIME.year = y;
+  if (done) { timeSettle(y); return; }
+  if (TIME.geo) { timeFlat(true); drawFlat(y); }
+  syncPlayer();
+}
+// A year in full. Today's is the map there is; another is asked of the worker (or was kept)
+function timeSettle(y) {
+  let h = TIME.hist, id = ++TIME.req;
+  TIME.year = y;
+  syncPlayer();
+  if (y >= h.last) { timeReset(); announce('The world today.'); return; }
+  let kept = TIME.cache.get(y);
+  if (kept && kept.style === currentStyle) { timeShow(kept, y); return; }
+  busy.time = true;
+  syncReady();
+  if (TIME.geo) { timeFlat(true); drawFlat(y); }
+  TIME.worker.postMessage({type: 'year', year: y, id});
+}
+// The worker's world for a year: drawn in the colours of today's map, then shown
+async function timeWorld(data) {
+  if (data.id !== TIME.req || !TIME.base) return;
+  let id = data.id, stale = () => id !== TIME.req, result = data.result;
+  Object.assign(result, {graph: graphKey, measure: null, by: '', year: data.year});
+  try {
+    let next = await locked(async () => {
+      let w = await drawWorld(result, {colours: TIME.base.colours}, stale);
+      if (stale() || !await prepare(w, {...state}, stale) || stale()) return null;
+      return w;
+    });
+    if (!next) return;
+    TIME.cache.set(data.year, next);
+    while (TIME.cache.size > 3) TIME.cache.delete(TIME.cache.keys().next().value);
+    await timeShow(next, data.year);
+  } catch (error) {
+    if (error.message !== 'cancelled' && !stale()) { console.error(error); timeReset(); }
+  }
+}
+async function timeShow(next, y) {
+  let id = TIME.req;
+  show(next);
+  showChecks(checkOf(next), next.result.exclaves, null);
+  applyView();
+  try { if (skin().settled && next.style === currentStyle) await skin().settled(next); } catch (error) { console.warn('style settled:', error); }
+  if (id !== TIME.req) return;
+  timeFlat(false);
+  busy.time = false;
+  syncReady();
+  syncPlayer();
+  announce(`The world in ${y}.`);
+}
+playButton.addEventListener('click', () => { if (TIME.playing || TIME.wantPlay) timePause(); else timePlay(); });
+yearInput.addEventListener('input', () => timeSeek(+yearInput.value, false));
+yearInput.addEventListener('change', () => timeSeek(+yearInput.value, true));
+// (the first touch of the bar starts the work, so that Play has less to wait for)
+player.addEventListener('pointerenter', () => { timeStart().then(syncPlayer); }, {once: false});
+player.addEventListener('focusin', () => { timeStart().then(syncPlayer); });
 
 chart().catch(failed);
 // the bar's corner can grow once a font arrives: fit again then, if the map was not moved yet

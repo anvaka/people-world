@@ -20,6 +20,8 @@ up.
 - Click a country to see its neighbours.
 - Remove or add a border, and the world is drawn again. It takes about 4 seconds on a laptop.
 - Size the countries by something else: `Customize...` has land area and GDP next to population.
+- Press play at the bottom left to watch the world grow from 1960 to today, or drag the bar to
+  any year. Stop on a year and it is drawn in full.
 - Switch between two styles, `ink` and `realm`. Both draw the same mountains, rivers and climate.
 - Send someone the address. It holds the world and your edits: `#world-1-cut-FR-ES-add-JP-KR` is
   world 1 without the France-Spain border and with a Japan-South Korea one.
@@ -52,6 +54,12 @@ Here is what happens when a world is made:
 An edited map starts from the world as it was, so countries that the edit doesn't touch stay
 roughly where they were.
 
+A past year is not built again. It is today's map, moved: every point of it is carried along a
+flow that shrinks each country to the size it had in that year
+([Gastner, Seguy and More, 2018](https://doi.org/10.1073/pnas.1712674115)). The borders move with
+the land, so the three rules still hold in every year, and the map changes smoothly from one year
+to the next.
+
 There is a longer description of every step, the styles and the files in
 [docs/internals.md](docs/internals.md).
 
@@ -67,6 +75,7 @@ and open http://localhost:8080. To build a few worlds in Node and check the thre
 
 ```
 node tools/check.mjs
+node tools/check.mjs 1 --years 1960,1990   # world 1, and the same world in those years
 ```
 
 ## Limitations
@@ -80,6 +89,12 @@ node tools/check.mjs
   are small territories with no figure anywhere, or with nobody living there: they get an
   estimate, their population times the median GDP per person, and the page marks it as one.
 - An edit reshapes many countries, not only the edited ones.
+- A past year keeps today's borders and today's countries: there is no Soviet Union in 1980.
+  Countries that grew the most since 1960 come out stretched in the early years: the United Arab
+  Emirates and Qatar had about 1% of the people they have now. 26 small territories have no
+  population history and change as the whole world did.
+- While the years play the map is drawn plain, without terrain. Mountains and rivers are made
+  for each year's shapes, so they differ from year to year. The year is not in the address.
 - At whole-world zoom many countries are smaller than a pixel: populations range from a few dozen
   people to 1.4 billion. A small ring marks each country that is too small to see.
 - On a phone held upright the world is a narrow band: it is about twice as wide as it is tall.
@@ -88,6 +103,9 @@ node tools/check.mjs
 
 - Countries, populations, land areas and land neighbours: [GeoNames](https://www.geonames.org/),
   CC BY 4.0.
+- Population by year: [World Bank](https://data.worldbank.org/indicator/SP.POP.TOTL), CC BY 4.0;
+  [Gapminder](https://www.gapminder.org/data/), CC BY 4.0, for Taiwan, Réunion and the
+  Palestinian Territory before 1990.
 - GDP: [World Bank](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD), CC BY 4.0. Where it
   has no figure: Taiwan's and North Korea's statistics as reported, INSEE and IEDOM for the
   French territories, the UN, and the territories' own statistics offices (each is named in

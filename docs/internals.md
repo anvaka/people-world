@@ -20,6 +20,16 @@ step by step, how a style plugs in, and what each file is for.
   for the visit; the world number and your border edits carry over. The address says which:
   `#land-world-1`, `#gdp-world-1-cut-FR-ES`. A country's panel and the tooltip give its size in
   that measure, and an estimated GDP is marked as one.
+- **The years.** Under the map sized by population there is a bar like a video player's: the
+  line is the years from 1960 to today. Play runs through them, five years a second; dragging
+  the line (or the arrow keys, Home and End while it has the focus) goes to a year. The first
+  time it takes about 10 seconds on a laptop before the years run: nine of them are worked out
+  first, and the line fills as they come. While the years move the map is drawn plain: flat
+  colours, borders, coasts and names. Stop on a year, and a few seconds later it is drawn in full,
+  with mountains and rivers made for its shapes. A country's panel then gives its people in that
+  year. Borders are changed on today's map only: the panel has a way back to today, and so does
+  the end of the line. A border edit, another world number, size or style starts again from
+  today. The year is not in the address.
 - **Customize...** also has the style and the theme: the map as ink (pen and ink on paper: hatched coasts,
   mountains and woods) or realm (a painted relief: terrain, shallows and rivers under the
   countries), the theme (light, dark, or auto: as the device is set), and what the page is.
@@ -67,6 +77,50 @@ generator works at the scale it was made for.
 A new measure is an entry in `MEASURES`, its numbers (a file like `gdp.json`), and its wording in
 `sizeWords` and `legendOf`. It has to be a total, something that adds up over countries: GDP per
 person or life expectancy as an area would mislead.
+
+## Years
+
+A past year is not built by the generator: nothing ties one build to the next, and 65 worlds
+that each look different would not play as one. A year is today's map, moved (`time.js`).
+
+- **The numbers.** `population.json` has every country's people for each year from 1960 to
+  2024: the World Bank's series, with Gapminder's for Taiwan, Réunion and the Palestinian
+  Territory before 1990, and the World Bank's Channel Islands shared between Jersey and
+  Guernsey. 26 small territories have no history anywhere: they change as the world's total
+  did, and are listed under `estimated`. `node tools/population.mjs` makes the file again.
+  The page uses only how each country changed: its people in a year are its people on the map
+  today (GeoNames) times that year's figure over the last year's. So a unit of area is the same
+  number of people in every year, and the land as a whole grows with the world's population.
+- **The flow** (`flow.js`) is the cartogram method of Gastner, Seguy and More (2018). Every
+  country gets a density, the area it should have over the area it has, and the sea takes up
+  the difference. The densities are spread on a grid of 1024 × 512 cells, and equalizing them
+  gives a velocity everywhere (a Poisson equation, solved with a cosine transform); every point
+  of the map is carried along it. What moves is the whole sheet, land and sea, so borders stay
+  borders, neighbours stay neighbours, and no two other countries come to touch.
+- **A year** (`solve` in `time.js`). The whole world is first scaled evenly to the year's total,
+  which stretches nothing. Flow passes then bring every country the grid can see to within
+  0.6% of its area. A country smaller than 24 grid cells is scaled about its own middle, and
+  what lies around it gives way. Last, boundaries are untangled: near a corner where three
+  countries meet, two pieces of boundary can lie a hair apart, and points moved one by one can
+  end on the wrong side of each other. Those are found and put back on the side they are on in
+  today's map.
+- **Playing.** A worker (`time-worker.js`) works out every eighth year back from today, each
+  from the one after it. Between two of those the page draws plain frames on a canvas: every
+  point on a straight line between its two positions, in the style's colours. A year the bar
+  stops on is asked of the worker in full: its positions (started from between the two years
+  around it), then the addons for its shapes, and the page draws that like any other world.
+  The last three years drawn are kept.
+- **Checked.** `node tools/check.mjs 1 --years 1960,1990` builds a world and those years of it
+  as the page does, and checks each year's sizes (within 1%) and that it is still a map: no two
+  pieces of boundary cross, no ring has turned over, no country lies over another. Every year
+  from 1960 to 2023 of world 1 passes, the worst size off by 0.93%; so do a dozen years each of
+  worlds 2 to 5, and of worlds 1 and 7 with three borders edited.
+
+What it costs: shapes. A country that had far fewer people is squeezed, and its neighbours
+stretch around it. In 1960, in worlds 1 to 3, half the countries are stretched by less than 1.4
+to 1 against their shape today, nine in ten by less than 2 to 1, and about twenty of the 246 by
+more: the United Arab Emirates the most, up to 4.8 to 1 (they had 1% of the people they have
+now). Back to 1992 almost none is stretched by more than 2 to 1.
 
 ## A graph of your own
 
@@ -220,7 +274,8 @@ node tools/check.mjs 1 --edits cut-FR-ES-add-JP-KR # world 1, then world 1 with 
 
 builds the worlds in Node (tested with Node 22) and checks all three rules on each, with areas
 within 1% of their share of the population. It exits with 1 when a rule fails.
-`node tools/check.mjs --dot graph.dot` does the same for a graph of your own.
+`node tools/check.mjs --dot graph.dot` does the same for a graph of your own, and
+`--years 1960,1990` adds those years of each world (see Years above).
 
 ## Known flaws
 
@@ -229,6 +284,10 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
   stretched, and most worlds have 9 to 16 exclaves.
 - An edit reshapes many countries, not only the ones edited: the warm start is not local.
 - The land is not eroded: a valley is drawn from its river's flow, and there are no lakes.
+- A past year has today's countries and borders, and its shapes are today's, squeezed: the
+  countries that grew the most are stretched in the early years. Its mountains and rivers are
+  made for its shapes, so they are not the ones of the year before. Switching what the
+  countries are sized by still builds a new world: only the years move smoothly.
 - The climate has no seasons, and its belts lie at much the same latitudes in every world: the
   deserts are always about a third of the way up the map.
 - On a phone held upright the whole world is a band across the middle of the screen: it is about
@@ -261,16 +320,28 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 | `countries.json` | the graph, with each country's population and land area |
 | `measures.js` | what the countries can be sized by, and the document for each |
 | `gdp.json` | each country's GDP (World Bank), for the map sized by it |
+| `flow.js` | the flow that carries a map to other sizes: densities on a grid, a Poisson solve, points moved |
+| `time.js` | a world in another year: `prepare`, `solve`, `deformed`, `throughYears` |
+| `time-worker.js` | works out the years off the page's thread |
+| `population.json` | each country's population for every year from 1960 |
 | `vendor/` | Delaunator, the `orient2d` predicate from robust-predicates, earcut (Realm's triangles) |
 | `tools/check.mjs` | builds worlds and checks the rules |
 | `tools/gdp.mjs` | makes `gdp.json` from the World Bank's figures and `tools/gdp-others.json` |
 | `tools/gdp-others.json` | GDP figures from other sources, for countries the World Bank has none for |
+| `tools/population.mjs` | makes `population.json` from the World Bank's series and `tools/population-others.json` |
+| `tools/population-others.json` | Gapminder's population figures for places the World Bank has no full history for |
 
 ## Credits
 
 - GDP: [World Bank](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD) (indicator
   `NY.GDP.MKTP.CD`), CC BY 4.0; for countries it has no figure for, the sources named in
   `tools/gdp-others.json`.
+- Population by year: [World Bank](https://data.worldbank.org/indicator/SP.POP.TOTL) (indicator
+  `SP.POP.TOTL`), CC BY 4.0; [Gapminder](https://www.gapminder.org/data/), CC BY 4.0, for the
+  series in `tools/population-others.json`.
+- The flow that moves the map through the years: M. T. Gastner, V. Seguy and P. More,
+  [Fast flow-based algorithm for creating density-equalizing map projections](https://doi.org/10.1073/pnas.1712674115),
+  PNAS 115 (2018). The code here is written for this map and is not theirs.
 - Countries, populations, land areas and land neighbours: [GeoNames](https://www.geonames.org/)
   ([countryInfo.txt](https://download.geonames.org/export/dump/countryInfo.txt)), CC BY 4.0.
   Left out of that list: Serbia and Montenegro and the Netherlands Antilles, which no longer

@@ -23,6 +23,8 @@ html[data-style="realm"] {
   /* (the gold is a strong yellow at half strength: lighter golds are the colours of the painted
      deserts, and the size checker would take sand for gold land) */
   --legend-land: linear-gradient(135deg, #9cbc62, #5f8a3e);
+  /* land without its painting, for the plain frames the page draws while the years play */
+  --plain-land: #c2bd7c;
   /* flat colours when nothing is painted under the map */
   --flat-c0: #dc746f; --flat-c1: #9a82cf; --flat-c2: #efc457; --flat-c3: #c07cc0;
   --flat-c4: #66b58d; --flat-c5: #f4a361; --flat-c6: #e97fae; --flat-c7: #ba8f6a;
@@ -31,6 +33,7 @@ html[data-style="realm"] {
 /* ---------------------------------------------------------------- tokens: night */
 @media (prefers-color-scheme: dark) {
   html[data-style="realm"]:not([data-theme="light"]) {
+    --plain-land: #59616a;
     --sea: #08131f;
     --ink: #efe5cf;
     --label: #f6ecd4;
@@ -52,6 +55,7 @@ html[data-style="realm"] {
   }
 }
 html[data-style="realm"][data-theme="dark"] {
+  --plain-land: #59616a;
   --sea: #08131f;
   --ink: #efe5cf;
   --label: #f6ecd4;
@@ -147,6 +151,8 @@ html[data-style="realm"] #realm-scale {
   background: var(--ui-bg); color: var(--ui-text); box-shadow: var(--ui-shadow);
   padding: 4px 10px 4px 6px; font-size: 12px; line-height: 1.35;
 }
+/* (over the bar of years, where there is one) */
+html[data-style="realm"].has-player #realm-scale { bottom: calc(var(--edge) + 78px + env(safe-area-inset-bottom)); }
 html[data-style="realm"] #realm-scale[hidden] { display: none; }
 html[data-style="realm"] #realm-scale .sq-wrap { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; }
 html[data-style="realm"] #realm-scale .sq {
