@@ -25,12 +25,12 @@ step by step, how a style plugs in, and what each file is for.
   countries), the theme (light, dark, or auto: as the device is set), and what the page is.
   Switching doesn't build the world again, and the panel closes once the map is drawn in the new
   style. The browser remembers both choices.
-- **Share a map.** The address holds the world number and the edits, so a link opens the same
+- **The address is the map.** It holds the world number and the edits, so a link opens the same
   map. `#world-1-cut-FR-ES-add-JP-KR` is world 1 without the France–Spain border and with a
   Japan–South Korea one. Countries are named by their two-letter codes. Past four edits the link
   switches to a compact code of four letters or digits per edit (`#world-1-e-0PLu1pIL…`), so a
   long editing session still fits in a link you can paste. A style other than ink ends the link
-  (`#world-1-cut-FR-ES-realm`). **share** copies the link, or opens a phone's share sheet.
+  (`#world-1-cut-FR-ES-realm`).
 - Keys: `/` finds, arrows move the map, `+` `−` zoom, `0` shows the whole world, Enter picks the
   country under the ring in the middle, B shows before, Ctrl+Z undoes, Escape closes.
 
@@ -89,7 +89,7 @@ anywhere on the page is drawn in the countries' place: every node a country, eve
 - **The address** names the graph by a key made from the file's text (`#graph-1a9qplw-world-1`),
   and the browser tab keeps the text, so reloading, Back and Forward, other world numbers and
   border edits work as they do for the countries. The file is not in the link: opened anywhere
-  else, the link shows the countries and says why, so such a map has no share link.
+  else, the link shows the countries and says why.
 
 `window.peopledMap.openDot(text, name)` does the same from the console.
 
