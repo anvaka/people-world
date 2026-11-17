@@ -1,0 +1,189 @@
+/* The atlas. Scoped to html[data-style="atlas"]. By day: a plate of a sixteenth-century atlas, the
+   sea engraved in grey, the land the paper itself, each realm coloured by hand along its outline in
+   the old pigments (verdigris, lilac, gamboge, rose, minium, sap green, sienna), the borders dotted,
+   the names in an engraver's roman. By night: the same plate pulled in pale ink on a dim vellum over
+   a deep blue-black sea, the washes deep glazes that darken the paper as pigment does (never a pale
+   band, which glows), the mountains still dark chains. The drawing is the ink style's (styles/ink.js
+   and ink-engine.js, in the atlas's look), so the classes below are the ink's: only their values
+   differ. */
+
+/* ---------------------------------------------------------------- tokens: day */
+html[data-style="atlas"] {
+  --sea: #d6d6cd;              /* the sea's paper; the engraving greys it */
+  --paper: #efebdd;            /* the margin and the blanks of the frame */
+  /* the page's controls on this sheet: panels the colour of its paper, and the red of the old
+     title pieces for whatever can be pressed */
+  --ui-bg: #f2eee1; --ui-soft: #e7e2d3; --ui-text: #241d16; --ui-text-2: rgba(36, 29, 22, 0.62);
+  --ui-line: rgba(36, 29, 22, 0.14); --ui-accent: #a3301e;
+  --ink: #241d16;              /* the printer's black, a little brown */
+  --wave-ink: #3a4244;         /* the sea's strokes (the engine sets how dark) */
+  --shore-ink: #283033;        /* the same strokes again along the coasts */
+  --rhumb-ink: rgba(36, 29, 22, 0.34);
+  --river: #2a231b;
+  --rose-fill: #efebdd;
+  --sea-name: #241d16;
+  --rubric: #241d16;           /* no red names: the atlas letters all of them in black */
+  --accent: #a3301e;
+  --veil: rgba(236, 232, 219, 0.7);
+  --lit: none;
+  /* the realms' paper (barely tinted) and, for the wash along their outlines, the pigment */
+  --land-0: #e0e1cb; --band-0: #7fae6e;   /* verdigris */
+  --land-1: #e5ddd5; --band-1: #a98bbd;   /* lilac */
+  --land-2: #ece3c6; --band-2: #e3bf45;   /* gamboge */
+  --land-3: #ebdbce; --band-3: #e07f86;   /* rose */
+  --land-4: #eddfc8; --band-4: #ec9a55;   /* minium */
+  --land-5: #e5e2c9; --band-5: #a8b55a;   /* sap */
+  --land-6: #e8decc; --band-6: #c79670;   /* sienna */
+  color-scheme: light;
+}
+/* ---------------------------------------------------------------- tokens: night */
+@media (prefers-color-scheme: dark) {
+  html[data-style="atlas"]:not([data-theme="light"]) {
+    --ui-bg: #2a2924; --ui-soft: #35332d; --ui-text: #e6dfcc; --ui-text-2: rgba(230, 223, 204, 0.62);   /* (night: panels of the sheet's dark paper, and a vermilion light enough to read on them) */
+    --ui-line: rgba(230, 223, 204, 0.14); --ui-accent: #e2735a; --ui-on-accent: #1f1d19;
+    --frame-ink: #bab29f;        /* the frame's ticks a little dimmer than the lettering: full strength they were the brightest thing on the page */
+    --sea: #121c23;
+    --paper: #272621;
+    --ink: #e4dac2;
+    --wave-ink: rgba(169, 186, 196, 0.5);
+    --shore-ink: rgba(185, 200, 208, 0.42);
+    --rhumb-ink: rgba(200, 210, 215, 0.16);
+    --river: #d3c9b1;
+    --rose-fill: #252a31;
+    --sea-name: #ddd3bb;
+    --rubric: #e4dac2;
+    --accent: #e9b85a;
+    --veil: rgba(24, 22, 19, 0.7);
+    /* one dim vellum for every realm (a hair of its pigment), and for the wash a deep glaze near the
+       paper's own value: a little darker, never paler (a band paler than the paper, by the pale
+       borders, read as a glow round each realm), and laid on a paper that is not brown, so the warm
+       pigments stay colours and do not sink into it. Sienna is lost in a dark paper; smalt takes its slot */
+    --land-0: #4b4b44; --band-0: #01503b;   /* verdigris */
+    --land-1: #4f4a46; --band-1: #5b3175;   /* lilac */
+    --land-2: #504b41; --band-2: #664600;   /* gamboge */
+    --land-3: #514944; --band-3: #7b253d;   /* rose */
+    --land-4: #514942; --band-4: #802d0f;   /* minium */
+    --land-5: #4e4b41; --band-5: #364d04;   /* sap */
+    --land-6: #4b4b47; --band-6: #034777;   /* smalt */
+    color-scheme: dark;
+  }
+}
+html[data-style="atlas"][data-theme="dark"] {
+  --ui-bg: #2a2924; --ui-soft: #35332d; --ui-text: #e6dfcc; --ui-text-2: rgba(230, 223, 204, 0.62);
+  --ui-line: rgba(230, 223, 204, 0.14); --ui-accent: #e2735a; --ui-on-accent: #1f1d19;
+  --frame-ink: #bab29f;
+  --sea: #121c23;
+  --paper: #272621;
+  --ink: #e4dac2;
+  --wave-ink: rgba(169, 186, 196, 0.5);
+  --shore-ink: rgba(185, 200, 208, 0.42);
+  --rhumb-ink: rgba(200, 210, 215, 0.16);
+  --river: #d3c9b1;
+  --rose-fill: #252a31;
+  --sea-name: #ddd3bb;
+  --rubric: #e4dac2;
+  --accent: #e9b85a;
+  --veil: rgba(24, 22, 19, 0.7);
+  --land-0: #4b4b44; --band-0: #01503b;   /* verdigris */
+  --land-1: #4f4a46; --band-1: #5b3175;   /* lilac */
+  --land-2: #504b41; --band-2: #664600;   /* gamboge */
+  --land-3: #514944; --band-3: #7b253d;   /* rose */
+  --land-4: #514942; --band-4: #802d0f;   /* minium */
+  --land-5: #4e4b41; --band-5: #364d04;   /* sap */
+  --land-6: #4b4b47; --band-6: #034777;   /* smalt */
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------- the sheet */
+/* the tiles (images in the svg): a band fades in over the one before; a tile added to a band on
+   screen fades in */
+html[data-style="atlas"] .ink-band { opacity: 1; transition: opacity 0.25s ease-out; pointer-events: none; }
+html[data-style="atlas"] .ink-band.incoming { opacity: 0; }
+html[data-style="atlas"] .ink-tile { display: block; width: 480px; height: 480px; }
+html[data-style="atlas"] .ink-tile.fresh { animation: atlas-fade 0.22s ease-out; }
+@keyframes atlas-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  html[data-style="atlas"] .ink-band { transition: none; }
+  html[data-style="atlas"] .ink-tile.fresh { animation: none; }
+}
+html[data-style="atlas"] .ink-ornament { pointer-events: none; }
+html[data-style="atlas"] .ink-ornament.hidden { display: none; }
+html[data-style="atlas"] .ink-veil path { fill: var(--veil); stroke: none; pointer-events: none; }
+html[data-style="atlas"] .lines .ink-faded { opacity: 0.32; }
+html[data-style="atlas"] .ink-seaname {
+  font-family: 'IM Fell English', Georgia, serif; font-style: normal; fill: var(--sea-name); text-anchor: middle; pointer-events: none;
+  stroke: var(--sea); stroke-opacity: 0.85; stroke-width: 0.28em; stroke-linejoin: round; paint-order: stroke;
+}
+/* the sea: its paper and the grain on the map's plate (ink.js pins the grain to the map) */
+html[data-style="atlas"] #plate { background-color: var(--sea); }
+html[data-style="atlas"] .sea-fill { fill: transparent; }
+
+/* coasts in a firm line; borders a row of dots, as the old plates have them (the washes on either
+   side tell the realms apart) */
+html[data-style="atlas"] .coast { stroke: var(--ink); stroke-width: 1.3; stroke-linecap: round; }
+html[data-style="atlas"] .border {
+  stroke: var(--ink); stroke-width: 1.8; opacity: 0.95; stroke-linecap: round; stroke-dasharray: 0 3.6;
+}
+html[data-style="atlas"] .coast.ink-fine { stroke-width: 0.9; }
+html[data-style="atlas"] .border.ink-fine { stroke-width: 1.25; stroke-dasharray: 0 2.6; }
+html[data-style="atlas"] .border.lit { stroke: var(--accent); stroke-width: 2.4; stroke-dasharray: none; opacity: 1; }
+html[data-style="atlas"] .marker { stroke: var(--ink); stroke-opacity: 0.7; stroke-width: 0.9; }
+html[data-style="atlas"] .marker.lit { stroke: var(--accent); stroke-opacity: 1; stroke-width: 1.6; }
+html[data-style="atlas"] .country.lit { filter: none; }
+html[data-style="atlas"] .country.ink-chosen.land-0 { fill: color-mix(in srgb, var(--land-0) 86%, var(--accent)); }
+html[data-style="atlas"] .country.ink-chosen.land-1 { fill: color-mix(in srgb, var(--land-1) 86%, var(--accent)); }
+html[data-style="atlas"] .country.ink-chosen.land-2 { fill: color-mix(in srgb, var(--land-2) 86%, var(--accent)); }
+html[data-style="atlas"] .country.ink-chosen.land-3 { fill: color-mix(in srgb, var(--land-3) 86%, var(--accent)); }
+html[data-style="atlas"] .country.ink-chosen.land-4 { fill: color-mix(in srgb, var(--land-4) 86%, var(--accent)); }
+html[data-style="atlas"] .country.ink-chosen.land-5 { fill: color-mix(in srgb, var(--land-5) 86%, var(--accent)); }
+html[data-style="atlas"] .country.ink-chosen.land-6 { fill: color-mix(in srgb, var(--land-6) 86%, var(--accent)); }
+html[data-style="atlas"] .country.dim { opacity: 1; }
+
+/* names: an engraver's roman, the least in its italic; the halo is the land's own paper */
+html[data-style="atlas"] .label.ink-name {
+  font-family: 'IM Fell English', Georgia, serif; font-style: normal; fill: var(--ink);
+  stroke-width: 0.16em; stroke-linejoin: round; paint-order: stroke; stroke-opacity: 0.9;
+}
+html[data-style="atlas"] .label.ink-rubric { fill: var(--rubric); }
+html[data-style="atlas"] .label.ink-t4 { font-style: italic; }
+html[data-style="atlas"] .label.ink-dim { fill-opacity: 0.45; stroke: none; }
+html[data-style="atlas"] .ink-halo-0 { stroke: var(--land-0); }
+html[data-style="atlas"] .ink-halo-1 { stroke: var(--land-1); }
+html[data-style="atlas"] .ink-halo-2 { stroke: var(--land-2); }
+html[data-style="atlas"] .ink-halo-3 { stroke: var(--land-3); }
+html[data-style="atlas"] .ink-halo-4 { stroke: var(--land-4); }
+html[data-style="atlas"] .ink-halo-5 { stroke: var(--land-5); }
+html[data-style="atlas"] .ink-halo-6 { stroke: var(--land-6); }
+html[data-style="atlas"] .label.ink-mark {
+  font-family: 'IM Fell English', Georgia, serif; font-style: italic; fill: var(--ink); dominant-baseline: central;
+  stroke: var(--sea); stroke-opacity: 0.85; stroke-width: 0.25em; stroke-linejoin: round; paint-order: stroke;
+}
+html[data-style="atlas"] .label.ink-mark.lit { fill: var(--accent); }
+html[data-style="atlas"] .ink-marks .hidden { display: none; }
+
+/* ---------------------------------------------------------------- the sheet's frame */
+/* a band of degrees round the map, inked and blank by turns between two fine lines, with a margin
+   of paper outside it */
+html[data-style="atlas"] #atlas-frame { position: fixed; inset: 0; pointer-events: none; --tick: 6px; --step: 32px; }
+html[data-style="atlas"] #atlas-frame::before {
+  /* (the border is clear: a border is painted over the background, where the ticks are) */
+  content: ''; position: absolute; inset: 7px; border: var(--tick) solid transparent;
+  background:
+    repeating-linear-gradient(90deg, var(--frame-ink, var(--ink)) 0 var(--step), var(--paper) 0 calc(2 * var(--step))) top left / 100% var(--tick) no-repeat border-box,
+    repeating-linear-gradient(90deg, var(--frame-ink, var(--ink)) 0 var(--step), var(--paper) 0 calc(2 * var(--step))) bottom left / 100% var(--tick) no-repeat border-box,
+    repeating-linear-gradient(180deg, var(--frame-ink, var(--ink)) 0 var(--step), var(--paper) 0 calc(2 * var(--step))) top left / var(--tick) 100% no-repeat border-box,
+    repeating-linear-gradient(180deg, var(--frame-ink, var(--ink)) 0 var(--step), var(--paper) 0 calc(2 * var(--step))) top right / var(--tick) 100% no-repeat border-box;
+  box-shadow: 0 0 0 1px var(--frame-ink, var(--ink)), inset 0 0 0 1px var(--frame-ink, var(--ink)), 0 0 0 7px var(--paper);
+}
+
+/* ---------------------------------------------------------------- the page's controls */
+/* (the page draws its own controls; this style only tints them, in the tokens at the top. The
+   sheet's frame takes the first few pixels of the window, so they sit inside it.) */
+html[data-style="atlas"] { --edge: 22px; }
+html:not([data-style="atlas"]) #atlas-frame { display: none; }
+
+@media (max-width: 600px) {
+  html[data-style="atlas"] { --edge: 15px; }
+  html[data-style="atlas"] #atlas-frame { --tick: 4px; --step: 22px; }
+  html[data-style="atlas"] #atlas-frame::before { inset: 4px; box-shadow: 0 0 0 1px var(--frame-ink, var(--ink)), inset 0 0 0 1px var(--frame-ink, var(--ink)), 0 0 0 4px var(--paper); }
+}
