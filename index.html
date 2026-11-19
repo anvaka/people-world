@@ -197,12 +197,15 @@
   header .message.alert { color: var(--ui-accent); }
   /* (an open panel says more than the welcome under it) */
   header .panel:not([hidden]) ~ .welcome { display: none; }
-  header .panel { padding: 2px 10px 10px; overflow-y: auto; overscroll-behavior: contain;
+  header .panel { padding: 6px 14px 14px; overflow-y: auto; overscroll-behavior: contain;
+    scrollbar-width: thin; scrollbar-color: var(--ui-line) transparent;
     max-height: calc(100vh - 76px - 2 * var(--edge) - env(safe-area-inset-top) - env(safe-area-inset-bottom)); box-sizing: border-box; }
-  header .panel h3 { margin: 8px 0 4px; font-size: 16px; font-weight: normal; text-align: right; }
-  header .prow { display: flex; margin-top: 4px; min-height: 32px; }
-  header .prow > .plabel { flex: 1; padding-top: 7px; }
-  header .prow > .pval { flex: 2; min-width: 0; }
+  header .panel h3 { margin: 0; font-size: 15px; font-weight: 500; }
+  /* a setting: its name in a narrow column, what it can be set to beside it, centred on one line */
+  header .prow { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); column-gap: 12px; align-items: center;
+    min-height: 36px; margin-top: 8px; }
+  header .prow > .plabel { font-size: 13px; color: var(--ui-text-2); }
+  header .prow > .pval { min-width: 0; justify-self: start; }
   /* the search field's clear button, in the field's own colour */
   input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; width: 12px; height: 12px;
     margin-left: 6px; cursor: pointer; background: currentColor; opacity: 0.55;
@@ -222,24 +225,46 @@
   /* Customize: what the countries are sized by, the style that draws the map (each with a swatch
      of its look in the theme shown now), the theme (light, dark, or as the device is set), and
      what this page is */
-  #style-box .choices { display: flex; gap: 4px; }
-  #style-box button.choice { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 64px; height: auto;
-    padding: 4px 0 3px; font-size: 12px; color: var(--ui-text); }
+  /* (the frame of a set of choices: the text's own colour, faint, so it reads on every paper) */
+  #style-box { --frame: var(--ui-line); --frame: color-mix(in srgb, var(--ui-text) 22%, transparent); }
+  #style-box .choices { display: flex; gap: 16px; padding: 6px 0 2px; }
+  #style-box button.choice { display: flex; flex-direction: column; align-items: center; gap: 7px; width: auto; height: auto;
+    padding: 0; font-size: 12px; color: var(--ui-text-2); }
   #style-box button.choice:hover { background: none; color: var(--ui-accent); }
+  #style-box button.choice:hover .swatch { box-shadow: 0 0 0 2px var(--ui-bg), 0 0 0 3px var(--frame); }
   #style-box button.choice[aria-checked="true"] { color: var(--ui-accent); }
-  #style-box button.choice[aria-checked="true"] .swatch { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+  #style-box button.choice[aria-checked="true"] .swatch { box-shadow: 0 0 0 2px var(--ui-bg), 0 0 0 4px var(--ui-accent); }
+  #style-box button.choice:focus-visible { outline-offset: 5px; }
   #style-box button.choice[aria-busy="true"] .nm::after { content: '…'; }
-  .swatch { display: block; flex: none; width: 40px; height: 28px; border: 1px solid var(--ui-line); box-sizing: border-box; }
+  .swatch { display: block; flex: none; width: 52px; height: 34px; border: 1px solid var(--ui-line); box-sizing: border-box; }
   .swatch.ink { background: var(--swatch-ink); }
   .swatch.realm { background: var(--swatch-realm); }
   .swatch.atlas { background: var(--swatch-atlas); }
-  #style-box .themes { display: flex; flex-wrap: wrap; }
-  #style-box .themes button { height: 32px; padding: 0 10px; }
+  /* the other choices: one framed strip, its parts split by hairlines, the one picked filled */
+  #style-box .themes { display: inline-flex; border: 1px solid var(--frame); }
+  #style-box .themes button { height: 30px; padding: 0 12px; font-size: 13px; white-space: nowrap; }
+  #style-box .themes button + button { border-left: 1px solid var(--frame); }
+  #style-box .themes button:hover { background: var(--ui-soft); color: var(--ui-accent); }
   #style-box .themes button[aria-checked="true"], #style-box .themes button[aria-checked="true"]:hover { background: var(--ui-accent); color: var(--ui-on-accent); }
-  #about { font-size: 13px; line-height: 1.5; }
-  #about p { margin: 6px 0; text-wrap: pretty; }
+  /* About: under a hairline, what this is; then, on a tint of its own, how this map came out; the keys */
+  #about-head { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--ui-line); }
+  #about-head:focus { outline: none; }
+  #about { font-size: 13px; line-height: 1.55; }
+  #about p { margin: 8px 0; text-wrap: pretty; }
   #about ul { margin: 6px 0; padding: 0; list-style: none; }
-  #about li { margin: 2px 0; }
+  #about li { margin: 3px 0; }
+  #about .report { margin: 12px 0; padding: 2px 12px; background: var(--ui-soft); font-size: 12px; color: var(--ui-text-2);
+    font-variant-numeric: tabular-nums; }
+  #about .report li { padding-left: 1.1em; text-indent: -1.1em; }
+  #about .report .ok { color: var(--ui-text); }
+  #about .report li > span:first-child:not(.ok) { color: var(--ui-accent); }
+  /* the keys: what each does, and its keys at the right, as a menu lists them */
+  #about .keys-head { margin: 12px 0 6px; color: var(--ui-text-2); font-size: 12px; }
+  #about .keys { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 5px 12px; align-items: baseline;
+    margin: 0 0 12px; font-size: 12px; }
+  #about .keys li { display: contents; }
+  #about .keys .k { white-space: nowrap; justify-self: end; }
+  #about .keys kbd + kbd { margin-left: 2px; }
   #checks { font-variant-numeric: tabular-nums; }
   a.support { white-space: nowrap; }
   a.support .cup { width: 1.15em; height: 1.15em; margin-right: 0.25em; vertical-align: -0.2em; fill: none; stroke: currentColor;
@@ -443,7 +468,7 @@
     </div>
   </div>
   <div id="style-box" class="panel" hidden>
-    <h3>Display</h3>
+    <h3 class="sr-only">Display</h3>
     <div class="prow" id="size-row">
       <div class="plabel" id="size-head">Size by</div>
       <div class="pval themes" role="radiogroup" aria-labelledby="size-head">
@@ -1366,7 +1391,7 @@ function showChecks(check, exclaves, ms) {
     `${check.extra} false, sizes within ${pct}%. <a href="#about" data-about>Learn more.</a>`;
   let mark = good => `<span class="${good ? 'ok' : ''}">${good ? '✓' : '✗'}</span>`;
   let which = edits.length ? (showingBefore ? ', before your changes' : `, with your ${edits.length} change${edits.length > 1 ? 's' : ''}`) : '';
-  document.getElementById('about-body').innerHTML = `<p>This map was checked after it was drawn:</p><ul>
+  document.getElementById('about-body').innerHTML = `<div class="report"><p>This map was checked after it was drawn:</p><ul>
       <li>${mark(check.missing === 0)} Neighbours share a border: ${check.pairs - check.missing} of ${check.pairs} pairs do.</li>
       <li>${mark(check.extra === 0)} Countries that are not neighbours never touch: ${check.extra} false borders.</li>
       <li>${mark(check.worst < 0.01)} Each country's area is its share of ${by ? MEASURES[by].whole : measure ? 'all the ' + escapeHtml(measure) : 'the world\'s people'}` +
@@ -1375,8 +1400,16 @@ function showChecks(check, exclaves, ms) {
     ${measure && !by && !ok ? '<p>Not every graph can be drawn by these rules: one with many links to a node, or one node linked to very many, runs out of room.</p>' : ''}
     <p>${exclaves.length} exclaves: no flat map can give every pair of neighbours a border, so ${exclaves.length} borders are made by a detached piece of one country touching the other, like Kaliningrad.</p>
     <p>World ${seed}${which}${ms ? `, drawn in ${(ms / 1000).toFixed(1)} s` : ''}. Each world number draws the same countries differently.` +
-    (edits.length && !showingBefore && edited && edited.scratch ? ' Drawn from scratch: the last change didn’t fit into the map as it was, so countries moved.' : '') + `</p>
-    <p>Keys: <kbd>/</kbd> find · arrows, <kbd>+</kbd> <kbd>−</kbd> and <kbd>0</kbd> move the map · <kbd>Enter</kbd> picks the country in the middle · <kbd>B</kbd> before and after · <kbd>Ctrl</kbd> <kbd>Z</kbd> undo · <kbd>Esc</kbd> close.</p>`;
+    (edits.length && !showingBefore && edited && edited.scratch ? ' Drawn from scratch: the last change didn’t fit into the map as it was, so countries moved.' : '') + `</p></div>
+    <p class="keys-head">Keys</p>
+    <ul class="keys">
+      <li><span>find</span><span class="k"><kbd>/</kbd></span></li>
+      <li><span>move the map</span><span class="k"><kbd>arrows</kbd> <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd></span></li>
+      <li><span>pick the country in the middle</span><span class="k"><kbd>Enter</kbd></span></li>
+      <li><span>before and after</span><span class="k"><kbd>B</kbd></span></li>
+      <li><span>undo</span><span class="k"><kbd>Ctrl</kbd> <kbd>Z</kbd></span></li>
+      <li><span>close</span><span class="k"><kbd>Esc</kbd></span></li>
+    </ul>`;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2768,12 +2801,14 @@ function syncPicker(pending) {
   note.hidden = !pending;
   note.textContent = pending ? `Drawing the map in ${styleTitle[pending]}…` : '';
 }
-function openStyles() {
+// (the focus goes into the panel when it was opened from the keyboard; opened with a click, it
+// stays put)
+function openStyles(focusInside = true) {
   styleBox.hidden = false;
   styleBox.scrollTop = 0;
   styleButton.setAttribute('aria-expanded', 'true');
   syncPicker();
-  styleBox.querySelector('[data-pick-style][aria-checked="true"]').focus({preventScroll: true});
+  if (focusInside) styleBox.querySelector('[data-pick-style][aria-checked="true"]').focus({preventScroll: true});
 }
 // "Learn more": the same panel, at what this page is
 document.querySelector('header.cartouche').addEventListener('click', e => {
@@ -2794,11 +2829,11 @@ function closeStyles(refocus = true) {
 }
 // A click (or Enter) on a style picks it and closes the menu once the map is drawn in it (until
 // then the menu says what it is drawing); the arrow keys only move the pick, as in any radio group
-function pickStyle(name, fold) {
+function pickStyle(name, fold, refocus = true) {
   setStyle(name).then(done => {
     if (!done) return;           // another pick came after this one
     if (done.ms) announce(`The map is drawn in ${styleTitle[name]}.`);
-    if (fold && !styleBox.hidden) closeStyles();
+    if (fold && !styleBox.hidden) closeStyles(refocus);
   }, failed);
 }
 function setTheme(name) {
@@ -2810,7 +2845,9 @@ function setTheme(name) {
   syncPicker();
   announce(name === 'auto' ? 'Light or dark as your device is set.' : `The map is ${name}.`);
 }
-styleButton.addEventListener('click', () => { if (styleBox.hidden) openStyles(); else closeStyles(); });
+// (a click from Enter or Space has no presses: detail 0. The focus moves for the keyboard only,
+// opening or closing: moved by a script after a click, the browser rings it as if tabbed to.)
+styleButton.addEventListener('click', e => { if (styleBox.hidden) openStyles(e.detail === 0); else closeStyles(e.detail === 0); });
 // a press anywhere outside the menu and its button closes it
 document.addEventListener('pointerdown', e => {
   if (!styleBox.hidden && !e.target.closest('#style-box, #style-button')) closeStyles(false);
@@ -2826,11 +2863,11 @@ function radioKeys(button, list, attr, pick) {
   });
 }
 styleBox.querySelectorAll('[data-pick-style]').forEach(button => {
-  button.addEventListener('click', () => pickStyle(button.dataset.pickStyle, true));
+  button.addEventListener('click', e => pickStyle(button.dataset.pickStyle, true, e.detail === 0));
   radioKeys(button, STYLES, 'pickStyle', name => pickStyle(name));
 });
 styleBox.querySelectorAll('[data-pick-theme]').forEach(button => {
-  button.addEventListener('click', () => { setTheme(button.dataset.pickTheme); closeStyles(); });
+  button.addEventListener('click', e => { setTheme(button.dataset.pickTheme); closeStyles(e.detail === 0); });
   radioKeys(button, THEMES, 'pickTheme', setTheme);
 });
 // What the countries are sized by: another map of the same world and edits, at an address of its
@@ -2841,7 +2878,7 @@ function setSizeBy(key) {
   announce(`Drawing the countries by ${MEASURES[key].name}.`);
 }
 styleBox.querySelectorAll('[data-pick-size]').forEach(button => {
-  button.addEventListener('click', () => { setSizeBy(button.dataset.pickSize); closeStyles(); });
+  button.addEventListener('click', e => { setSizeBy(button.dataset.pickSize); closeStyles(e.detail === 0); });
   radioKeys(button, Object.keys(MEASURES), 'pickSize', key => { setSizeBy(key); syncPicker(); });
 });
 syncPicker();
