@@ -22,8 +22,9 @@ step by step, how a style plugs in, and what each file is for.
   that measure, and an estimated GDP is marked as one.
 - **Customize...** also has the style and the theme: the map as ink (pen and ink on paper: hatched coasts,
   mountains and woods), realm (a painted relief: terrain, shallows and rivers under the
-  countries) or atlas (a plate of a sixteenth-century atlas: an engraved sea, each country
-  coloured by hand along its outline, dotted borders, mountains in dark chains), the theme (light, dark, or auto: as the device is set), and what the page is.
+  countries), atlas (a plate of a sixteenth-century atlas: an engraved sea, each country
+  coloured by hand along its outline, dotted borders, mountains in dark chains) or dots (only
+  people: one dot for every so many, on one even grid over the world), the theme (light, dark, or auto: as the device is set), and what the page is.
   Switching doesn't build the world again, and the panel closes once the map is drawn in the new
   style. The browser remembers both choices.
 - **Share a map.** The address holds the world number and the edits, so a link opens the same
@@ -189,6 +190,22 @@ calls the map ready, and `unmount()` when another style is picked. A style's can
 `#plate` with the map, so a gesture moves them together. The comment above `skin()` in
 `index.html` lists the hooks.
 
+Dots draws no land at all, only people (`styles/dots.js`). This map gives every person the same
+room, so one dot for every so many people lies on one even grid over the whole world, the same
+distance apart in every country; a country is where its dots are. The grid is fixed to the map, so
+the dots keep their places as it moves, and how many people a dot stands for follows the zoom: a
+million at whole-world zoom on a laptop, then a hundred thousand, ten thousand, down to one person,
+always a power of ten when one puts the dots a comfortable distance apart (about 6 to 11 pixels on
+a laptop, closer on a phone), and 2 or 5 of one otherwise. On a phone the whole world is smaller, so
+there a dot starts at ten million. The legend at the
+bottom left says how many. Which country a dot falls in is read from an id map: every country in
+view filled in a colour of its own on a canvas off screen; a dot on the very edge of a shape is
+tested against the shapes around it exactly. A dot with another country within a third of the
+spacing shrinks to a pinprick, and that is the border. The svg's countries are left unfilled, there
+for the pointer only, its coasts and borders are not stroked, and the page letters the names (the
+style has no render hook), which the style keeps from growing past 46 pixels on screen. Sized by
+land area or GDP, a dot is so many km² or dollars.
+
 Atlas is drawn by Ink's code in another look. `styles/atlas.js` only imports `ink.js?look=atlas`:
 the address differs, so the browser runs `ink.js` a second time as a module of its own, with its own
 workers, colours, names and tiles, and it registers `window.mapStyles.atlas`. The look travels to
@@ -249,7 +266,7 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 | file | what it does |
 | --- | --- |
 | `index.html` | the page: drawing, pan and zoom, border editing, the controls |
-| `styles/` | the three styles: `ink`, `realm` and `atlas` (`.css`, `.js`, `.fonts` and helpers; atlas is drawn by ink's code) |
+| `styles/` | the four styles: `ink`, `realm`, `atlas` and `dots` (`.css`, `.js`, `.fonts` and helpers; atlas is drawn by ink's code) |
 | `worker.js` | runs the generator off the main thread |
 | `dot.js` | reads a DOT file into a graph the generator draws; loaded when a file is dropped |
 | `world.js` | the pipeline, `buildWorld(graph, {seed, base, addons})` |
@@ -290,4 +307,4 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 - [earcut](https://github.com/mapbox/earcut) by Mapbox, ISC license (`vendor/LICENSE-earcut`).
 - Fonts from [Google Fonts](https://fonts.google.com/), SIL Open Font License: Eagle Lake,
   Fondamento and Sorts Mill Goudy (Ink), Alegreya and Alegreya SC (Realm), IM Fell English
-  (Atlas).
+  (Atlas), Inter (Dots).

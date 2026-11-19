@@ -1,0 +1,89 @@
+/* The dots. Scoped to html[data-style="dots"]. One dot for every so many people, the same distance
+   apart all over the world, because this map gives everyone the same room (styles/dots.js draws
+   them on a canvas under the svg). Nothing else of the land is drawn: the svg's countries are
+   only there for the pointer to find, its coasts and borders are not stroked, and the names sit on
+   the dots with a halo of the paper. By day black dots on a warm paper with one red for the chosen
+   country; by night pale dots on black. */
+
+/* ---------------------------------------------------------------- tokens: day */
+html[data-style="dots"] {
+  --sea: #f3f1ec;              /* the paper: there is no sea, only where the dots are not */
+  --ink: #161514;
+  --accent: #e2412b;
+  --dot: #161514;              /* a dot */
+  --dot-lit: #e2412b;          /* the chosen country's dots */
+  --dot-faint: rgba(22, 21, 20, 0.2);   /* the dots of countries not lit while one is chosen */
+  --lit: none;
+  /* the page's controls on this paper: panels a shade lighter than it, and its red (a little
+     deeper than the dots', to read as text) for whatever can be pressed */
+  --ui-bg: #fbfaf7; --ui-soft: #efede7; --ui-text: #161514; --ui-text-2: rgba(22, 21, 20, 0.6);
+  --ui-line: rgba(22, 21, 20, 0.12); --ui-accent: #c8331e;
+  --ui-font: 'Inter', Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+/* ---------------------------------------------------------------- tokens: night */
+@media (prefers-color-scheme: dark) {
+  html[data-style="dots"]:not([data-theme="light"]) {
+    --sea: #121417;
+    --ink: #ece6d9;
+    --accent: #ff6a4d;
+    --dot: #ece6d9;
+    --dot-lit: #ff6a4d;
+    --dot-faint: rgba(236, 230, 217, 0.18);
+    --ui-bg: #1d2024; --ui-soft: #272a2f; --ui-text: #ece6d9; --ui-text-2: rgba(236, 230, 217, 0.6);
+    --ui-line: rgba(236, 230, 217, 0.14); --ui-accent: #ff6a4d; --ui-on-accent: #121417;
+    color-scheme: dark;
+  }
+}
+html[data-style="dots"][data-theme="dark"] {
+  --sea: #121417;
+  --ink: #ece6d9;
+  --accent: #ff6a4d;
+  --dot: #ece6d9;
+  --dot-lit: #ff6a4d;
+  --dot-faint: rgba(236, 230, 217, 0.18);
+  --ui-bg: #1d2024; --ui-soft: #272a2f; --ui-text: #ece6d9; --ui-text-2: rgba(236, 230, 217, 0.6);
+  --ui-line: rgba(236, 230, 217, 0.14); --ui-accent: #ff6a4d; --ui-on-accent: #121417;
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------- the map */
+/* the dots' canvas, under the svg and moved with it */
+html[data-style="dots"] #dots-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+html:not([data-style="dots"]) #dots-layer, html:not([data-style="dots"]) #dots-scale { display: none; }
+/* the svg draws no land: its countries only answer the pointer, its sea lets the dots through */
+html[data-style="dots"] .sea-fill { fill: transparent; }
+html[data-style="dots"] .country, html[data-style="dots"] .country.lit, html[data-style="dots"] .country.dim { fill: transparent; stroke: none; opacity: 1; filter: none; }
+html[data-style="dots"] .coast, html[data-style="dots"] .border, html[data-style="dots"] .border.lit { stroke: none; }
+/* (the border a neighbour's row in the panel points at still shows) */
+html[data-style="dots"] .border.hot { stroke: var(--accent); stroke-width: 3; stroke-dasharray: none; opacity: 1; }
+html[data-style="dots"] .marker { stroke: var(--ink); stroke-opacity: 0.55; stroke-width: 1; }
+html[data-style="dots"] .marker.lit { stroke: var(--accent); stroke-opacity: 1; stroke-width: 1.8; }
+
+/* names: a plain sans, capitals for the countries of more than thirty million, on a halo of paper */
+html[data-style="dots"] .label {
+  font-family: 'Inter', Helvetica, Arial, sans-serif; font-weight: 600; font-style: normal; letter-spacing: 0.01em;
+  fill: var(--ink); stroke: var(--sea); stroke-width: 0.32em; stroke-linejoin: round; paint-order: stroke;
+}
+html[data-style="dots"] .label:not(.small) { font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+html[data-style="dots"] .label.small { font-family: 'Inter', Helvetica, Arial, sans-serif; font-style: normal; }
+html[data-style="dots"] .label.dots-dim { fill-opacity: 0.4; }
+
+/* ---------------------------------------------------------------- the legend */
+/* (the page draws its own controls, the same in every style; the legend is dressed as one of them)
+   one dot, as large as on the map, and how many it stands for at this zoom */
+html[data-style="dots"] #dots-scale {
+  position: fixed; left: calc(var(--edge) + env(safe-area-inset-left)); bottom: calc(var(--edge) + 22px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 8px; pointer-events: none;
+  background: var(--ui-bg); color: var(--ui-text); box-shadow: var(--ui-shadow);
+  padding: 6px 10px 6px 8px; font-size: 12px; line-height: 1.35;
+}
+html[data-style="dots"] #dots-scale[hidden] { display: none; }
+html[data-style="dots"] #dots-scale .dot-wrap { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+html[data-style="dots"] #dots-scale .dot { display: block; border-radius: 50%; background: var(--dot); }
+html[data-style="dots"] #dots-scale .cap { color: var(--ui-text-2); }
+
+@media (max-width: 600px) {
+  /* the legend gives way to the bottom sheet */
+  html[data-style="dots"].dock-open #dots-scale { display: none; }
+}

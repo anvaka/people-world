@@ -20,8 +20,10 @@ up.
 - Click a country to see its neighbours.
 - Remove or add a border, and the world is drawn again. It takes about 4 seconds on a laptop.
 - Size the countries by something else: `Customize...` has land area and GDP next to population.
-- Switch between three styles: `ink`, `realm` and `atlas` (an engraved map coloured by hand, after
-  the sixteenth-century atlases). All draw the same mountains, rivers and climate.
+- Switch between four styles: `ink`, `realm` and `atlas` (an engraved map coloured by hand, after
+  the sixteenth-century atlases) draw the same mountains, rivers and climate; `dots` draws only
+  people: one dot for every million of them, spaced the same everywhere, because this map gives
+  everyone the same room. Zoom in and a dot stands for fewer people.
 - Share a link. The address holds the world and your edits: `#world-1-cut-FR-ES-add-JP-KR` is
   world 1 without the France-Spain border and with a Japan-South Korea one.
 - Drop a Graphviz `.dot` file onto the page to see your own graph as a map. Small graphs that are
