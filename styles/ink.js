@@ -18,11 +18,20 @@
 // picture; when it rests the page only places tiles (new ones fade in) and asks the worker for the
 // missing ones, so the main thread never draws ink. Where a worker cannot draw, the page draws the
 // tiles itself, one at a time.
+//
+// The same code draws the atlas (styles/atlas.js), an engraved map coloured by hand in the manner of
+// the sixteenth-century atlases. That style imports this module as './ink.js?look=atlas': a module
+// of its own, with its own workers, papers, names and tiles, registered as window.mapStyles.atlas.
+// LOOK is the style's name; the engine reads it from the palette and draws the atlas's sea, washes
+// and mountains in place of the ink's.
 import {createEngine, packWorld, bandOf, bandK, TILE_PX, roseRadius, vignetteSize, grainTile, drawOrnament} from './ink-engine.js';
 
+const LOOK = new URL(import.meta.url).searchParams.get('look') === 'atlas' ? 'atlas' : 'ink';
+const ATLAS = LOOK === 'atlas';
 const NS = 'http://www.w3.org/2000/svg';
 const html = document.documentElement;
-const active = () => html.dataset.style === 'ink';
+const active = () => html.dataset.style === LOOK;
+const FRAME = LOOK + '-frame';
 const darkQuery = matchMedia('(prefers-color-scheme: dark)');
 const isDark = () => html.dataset.theme === 'dark' || (html.dataset.theme !== 'light' && darkQuery.matches);
 const SLOTS = 7;
@@ -38,7 +47,8 @@ let pal = null;
 function readPalette() {
   let cs = getComputedStyle(html), v = name => cs.getPropertyValue(name).trim();
   pal = {
-    dark: isDark(), theme: isDark() ? 'd' : 'l',
+    // (the theme names the tiles and the palette in the engine: the atlas's apart from the ink's)
+    look: LOOK, dark: isDark(), theme: (ATLAS ? 'a' : '') + (isDark() ? 'd' : 'l'),
     ink: v('--ink'), sea: v('--sea'), shore: v('--shore-ink'), wave: v('--wave-ink'), rhumb: v('--rhumb-ink'),
     river: v('--river'), roseFill: v('--rose-fill'), accent: v('--accent'),
     land: Array.from({length: SLOTS}, (_, i) => v('--land-' + i)),
@@ -63,7 +73,8 @@ function labOf(hex) {
 function colourSlots(world, known) {
   let theme = pal.theme;
   if (known && known.slots && known.slots[theme]) return known.slots[theme];
-  let labs = pal.land.map(labOf);
+  // (the atlas tells its realms apart by the washes along their borders; the ink by its papers)
+  let labs = (ATLAS ? pal.band : pal.land).map(labOf);
   let gap = (a, b) => Math.hypot(2 * (labs[a][0] - labs[b][0]), labs[a][1] - labs[b][1], labs[a][2] - labs[b][2]);
   let slot = new Int8Array(world.result.countries.length).fill(-1);
   let order = world.items.map(it => it.index).sort((a, b) => world.neighbours[b].length - world.neighbours[a].length || a - b);
@@ -204,11 +215,14 @@ function render(world) {
   // the survey once the map is on screen, so the first picture is not held up by it
   if (!world.ink.survey) setTimeout(() => { if (active() && world.ink && !world.ink.survey) startSurvey(world); }, 30);
   planNames(world);
+  // once the font is in: the names lettered before it, fitted again in it, and the seas' names
   fontsLoaded.then(() => {
-    if (!world.ink || !world.ink.letteredEarly) return;
-    world.ink.letteredEarly = false;
-    world.ink.known.plans = null;
-    world.items.forEach(item => { item.inkName = null; item.label.classList.add('hidden'); });
+    if (!world.ink || !(world.ink.letteredEarly || !world.ink.seaNameList)) return;
+    if (world.ink.letteredEarly) {
+      world.ink.letteredEarly = false;
+      world.ink.known.plans = null;
+      world.items.forEach(item => { item.inkName = null; item.label.classList.add('hidden'); });
+    }
     if (current && current.world === world && active()) view(world, current.state, current.selected);
   });
 }
@@ -545,6 +559,12 @@ function placeFurniture(world, state) {
   let seed = seedOf();
   let decor = {rose, ship: shipS && {...shipS, dir: seed % 2 ? 1 : -1}, serpent: serp && {...serp, dir: seed % 3 ? -1 : 1}, clear: []};
   if (rose) decor.clear.push([rose.x, rose.y, roseRadius(rose, k) * 1.4]);
+  // (the atlas) the web of a sea chart: besides the rose's own lines, more from eight points on a
+  // great circle round it, as the old charts drew theirs
+  if (ATLAS && rose) {
+    let b = world.box, R = 0.42 * Math.max(b.maxX - b.minX, b.maxY - b.minY);
+    decor.web = Array.from({length: 8}, (_, i) => ({x: rose.x + R * Math.cos((i + 0.5) * Math.PI / 4), y: rose.y + R * Math.sin((i + 0.5) * Math.PI / 4)}));
+  }
   [decor.ship, decor.serpent].forEach(s => { if (s) decor.clear.push([s.x, s.y, vignetteSize(s, k) * 2.2]); });
   ink.decor = ink.known.decor = decor;
   ink.nameSpots = ink.known.nameSpots = sp.names.filter(s => !used.has(s));
@@ -610,9 +630,15 @@ function ornaments(world, state) {
 // The seas' names in spaced italic capitals on a gentle arch, as svg text under the countries,
 // chosen once (where the open water holds them) and kept the same size on screen
 const SEAS = {west: 'Mare Occidentale', east: 'Mare Orientale', south: 'Mare Australe', north: 'Mare Septentrionale', mid: 'Mare Medium'};
+// (the atlas: the open ocean round the world is an oceanus, where it holds the longer name, and the
+// names are in spaced roman capitals, as an engraver cut them)
+const OCEANS = {west: 'Oceanus Occidentalis', east: 'Oceanus Orientalis', south: 'Oceanus Australis', north: 'Oceanus Septentrionalis'};
+const SEA_ITALIC = !ATLAS;
 function seaNames(world, state) {
   let ink = world.ink, k = state.k;
-  if (!ink.seaNameList) chooseSeaNames(world, state);
+  // (chosen once the lettering's font is in: they are measured in it, and a name measured in the
+  // fallback font would run off the end of its arc)
+  if (!ink.seaNameList) { if (!fontsReady) return; chooseSeaNames(world, state); }
   for (let n of ink.seaNameList) {
     let px = n.px, total = n.per * px, R = total * 1.6 / k, f = px / k;
     let a = total / 2 / (total * 1.6);
@@ -631,10 +657,13 @@ function chooseSeaNames(world, state) {
     let dx = (spot.x - cx) / (b.maxX - b.minX), dy = (spot.y - cy) / (b.maxY - b.minY);
     let side = Math.abs(dx) < 0.18 && Math.abs(dy) < 0.18 ? 'mid' : Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 'west' : 'east') : (dy < 0 ? 'south' : 'north');
     if (used.has(side)) continue;
-    let text = SEAS[side].toUpperCase();
-    measure.font = `italic 100px ${FONT}, Georgia, serif`;
-    let per = [...text].reduce((a, ch) => a + measure.measureText(ch).width / 100 + 0.42, 0) - 0.42;
-    let px = Math.min(spot.outer ? 19 : 17, spot.d * 0.5 * k, spot.run * k * 0.8 / per);
+    measure.font = `${SEA_ITALIC ? 'italic ' : ''}100px ${FONT}, Georgia, serif`;
+    let fit = text => {
+      let per = [...text].reduce((a, ch) => a + measure.measureText(ch).width / 100 + 0.42, 0) - 0.42;
+      return {text, per, px: Math.min(spot.outer ? 19 : 17, spot.d * 0.5 * k, spot.run * k * 0.8 / per)};
+    };
+    let names = (ATLAS && spot.outer && OCEANS[side] ? [OCEANS[side], SEAS[side]] : [SEAS[side]]).map(t => fit(t.toUpperCase()));
+    let {text, per, px} = names.find(n => n.px >= 12) || names[names.length - 1];
     if (px < 10) continue;
     let total = per * px, sx = state.x + k * spot.mid, sy = state.y - k * spot.y;
     if (sx - total / 2 < 14 || sx + total / 2 > screen.w - 14 || sy < 30 || sy > screen.h - 30) continue;
@@ -674,8 +703,16 @@ function chooseSeaNames(world, state) {
 // Names. The great realms in widely spaced capitals, arched across their land and lettered in red;
 // then smaller and closer capitals; then the lesser realms in a roman hand, the least in italic.
 // Widths are measured in the lettering's own font once it has loaded.
-const FONT = 'Fondamento';
-const TIERS = [
+// (The atlas letters in an engraver's roman, the realms in capitals spread wide across their land
+// and barely arched, all in the one black: no rubric.)
+const FONT = ATLAS ? 'IM Fell English' : 'Fondamento';
+const TIERS = ATLAS ? [
+  {min: 1e8, caps: true, rel: 0.2, px: 40, spacing: [0.5, 1.4], arch: 0.05},
+  {min: 3e7, caps: true, rel: 0.19, px: 29, spacing: [0.32, 1.0], arch: 0.04},
+  {min: 5e6, caps: true, rel: 0.18, px: 21, spacing: [0.16, 0.5], arch: 0.03},
+  {min: 5e5, caps: false, rel: 0.17, px: 17, spacing: [0.04, 0.14]},
+  {min: 0, caps: false, italic: true, rel: 0.17, px: 15, spacing: [0.02, 0.06]},
+] : [
   {min: 1e8, caps: true, rel: 0.2, px: 40, spacing: [0.32, 0.85], arch: 0.11, rubric: true},
   {min: 3e7, caps: true, rel: 0.19, px: 29, spacing: [0.22, 0.6], arch: 0.09},
   {min: 5e6, caps: true, rel: 0.18, px: 21, spacing: [0.12, 0.32], arch: 0.07},
@@ -693,7 +730,24 @@ function advance(text, italic) {
   return w;
 }
 let fontsReady = false;
-const fontsLoaded = (document.fonts ? Promise.all([`100px ${FONT}`, `italic 100px ${FONT}`].map(f => document.fonts.load(f))) : Promise.resolve())
+// The faces are asked for once the page has added the style's font sheet (link[data-style-fonts],
+// added once it has read styles/<name>.fonts): asked for before, there is no such face yet, and the
+// promise resolves at once with nothing loaded, so the names would be measured in the fallback font.
+function fontSheet() {
+  return new Promise(resolve => {
+    let find = () => document.querySelector(`link[data-style-fonts="${LOOK}"]`);
+    let wait = link => {
+      if (link.sheet) return resolve();
+      link.addEventListener('load', resolve, {once: true});
+      link.addEventListener('error', resolve, {once: true});
+    };
+    if (find()) return wait(find());
+    let watch = new MutationObserver(() => { if (find()) { watch.disconnect(); wait(find()); } });
+    watch.observe(document.head, {childList: true});
+    setTimeout(() => { watch.disconnect(); resolve(); }, 8000);
+  });
+}
+const fontsLoaded = (document.fonts ? fontSheet().then(() => Promise.all([`100px ${FONT}`, `italic 100px ${FONT}`].map(f => document.fonts.load(f)))) : Promise.resolve())
   .catch(() => {}).then(() => { fontsReady = true; widths.clear(); });
 
 function inside(ring, x, y) {
@@ -1072,9 +1126,9 @@ function mount() {
   if (mounted) return;
   mounted = true;
   readPalette();
-  if (!document.getElementById('ink-frame')) {
+  if (!document.getElementById(FRAME)) {
     frame = document.createElement('div');
-    frame.id = 'ink-frame';
+    frame.id = FRAME;
     frame.setAttribute('aria-hidden', 'true');
     document.body.insertBefore(frame, document.getElementById('stage').nextSibling);
   }
@@ -1113,7 +1167,7 @@ function unmount() {
     w.ink.waiters.splice(0).forEach(f => f());
   }
   current = null;
-  let f = document.getElementById('ink-frame');
+  let f = document.getElementById(FRAME);
   if (f) f.remove();
   let plate = document.getElementById('plate');
   if (plate) { plate.style.backgroundImage = ''; plate.style.backgroundPosition = ''; }
@@ -1126,7 +1180,7 @@ function unmount() {
 
 if (typeof window !== 'undefined') {
   window.mapStyles = window.mapStyles || {};
-  window.mapStyles.ink = {ripples: [], markerPx: 4.5, render, view, settled, unmount};
+  window.mapStyles[LOOK] = {ripples: [], markerPx: 4.5, render, view, settled, unmount};
   window.__inkStats = () => current && current.world.ink ? {surveyed: !!current.world.ink.survey, ready: current.world.ink.ready, band: current.world.ink.z, placed: [...document.querySelectorAll('.ink-band .ink-tile')].length, pending: current.world.ink.pending ? current.world.ink.pending.size : 0} : null;
 }
 if (active()) {

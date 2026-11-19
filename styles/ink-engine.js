@@ -10,6 +10,9 @@
 //         mountains, hills, woods, marshes and dunes
 // Everything is a function of the world and the band, so a tile drawn twice is the same tile, and
 // tiles drawn separately meet without a seam in their content.
+// The atlas (palette.look 'atlas') is the same engine drawing other parts: its sea engraved in rows of
+// strokes, darker along the coasts, under a web of rhumb lines; a wash of colour inside each realm's
+// outline in place of the ribbon; molehill mountains, set closer. Its other marks are the ink's.
 import {hash, makeTerrain, smoothstep} from './ink-noise.js';
 import {drawIds} from './ink-raster.js';
 import {survey} from './ink-survey.js';
@@ -251,7 +254,10 @@ export function createEngine(makeCanvas) {
     v.level = level(st, z, kb);
     v.inked = false;
     P = pal;
-    if (layer === 'land') { ribbons(v); rivers(v); marks(v); }
+    if (pal.look === 'atlas') {
+      if (layer === 'land') { washes(v); rivers(v); marks(v); }
+      else { engraving(v); rhumbs(v); }
+    } else if (layer === 'land') { ribbons(v); rivers(v); marks(v); }
     else { waves(v); rhumbs(v); shore(v); }
     ctx = null;
     return v.inked ? canvas : null;
@@ -317,6 +323,55 @@ export function createEngine(makeCanvas) {
     }
   }
 
+  // The atlas's washes: each realm coloured by hand along its whole outline, borders and coasts, as
+  // the old atlases were: the colour laid on strongest at the line and thinning inward, in a few
+  // overlapping strokes, then mottled where the brush ran dry. A realm too small for a band of
+  // colour inside it is washed all over. (By night the band is a little wider, since the colour is all
+  // the dark paper has, and laid in twice as many thinner strokes: there the steps between four
+  // showed as stripes round each realm.)
+  const WASH_PX = 14, WASH_STROKES = 4, WASH_ALPHA = 0.3;
+  let mottle = null, shade = null;
+  function washes(v) {
+    let night = P.dark, wide = night ? 18 : WASH_PX, strokes = night ? 2 * WASH_STROKES : WASH_STROKES, alpha = night ? 0.16 : WASH_ALPHA;
+    let {st, kb} = v, m = wide / kb;
+    v.toWorld();
+    ctx.lineJoin = 'round';
+    for (let item of st.items.values()) {
+      if (!meets(item.box, v.x0, v.y0, v.x1, v.y1, m)) continue;
+      let px = item.size * kb, path = countryPath(v, item);
+      ctx.save();
+      ctx.clip(path, 'evenodd');
+      ctx.fillStyle = ctx.strokeStyle = P.band[item.slot];
+      // (a band about a tenth of the realm across, within limits)
+      let W = Math.min(wide, Math.max(3, px * 0.1));
+      if (px < 4.5 * W) {
+        ctx.globalAlpha = 0.5;
+        ctx.fill(path, 'evenodd');
+      } else {
+        ctx.globalAlpha = alpha;
+        for (let i = 1; i <= strokes; ++i) {
+          ctx.lineWidth = 2 * W * (i / strokes) ** 1.3 / kb;
+          ctx.stroke(path);
+        }
+      }
+      ctx.restore();
+      v.inked = true;
+    }
+    if (!v.inked) return;
+    // the mottling: a tile of soft blotches taken out of the colour (anchored to the world, so the
+    // tiles of a band meet without a seam)
+    if (!mottle) mottle = mottleTile(makeCanvas);
+    let N = mottle.width;
+    v.toPx();
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.fillStyle = ctx.createPattern(mottle, 'repeat');
+    let ox = -(((v.x0 * kb) % N) + N) % N, oy = -(((-v.y1 * kb) % N) + N) % N;
+    ctx.translate(ox, oy);
+    ctx.fillRect(-ox, -oy, TILE_PX, TILE_PX);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
   // Rivers: blue, unbroken, swelling downstream, and across a border unbroken too. The terrain keeps
   // them off the borders (each border stands on a low ridge they cross square on); where one still
   // runs along a border, within a few pixels and nearly parallel, that stretch is not drawn, so a
@@ -334,7 +389,8 @@ export function createEngine(makeCanvas) {
     v.toPx();
     ctx.strokeStyle = P.river;
     ctx.lineCap = ctx.lineJoin = 'round';
-    let gap = 3.5 / kb, width = a => Math.min(2.6, 0.7 + 0.45 * Math.log2(1 + a / RIVER_MIN));
+    // (the atlas's rivers are fine black lines, a little finer than the ink's blue ones)
+    let gap = 3.5 / kb, thin = P.look === 'atlas' ? 0.6 : 1, width = a => thin * Math.min(2.6, 0.7 + 0.45 * Math.log2(1 + a / RIVER_MIN));
     for (let r of list) {
       let line = r.pts, ok = line.map(([x, y], q) => {
         let a = line[Math.max(0, q - 1)], b = line[Math.min(line.length - 1, q + 1)];
@@ -363,6 +419,10 @@ export function createEngine(makeCanvas) {
   const CLEAR_PX = 5.5;
   // (spaced a little more than the marks are wide: at reading zoom on a phone less is more)
   const KINDS = {mountain: {px: 12, size: 1.55, thin: 0.15}, hill: {px: 14, size: 1.05, thin: 0.3}, tree: {px: 6.2, size: 1.05, thin: 0.32}, marsh: {px: 12, size: 1, thin: 0.3}, dune: {px: 10, size: 1, thin: 0.3}};
+  // (the atlas's mountains stand closer and larger, overlapping into the dark chains of the old
+  // maps; its other marks are the ink's)
+  const ATLAS_KINDS = {...KINDS, mountain: {px: 8, size: 2, thin: 0.15}};
+  const kindsOf = () => P && P.look === 'atlas' ? ATLAS_KINDS : KINDS;
   // (and at a whole-world view the woods are a little sparser too, so they read as woods, not smudges)
   const spread = (spec, b) => Math.min(2.4, 1 + spec.thin * Math.max(0, b - 1)) * (b <= 0 && spec === KINDS.tree ? 1.22 : 1);
   const grow = b => Math.min(1.45, 1 + 0.1 * Math.max(0, b - 1));
@@ -373,9 +433,9 @@ export function createEngine(makeCanvas) {
   const COLD = 0.375, HOT = 0.8;
 
   function markTile(st, kind, b, ti, tj) {
-    let key = kind + b + ':' + ti + ':' + tj, out = st.marks.get(key);
+    let kinds = kindsOf(), key = (kinds === KINDS ? '' : 'a') + kind + b + ':' + ti + ':' + tj, out = st.marks.get(key);
     if (out) return out;
-    let sv = st.sv, T = st.T, spec = KINDS[kind], kb = bandK(b, st.dev);
+    let sv = st.sv, T = st.T, spec = kinds[kind], kb = bandK(b, st.dev);
     let h = spec.px * spread(spec, b) / kb, size = spec.size * spec.px * grow(b) / kb;
     let clear = size * 0.62 + CLEAR_PX / kb, rise = RISE[kind], F = sv.fields;
     out = [];
@@ -451,9 +511,9 @@ export function createEngine(makeCanvas) {
   }
 
   function marks(v) {
-    let {st, z, kb} = v, list = [];
-    for (let kind in KINDS) {
-      let spec = KINDS[kind], h = spec.px * spread(spec, z) / kb, span = TILE * h, pad = 2.5 * spec.size * spec.px * grow(z) / kb;
+    let {st, z, kb} = v, list = [], kinds = kindsOf();
+    for (let kind in kinds) {
+      let spec = kinds[kind], h = spec.px * spread(spec, z) / kb, span = TILE * h, pad = 2.5 * spec.size * spec.px * grow(z) / kb;
       for (let ti = Math.floor((v.x0 - pad) / span); ti <= Math.floor((v.x1 + pad) / span); ++ti)
         for (let tj = Math.floor((v.y0 - pad) / span); tj <= Math.floor((v.y1 + pad) / span); ++tj)
           for (let g of markTile(st, kind, z, ti, tj)) if (g.x > v.x0 - pad && g.x < v.x1 + pad && g.y > v.y0 - pad && g.y < v.y1 + pad) list.push(g);
@@ -505,7 +565,7 @@ export function createEngine(makeCanvas) {
         continue;
       }
       flushTrees();
-      if (g.kind === 'mountain') mountain(x, y, s, g, dark);
+      if (g.kind === 'mountain') (P.look === 'atlas' ? molehill : mountain)(x, y, s, g, dark);
       else if (g.kind === 'hill') hill(x, y, s, g, dark);
       else if (g.kind === 'marsh') marsh(x, y, s, g, flat);
       else dune(x, y, s, g, flat, dots);
@@ -550,19 +610,102 @@ export function createEngine(makeCanvas) {
   function rhumbs(v) {
     let d = v.st.decor;
     if (!d || !d.rose) return;
-    let [cx, cy] = v.S(d.rose.x, d.rose.y), r = roseRadius(d.rose, v.kb), far = 4000;
-    // the eight winds only: thirty-two lines across the whole sea made the map busy
-    let main = new Path2D();
-    for (let i = 0; i < 8; ++i) {
-      let a = i * Math.PI / 4;
+    let atlas = P.look === 'atlas', b = v.st.sv.box;
+    let [cx, cy] = v.S(d.rose.x, d.rose.y), r = roseRadius(d.rose, v.kb);
+    let far = atlas ? Math.max(4000, 3 * Math.max(b.x1 - b.x0, b.y1 - b.y0) * v.kb) : 4000;
+    // the eight winds only: thirty-two lines across the whole sea made the map busy. (The atlas,
+    // a sea chart, has sixteen from the rose and eight from each point of its web, fainter.)
+    let main = new Path2D(), web = new Path2D(), n = atlas ? 16 : 8;
+    for (let i = 0; i < n; ++i) {
+      let a = i * 2 * Math.PI / n;
       // (from inside the rose's disc: the rose, an image over the sea tiles, covers their start)
       main.moveTo(cx + Math.cos(a) * r * 0.6, cy + Math.sin(a) * r * 0.6);
       main.lineTo(cx + Math.cos(a) * far, cy + Math.sin(a) * far);
+    }
+    if (atlas) for (let p of d.web || []) {
+      let [px, py] = v.S(p.x, p.y);
+      for (let i = 0; i < 8; ++i) {
+        let a = i * Math.PI / 4, c = Math.cos(a) * far, s = Math.sin(a) * far;
+        web.moveTo(px - c, py - s);
+        web.lineTo(px + c, py + s);
+      }
     }
     v.toPx();
     ctx.strokeStyle = P.rhumb;
     ctx.lineWidth = 0.7;
     ctx.stroke(main);
+    if (atlas) {
+      ctx.globalAlpha = 0.6;
+      ctx.lineWidth = 0.55;
+      ctx.stroke(web);
+      ctx.globalAlpha = 1;
+    }
+    v.inked = true;
+  }
+
+  // The atlas's sea, engraved: rows of short wavy strokes over the whole of it, as the old plates
+  // were cut, mottled where the plate held more ink or less, and darker along the coasts (the
+  // coast is shaded by the strokes alone: where there are none, the sea stays the paper's)
+  function engraving(v) {
+    let {st, kb, z} = v, sv = st.sv, hx = 6.5 / kb, hy = 3.3 / kb, T = st.T;
+    let tones = [new Path2D(), new Path2D(), new Path2D(), new Path2D()], any = false;
+    for (let j = Math.floor(v.y0 / hy) - 1; j <= Math.ceil(v.y1 / hy) + 1; ++j) {
+      let shift = (j & 1) * 0.5;
+      for (let i = Math.floor(v.x0 / hx) - 1; i <= Math.ceil(v.x1 / hx) + 1; ++i) {
+        let r1 = hash(i, j, z, st.seed + 21), r2 = hash(j, i, z, st.seed + 22);
+        let x = (i + shift + (r1 - 0.5) * 0.6) * hx, y = (j + (r2 - 0.5) * 0.35) * hy;
+        let c = cellAt(sv, x, y);
+        if (c >= 0 && sv.ids[c] !== -1 && sv.toEdge[c] > 1) continue;   // well inside the land
+        // the plate's mottling, at the scale of the screen: lighter patches have fewer strokes
+        let tone = 0.5 + 0.42 * T.noise(x * kb / 110 + 3.3, y * kb / 110 - 1.7) + 0.2 * T.noise(x * kb / 23 - 5.1, y * kb / 23 + 2.9);
+        if (r2 > 0.35 + tone) continue;
+        let k = Math.max(0, Math.min(3, Math.floor(tone * 3.2)));
+        let [sx, sy] = v.S(x, y), w = 1.9 + 1.5 * r1, lift = 0.75 + 0.5 * r2;
+        let p = tones[k];
+        p.moveTo(sx - w, sy);
+        p.quadraticCurveTo(sx - w / 2, sy - lift * 2, sx, sy);
+        p.quadraticCurveTo(sx + w / 2, sy + lift * 2, sx + w, sy);
+        any = true;
+      }
+    }
+    if (!any) return;
+    v.toPx();
+    ctx.strokeStyle = P.wave;
+    ctx.lineWidth = 0.55;
+    ctx.lineCap = 'round';
+    [0.2, 0.3, 0.42, 0.55].forEach((a, k) => { ctx.globalAlpha = a; ctx.stroke(tones[k]); });
+    ctx.globalAlpha = 1;
+    // the coasts' shade: the same strokes inked again near the land, the more the nearer (a band
+    // along the coasts on a canvas of its own, the strokes kept only where it lies, laid over the
+    // tile), so the shade is engraved too
+    let path = new Path2D(), m = 24 / kb, near = false;
+    st.lines.forEach((line, i) => {
+      if (line.kind !== 'coast' || !meets(line.box, v.x0, v.y0, v.x1, v.y1, m)) return;
+      linePoints(v, i).forEach(([x, y], q) => { let [sx, sy] = v.S(x, y); q ? path.lineTo(sx, sy) : path.moveTo(sx, sy); });
+      near = true;
+    });
+    if (near) {
+      let tile = ctx.canvas, W = tile.width, H = tile.height;
+      if (!shade || shade.width !== W || shade.height !== H) shade = makeCanvas(W, H);
+      let e = shade.getContext('2d');
+      e.setTransform(1, 0, 0, 1, 0, 0);
+      e.globalCompositeOperation = 'source-over';
+      e.clearRect(0, 0, W, H);
+      e.setTransform(v.res, 0, 0, v.res, 0, 0);
+      e.strokeStyle = '#000';
+      e.lineJoin = e.lineCap = 'round';
+      for (let [w, a] of [[40, 0.3], [24, 0.4], [12, 0.55]]) { e.globalAlpha = a; e.lineWidth = w; e.stroke(path); }
+      e.globalAlpha = 1;
+      e.globalCompositeOperation = 'source-in';
+      e.strokeStyle = P.shore;
+      e.lineWidth = 0.6;
+      // (in one stroke: each stroke drawn 'source-in' clears whatever it does not cover)
+      let all = new Path2D();
+      tones.forEach(p => all.addPath(p));
+      e.stroke(all);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(shade, 0, 0);
+    }
     v.inked = true;
   }
 
@@ -674,6 +817,67 @@ function mountain(x, y, s, g, dark) {
   }
   ctx.lineWidth = 0.6;
   ctx.stroke();
+}
+// A mountain of the old atlases: a rounded molehill, its inside cleared to the paper so it hides the
+// ones behind, its shaded side (the light comes from the west) laid in with a tone of ink and close
+// strokes down the slope, so that a range reads as a dark chain across the land. By night too: the
+// shade is laid in the dark of the sea and only the outline is in pale ink (a pale lit side, as the
+// ink's mountains have by night, made the ranges the brightest thing on the map, like snow).
+function molehill(x, y, s, g, dark) {
+  let w = s * (0.85 + 0.25 * g.w), h = s * (0.55 + 0.3 * g.v);
+  let px = x + (g.v - 0.5) * 0.2 * w, py = y - h, lx = x - w / 2, rx = x + w / 2, shade = dark ? P.sea : P.ink;
+  let outline = () => {
+    ctx.moveTo(lx, y);
+    ctx.bezierCurveTo(lx + w * 0.2, y - h * 0.62, px - w * 0.2, py, px, py);
+    ctx.bezierCurveTo(px + w * 0.2, py, rx - w * 0.2, y - h * 0.62, rx, y);
+  };
+  ctx.beginPath(); outline(); ctx.closePath();
+  clearShape();
+  let a0 = ctx.globalAlpha;
+  ctx.save();
+  ctx.beginPath(); outline(); ctx.closePath();
+  ctx.clip();
+  // the shaded side: from the crest down to the foot a little short of the middle
+  ctx.beginPath();
+  ctx.moveTo(px - w * 0.04, py - 1);
+  ctx.quadraticCurveTo(px + w * 0.05, y - h * 0.45, x - w * 0.1, y + 1);
+  ctx.lineTo(x + w, y + 1);
+  ctx.lineTo(x + w, py - 1);
+  ctx.closePath();
+  ctx.fillStyle = shade;
+  ctx.globalAlpha = dark ? 0.38 : a0 * 0.4;
+  ctx.fill();
+  ctx.clip();
+  ctx.beginPath();
+  let lean = h * 0.3;
+  for (let t = lx - lean - 1; t <= rx + lean + 1; t += 1.3) { ctx.moveTo(t, py - 1); ctx.lineTo(t - lean, y + 1); }
+  ctx.globalAlpha = dark ? 0.7 : a0 * 0.8;
+  ctx.strokeStyle = shade;
+  ctx.lineWidth = 0.55;
+  ctx.stroke();
+  ctx.restore();
+  ctx.beginPath(); outline();
+  ctx.strokeStyle = P.ink;
+  ctx.lineWidth = Math.min(1.3, 0.6 + s * 0.03);
+  // (by night the outlines a little fainter, so a range reads as one mass, not as a heap of scales)
+  if (dark) ctx.globalAlpha = a0 * 0.75;
+  ctx.stroke();
+  ctx.globalAlpha = a0;
+}
+// The atlas's washes are mottled by this: soft blotches and a fine grain, as alpha, on a tile that
+// repeats without a seam (the noise is taken round a torus, as the paper's grain is)
+function mottleTile(makeCanvas) {
+  const N = 192;
+  let canvas = makeCanvas(N, N), g = canvas.getContext('2d');
+  let img = g.createImageData(N, N), d = img.data, {noise} = makeTerrain(5150);
+  for (let y = 0; y < N; ++y) for (let x = 0; x < N; ++x) {
+    let a = x / N * 2 * Math.PI, b = y / N * 2 * Math.PI;
+    let m = 0.6 * noise(Math.cos(a) * 1.6 + 7, Math.sin(a) * 1.6 + Math.cos(b) * 1.6) + 0.4 * noise(Math.sin(b) * 3.2 + 3, Math.cos(a) * 3.2 - Math.sin(b) * 3.2);
+    let alpha = Math.max(0, Math.min(1, 0.12 + 0.5 * m + 0.14 * (hash(x, y, 31, 7) - 0.5)));
+    d[4 * (y * N + x) + 3] = Math.round(alpha * 255);
+  }
+  g.putImageData(img, 0, 0);
+  return canvas;
 }
 // A hill: a low dome with a few strokes of shade at its foot
 function hill(x, y, s, g, dark) {

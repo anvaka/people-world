@@ -21,16 +21,17 @@ step by step, how a style plugs in, and what each file is for.
   `#land-world-1`, `#gdp-world-1-cut-FR-ES`. A country's panel and the tooltip give its size in
   that measure, and an estimated GDP is marked as one.
 - **Customize...** also has the style and the theme: the map as ink (pen and ink on paper: hatched coasts,
-  mountains and woods) or realm (a painted relief: terrain, shallows and rivers under the
-  countries), the theme (light, dark, or auto: as the device is set), and what the page is.
+  mountains and woods), realm (a painted relief: terrain, shallows and rivers under the
+  countries) or atlas (a plate of a sixteenth-century atlas: an engraved sea, each country
+  coloured by hand along its outline, dotted borders, mountains in dark chains), the theme (light, dark, or auto: as the device is set), and what the page is.
   Switching doesn't build the world again, and the panel closes once the map is drawn in the new
   style. The browser remembers both choices.
-- **The address is the map.** It holds the world number and the edits, so a link opens the same
+- **Share a map.** The address holds the world number and the edits, so a link opens the same
   map. `#world-1-cut-FR-ES-add-JP-KR` is world 1 without the France–Spain border and with a
   Japan–South Korea one. Countries are named by their two-letter codes. Past four edits the link
   switches to a compact code of four letters or digits per edit (`#world-1-e-0PLu1pIL…`), so a
   long editing session still fits in a link you can paste. A style other than ink ends the link
-  (`#world-1-cut-FR-ES-realm`).
+  (`#world-1-cut-FR-ES-realm`). Copy the link from the address bar.
 - Keys: `/` finds, arrows move the map, `+` `−` zoom, `0` shows the whole world, Enter picks the
   country under the ring in the middle, B shows before, Ctrl+Z undoes, Escape closes.
 
@@ -188,6 +189,13 @@ calls the map ready, and `unmount()` when another style is picked. A style's can
 `#plate` with the map, so a gesture moves them together. The comment above `skin()` in
 `index.html` lists the hooks.
 
+Atlas is drawn by Ink's code in another look. `styles/atlas.js` only imports `ink.js?look=atlas`:
+the address differs, so the browser runs `ink.js` a second time as a module of its own, with its own
+workers, colours, names and tiles, and it registers `window.mapStyles.atlas`. The look travels to
+the engine (`ink-engine.js`) with the palette, and the engine draws the atlas's parts in place of the
+ink's: the engraved sea and the web of rhumb lines, the washes of colour inside each outline, and
+molehill mountains set closer. Its stylesheet gives the ink's classes the atlas's values.
+
 Switching styles draws the worlds on hand (and the map before your edits, when there is one)
 again from what the generator returned, at the same view and with the same country picked. The
 mountains and rivers are part of what it returned (`result.terrain`), and so are the valleys
@@ -195,7 +203,7 @@ mountains and rivers are part of what it returned (`result.terrain`), and so are
 same ones. A style chooses how to draw them (firs, round crowns or flat-topped trees by the
 warmth, dunes, reeds, the colour of the ground) and adds only its own hills and grain.
 
-The heavy work of each style runs off the page's thread: Ink draws its terrain and seas in a
+The heavy work of each style runs off the page's thread: Ink (and Atlas) draws its terrain and seas in a
 worker, in tiles kept per zoom level (one worker on a phone, two elsewhere); Realm prepares its
 terrain in a worker and paints it with WebGL 2. On a software renderer (no GPU) Realm keeps its flat colours, which is what headless
 test browsers show; `?realm-gl` in the address paints anyway.
@@ -241,7 +249,7 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 | file | what it does |
 | --- | --- |
 | `index.html` | the page: drawing, pan and zoom, border editing, the controls |
-| `styles/` | the two styles: `ink` and `realm` (`.css`, `.js`, `.fonts` and helpers) |
+| `styles/` | the three styles: `ink`, `realm` and `atlas` (`.css`, `.js`, `.fonts` and helpers; atlas is drawn by ink's code) |
 | `worker.js` | runs the generator off the main thread |
 | `dot.js` | reads a DOT file into a graph the generator draws; loaded when a file is dropped |
 | `world.js` | the pipeline, `buildWorld(graph, {seed, base, addons})` |
@@ -281,4 +289,5 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
   Jonathan Shewchuk's predicates, public domain (Unlicense).
 - [earcut](https://github.com/mapbox/earcut) by Mapbox, ISC license (`vendor/LICENSE-earcut`).
 - Fonts from [Google Fonts](https://fonts.google.com/), SIL Open Font License: Eagle Lake,
-  Fondamento and Sorts Mill Goudy (Ink), Alegreya and Alegreya SC (Realm).
+  Fondamento and Sorts Mill Goudy (Ink), Alegreya and Alegreya SC (Realm), IM Fell English
+  (Atlas).
