@@ -197,6 +197,14 @@
   header .message.alert { color: var(--ui-accent); }
   /* (an open panel says more than the welcome under it) */
   header .panel:not([hidden]) ~ .welcome { display: none; }
+  /* a build asked for up here is told of up here, under the bar (the dock tells of its own); an
+     open panel gives it room rather than push it out of the window */
+  header.cartouche { display: flex; flex-direction: column;
+    max-height: calc(100vh - 2 * var(--edge) - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  header.cartouche > * { flex: none; }
+  header.cartouche > .panel { flex: 0 1 auto; min-height: 0; }
+  header #status { border-top: 1px solid var(--ui-line); padding: 8px 10px; font-size: 13px; }
+  header #status:not([hidden]) ~ .welcome { display: none; }
   header .panel { padding: 6px 14px 14px; overflow-y: auto; overscroll-behavior: contain;
     scrollbar-width: thin; scrollbar-color: var(--ui-line) transparent;
     max-height: calc(100vh - 76px - 2 * var(--edge) - env(safe-area-inset-top) - env(safe-area-inset-bottom)); box-sizing: border-box; }
@@ -1661,6 +1669,7 @@ function toggleBorder(a, b) {
   picking = null;   // UX
   // UX: a phone folds the country sheet back to its peek, so the map shows while it is redrawn
   if (isPhone()) sheetOpen = false;
+  askedFrom = 'dock';
   location.hash = linkOf(seed, next);
 }
 function nameOfId(id) { let row = doc && doc.nodes.find(r => r[0] === id); return row ? row[1] : id; }
@@ -1688,7 +1697,7 @@ function showEdits() {
     .concat(undoing.map(e => `<li><span><s>${e.add ? 'Added' : 'Removed'} ${escapeHtml(describe(e))}</s> <span class="tag">undoing…</span></span></li>`));
   document.getElementById('edits-list').innerHTML = rows.join('');
   box.querySelectorAll('[data-undo]').forEach(button => {
-    button.onclick = () => { location.hash = linkOf(seed, edits.filter((e, k) => k !== +button.dataset.undo)); };
+    button.onclick = () => { askedFrom = 'dock'; location.hash = linkOf(seed, edits.filter((e, k) => k !== +button.dataset.undo)); };
   });
   document.getElementById('edits-toggle').textContent = `Your changes · ${edits.length}`;
   document.getElementById('clear').hidden = edits.length < 2;
@@ -2036,12 +2045,17 @@ window.addEventListener('hashchange', () => {
     if (!sized(next.graph) && !droppedGraphs.has(next.graph) && !storedGraph(next.graph)) {
       // a dropped graph this tab doesn't have (a link from elsewhere, typed in): the map stays
       history.replaceState(null, '', linkOf(seed, edits));
+      askedFrom = 'header';
+      placeStatus('header');
       if (world) showStatus(LOST_GRAPH, '', {error: true});
       announce(LOST_GRAPH);
       return;
     }
     switchGraph(next.graph);
-  } else if (hashOf(next.seed, next.edits) === hashOf(seed, edits)) return;
+  } else if (hashOf(next.seed, next.edits) === hashOf(seed, edits)) { askedFrom = 'header'; return; }
+  // (the build, and what came of it, are told of next to what asked for them)
+  placeStatus(askedFrom);
+  askedFrom = 'header';
   seed = next.seed;
   edits = next.edits;
   // UX: the panel and the list show the change as being drawn at once
@@ -2098,16 +2112,16 @@ flip.addEventListener('pointerup', () => { if (peek) { endPeek(false); swallowCl
 flip.addEventListener('pointercancel', () => endPeek(true));
 flip.addEventListener('contextmenu', e => e.preventDefault());
 flip.addEventListener('click', () => { if (swallowClick) { swallowClick = false; return; } setBefore(!showingBefore); });
-function undoLast() { if (edits.length) location.hash = linkOf(seed, edits.slice(0, -1)); }
+function undoLast() { if (edits.length) { askedFrom = 'dock'; location.hash = linkOf(seed, edits.slice(0, -1)); } }
 $('undo-last').addEventListener('click', undoLast);
 // Undo all: at once for one change; for more, a question in the panel first
 $('clear').addEventListener('click', () => {
-  if (edits.length < 2) { location.hash = linkOf(seed, []); return; }
+  if (edits.length < 2) { askedFrom = 'dock'; location.hash = linkOf(seed, []); return; }
   $('clear-question').textContent = `Undo all ${edits.length} changes and go back to world ${seed} as first drawn?`;
   $('clear-confirm').hidden = false;
   $('clear-no').focus();
 });
-$('clear-yes').addEventListener('click', () => { $('clear-confirm').hidden = true; location.hash = linkOf(seed, []); });
+$('clear-yes').addEventListener('click', () => { $('clear-confirm').hidden = true; askedFrom = 'dock'; location.hash = linkOf(seed, []); });
 $('clear-no').addEventListener('click', () => { $('clear-confirm').hidden = true; $('clear').focus(); });
 $('edits-toggle').addEventListener('click', () => {
   let t = $('edits-toggle');
@@ -2119,8 +2133,9 @@ if (isPhone()) $('edits-toggle').setAttribute('aria-expanded', 'false');   // a 
 if (window.matchMedia('(pointer: coarse)').matches)
   $('hint').textContent = 'Tap a country to see its neighbours and change its borders. Pinch to zoom.';
 
-// The build status in the dock: what is being drawn, a bar, the stage and the time left, and a
-// way to call it off; then what came of it. The first visit's build shows the same in the middle.
+// The build status, in the dock or under the search bar (next to what asked for it: placeStatus):
+// what is being drawn, a bar, the stage and the time left, and a way to call it off; then what
+// came of it. The first visit's build shows the same in the middle.
 const STAGES = [[0, 'Choosing which borders become exclaves'], [0.08, 'Placing the countries'], [0.15, 'Laying out the land'],
   [0.25, 'Growing each country to its size'], [0.55, 'Drawing the borders and coasts'], [0.9, 'Finishing the islands']];
 // the share of a build's time spent before each progress mark; learnt from this machine's builds
@@ -2187,6 +2202,16 @@ function showStatus(text, sub, {error = false, hideAfter = 0} = {}) {
   clearTimeout(statusTimer);
   if (hideAfter) statusTimer = setTimeout(() => { if (!st.contains(document.activeElement)) st.hidden = true; }, hideAfter);
 }
+// Where the slip shows: next to what asked for the build, where the eye is. A change made in the
+// dock (a border, an undo) is told of there; anything asked for at the top (Size by, a file
+// dropped, a link opened, Back) under the search bar. (Told of in the other corner, it went unseen.)
+let askedFrom = 'header';   // where the next build is asked for: the dock's buttons say 'dock'
+function placeStatus(where) {
+  let st = $('status');
+  if (where === 'dock') { if (st.parentNode !== $('dock')) $('dock').prepend(st); }
+  else if (st.previousElementSibling !== $('style-box')) $('style-box').after(st);
+}
+const statusAt = () => $('status').parentNode === $('dock') ? 'dock' : 'header';
 function hideStatus() {
   clearTimeout(statusTimer);
   let st = $('status');
@@ -2199,6 +2224,7 @@ let noteWhenShown = null;   // {text, error}: said once the map asked for is on 
 $('status-cancel').addEventListener('click', () => {
   if (graphKey && !plain) { leaveGraph('Cancelled: the map is as it was.', false); return; }
   noteWhenShown = {text: 'Cancelled: the map is as it was.'};
+  askedFrom = statusAt();   // (said where the build was)
   location.hash = linkOf(plain ? plain.seed : seed, plain && plain.seed === seed ? lastGood : edits);
 });
 // what a build is about, in words
@@ -2398,7 +2424,7 @@ async function openDot(text, name) {
   try { sessionStorage.setItem('peopled-graph-' + key, JSON.stringify({name, text})); }
   catch (e) { /* no storage, or no room in it: the graph lasts until the page is reloaded */ }
   if (key === graphKey) {
-    if (plain && world) showStatus(`${name} is the map on screen.`, '', {hideAfter: 5000});
+    if (plain && world) { placeStatus('header'); showStatus(`${name} is the map on screen.`, '', {hideAfter: 5000}); }
     return key;
   }
   location.hash = linkOf(1, [], key);
@@ -2943,7 +2969,7 @@ window.addEventListener('drop', async e => {
     await openDot(await file.text(), file.name);
   } catch (error) {
     let text = `${file.name} could not be drawn as a map: ${error.message}.`;
-    if (world) showStatus(text, 'The page reads DOT, the language of Graphviz files (.dot, .gv).', {error: true});
+    if (world) { placeStatus('header'); showStatus(text, 'The page reads DOT, the language of Graphviz files (.dot, .gv).', {error: true}); }
     announce(text);
   }
 });
