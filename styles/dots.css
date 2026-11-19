@@ -50,6 +50,7 @@ html[data-style="dots"][data-theme="dark"] {
 /* ---------------------------------------------------------------- the map */
 /* the dots' canvas, under the svg and moved with it */
 html[data-style="dots"] #dots-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+html[data-style="dots"] svg#map { position: relative; }   /* (positioned, so it is laid over the canvas) */
 html:not([data-style="dots"]) #dots-layer, html:not([data-style="dots"]) #dots-scale { display: none; }
 /* the svg draws no land: its countries only answer the pointer, its sea lets the dots through */
 html[data-style="dots"] .sea-fill { fill: transparent; }
