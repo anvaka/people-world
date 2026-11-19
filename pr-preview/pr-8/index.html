@@ -42,6 +42,8 @@
     --land-6: #d2b38e;
     --swatch-ink: linear-gradient(135deg, #efe4c8 0 48%, #2b2118 48% 56%, #efe4c8 56% 70%, #9b2d20 70% 78%, #d9e2df 78%);
     --swatch-realm: linear-gradient(135deg, #f3efe2 0 18%, #6f8f42 18% 52%, #b9a35f 52% 62%, #2f6f9a 62%);
+    --swatch-atlas: linear-gradient(135deg, #ede8d8 0 40%, #e07f86 40% 47%, #ede8d8 47% 56%, #241d16 56% 58%, #e3bf45 58% 65%, #ede8d8 65% 72%, #c3c4bb 72%);
+    --swatch-dots: radial-gradient(circle at 70% 64%, #e2412b 0 1.6px, transparent 2.1px), radial-gradient(circle, #161514 0 1.2px, transparent 1.7px) 0 0 / 6px 5.2px, #f3f1ec;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
@@ -60,6 +62,8 @@
       --land-6: #6b5035;
       --swatch-ink: linear-gradient(135deg, #514255 0 48%, #eadfc4 48% 56%, #294f57 56% 70%, #e9b85a 70% 78%, #121a27 78%);
       --swatch-realm: radial-gradient(circle at 34% 58%, #ffd27a 0 1.5px, transparent 2.5px), radial-gradient(circle at 22% 72%, #ffd27a 0 1px, transparent 2px), linear-gradient(135deg, #3a4048 0 52%, #565a5e 52% 62%, #10203a 62%);
+      --swatch-atlas: linear-gradient(135deg, #514944 0 40%, #7b253d 40% 47%, #514944 47% 56%, #e4dac2 56% 58%, #664600 58% 65%, #514944 65% 72%, #121c23 72%);
+      --swatch-dots: radial-gradient(circle at 70% 64%, #ff6a4d 0 1.6px, transparent 2.1px), radial-gradient(circle, #ece6d9 0 1.2px, transparent 1.7px) 0 0 / 6px 5.2px, #121417;
       color-scheme: dark;
     }
   }
@@ -78,6 +82,8 @@
     --land-6: #6b5035;
     --swatch-ink: linear-gradient(135deg, #514255 0 48%, #eadfc4 48% 56%, #294f57 56% 70%, #e9b85a 70% 78%, #121a27 78%);
     --swatch-realm: radial-gradient(circle at 34% 58%, #ffd27a 0 1.5px, transparent 2.5px), radial-gradient(circle at 22% 72%, #ffd27a 0 1px, transparent 2px), linear-gradient(135deg, #3a4048 0 52%, #565a5e 52% 62%, #10203a 62%);
+    --swatch-atlas: linear-gradient(135deg, #514944 0 40%, #7b253d 40% 47%, #514944 47% 56%, #e4dac2 56% 58%, #664600 58% 65%, #514944 65% 72%, #121c23 72%);
+    --swatch-dots: radial-gradient(circle at 70% 64%, #ff6a4d 0 1.6px, transparent 2.1px), radial-gradient(circle, #ece6d9 0 1.2px, transparent 1.7px) 0 0 / 6px 5.2px, #121417;
     color-scheme: dark;
   }
   html, body { margin: 0; height: 100%; background: var(--sea); color: var(--ink); overflow: hidden; }
@@ -194,12 +200,23 @@
   header .message.alert { color: var(--ui-accent); }
   /* (an open panel says more than the welcome under it) */
   header .panel:not([hidden]) ~ .welcome { display: none; }
-  header .panel { padding: 2px 10px 10px; overflow-y: auto; overscroll-behavior: contain;
+  /* a build asked for up here is told of up here, under the bar (the dock tells of its own); an
+     open panel gives it room rather than push it out of the window */
+  header.cartouche { display: flex; flex-direction: column;
+    max-height: calc(100vh - 2 * var(--edge) - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+  header.cartouche > * { flex: none; }
+  header.cartouche > .panel { flex: 0 1 auto; min-height: 0; }
+  header #status { border-top: 1px solid var(--ui-line); padding: 8px 10px; font-size: 13px; }
+  header #status:not([hidden]) ~ .welcome { display: none; }
+  header .panel { padding: 6px 14px 14px; overflow-y: auto; overscroll-behavior: contain;
+    scrollbar-width: thin; scrollbar-color: var(--ui-line) transparent;
     max-height: calc(100vh - 76px - 2 * var(--edge) - env(safe-area-inset-top) - env(safe-area-inset-bottom)); box-sizing: border-box; }
-  header .panel h3 { margin: 8px 0 4px; font-size: 16px; font-weight: normal; text-align: right; }
-  header .prow { display: flex; margin-top: 4px; min-height: 32px; }
-  header .prow > .plabel { flex: 1; padding-top: 7px; }
-  header .prow > .pval { flex: 2; min-width: 0; }
+  header .panel h3 { margin: 0; font-size: 15px; font-weight: 500; }
+  /* a setting: its name in a narrow column, what it can be set to beside it, centred on one line */
+  header .prow { display: grid; grid-template-columns: 4.5em minmax(0, 1fr); column-gap: 12px; align-items: center;
+    min-height: 36px; margin-top: 8px; }
+  header .prow > .plabel { font-size: 13px; color: var(--ui-text-2); }
+  header .prow > .pval { min-width: 0; justify-self: start; }
   /* the search field's clear button, in the field's own colour */
   input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; width: 12px; height: 12px;
     margin-left: 6px; cursor: pointer; background: currentColor; opacity: 0.55;
@@ -219,23 +236,47 @@
   /* Customize: what the countries are sized by, the style that draws the map (each with a swatch
      of its look in the theme shown now), the theme (light, dark, or as the device is set), and
      what this page is */
-  #style-box .choices { display: flex; gap: 4px; }
-  #style-box button.choice { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 64px; height: auto;
-    padding: 4px 0 3px; font-size: 12px; color: var(--ui-text); }
+  /* (the frame of a set of choices: the text's own colour, faint, so it reads on every paper) */
+  #style-box { --frame: var(--ui-line); --frame: color-mix(in srgb, var(--ui-text) 22%, transparent); }
+  #style-box .choices { display: flex; gap: 16px; padding: 6px 0 2px; }
+  #style-box button.choice { display: flex; flex-direction: column; align-items: center; gap: 7px; width: auto; height: auto;
+    padding: 0; font-size: 12px; color: var(--ui-text-2); }
   #style-box button.choice:hover { background: none; color: var(--ui-accent); }
+  #style-box button.choice:hover .swatch { box-shadow: 0 0 0 2px var(--ui-bg), 0 0 0 3px var(--frame); }
   #style-box button.choice[aria-checked="true"] { color: var(--ui-accent); }
-  #style-box button.choice[aria-checked="true"] .swatch { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+  #style-box button.choice[aria-checked="true"] .swatch { box-shadow: 0 0 0 2px var(--ui-bg), 0 0 0 4px var(--ui-accent); }
+  #style-box button.choice:focus-visible { outline-offset: 5px; }
   #style-box button.choice[aria-busy="true"] .nm::after { content: '…'; }
-  .swatch { display: block; flex: none; width: 40px; height: 28px; border: 1px solid var(--ui-line); box-sizing: border-box; }
+  .swatch { display: block; flex: none; width: 52px; height: 34px; border: 1px solid var(--ui-line); box-sizing: border-box; }
   .swatch.ink { background: var(--swatch-ink); }
   .swatch.realm { background: var(--swatch-realm); }
-  #style-box .themes { display: flex; flex-wrap: wrap; }
-  #style-box .themes button { height: 32px; padding: 0 10px; }
+  .swatch.atlas { background: var(--swatch-atlas); }
+  .swatch.dots { background: var(--swatch-dots); }
+  /* the other choices: one framed strip, its parts split by hairlines, the one picked filled */
+  #style-box .themes { display: inline-flex; border: 1px solid var(--frame); }
+  #style-box .themes button { height: 30px; padding: 0 12px; font-size: 13px; white-space: nowrap; }
+  #style-box .themes button + button { border-left: 1px solid var(--frame); }
+  #style-box .themes button:hover { background: var(--ui-soft); color: var(--ui-accent); }
   #style-box .themes button[aria-checked="true"], #style-box .themes button[aria-checked="true"]:hover { background: var(--ui-accent); color: var(--ui-on-accent); }
-  #about { font-size: 13px; line-height: 1.5; }
-  #about p { margin: 6px 0; text-wrap: pretty; }
+  /* About: under a hairline, what this is; then, on a tint of its own, how this map came out; the keys */
+  #about-head { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--ui-line); }
+  #about-head:focus { outline: none; }
+  #about { font-size: 13px; line-height: 1.55; }
+  #about p { margin: 8px 0; text-wrap: pretty; }
   #about ul { margin: 6px 0; padding: 0; list-style: none; }
-  #about li { margin: 2px 0; }
+  #about li { margin: 3px 0; }
+  #about .report { margin: 12px 0; padding: 2px 12px; background: var(--ui-soft); font-size: 12px; color: var(--ui-text-2);
+    font-variant-numeric: tabular-nums; }
+  #about .report li { padding-left: 1.1em; text-indent: -1.1em; }
+  #about .report .ok { color: var(--ui-text); }
+  #about .report li > span:first-child:not(.ok) { color: var(--ui-accent); }
+  /* the keys: what each does, and its keys at the right, as a menu lists them */
+  #about .keys-head { margin: 12px 0 6px; color: var(--ui-text-2); font-size: 12px; }
+  #about .keys { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 5px 12px; align-items: baseline;
+    margin: 0 0 12px; font-size: 12px; }
+  #about .keys li { display: contents; }
+  #about .keys .k { white-space: nowrap; justify-self: end; }
+  #about .keys kbd + kbd { margin-left: 2px; }
   #checks { font-variant-numeric: tabular-nums; }
   a.support { white-space: nowrap; }
   a.support .cup { width: 1.15em; height: 1.15em; margin-right: 0.25em; vertical-align: -0.2em; fill: none; stroke: currentColor;
@@ -378,8 +419,8 @@
 // chose last time, else ink. Only that style's files load now; the others when first picked.
 (function () {
   // (a style that was retired, named in an old link or kept as a choice, gives way to ink)
-  var names = ['ink', 'realm'], name = 'ink', html = document.documentElement;
-  var m = /-(ink|realm)$/.exec(decodeURIComponent(location.hash));
+  var names = ['ink', 'realm', 'atlas', 'dots'], name = 'ink', html = document.documentElement;
+  var m = /-(ink|realm|atlas|dots)$/.exec(decodeURIComponent(location.hash));
   var saved = null;
   try { saved = localStorage.getItem('peopled-style'); } catch (e) { /* no storage: the default */ }
   if (m) name = m[1];
@@ -405,7 +446,9 @@
   window.peopledFonts = function (name) {
     var known = {   // (until a style ships its .fonts file)
       ink: 'https://fonts.googleapis.com/css2?family=Eagle+Lake&family=Fondamento:ital@0;1&family=Sorts+Mill+Goudy:ital@0;1&display=swap',
-      realm: 'https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&family=Alegreya:ital,wght@0,400;0,500;1,500&display=swap'
+      realm: 'https://fonts.googleapis.com/css2?family=Alegreya+SC:wght@500;700&family=Alegreya:ital,wght@0,400;0,500;1,500&display=swap',
+      atlas: 'https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&display=swap',
+      dots: 'https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700&display=swap'
     };
     if (document.querySelector('link[data-style-fonts="' + name + '"]')) return;
     var add = function (url) {
@@ -424,9 +467,9 @@
 </script>
 </head>
 <body>
-<!-- The search bar comes first, so Tab starts at the search. Under it: the panel that
-     Customize opens (what the countries are sized by, the style, the theme and what this page
-     is), then one sentence that says what this is and one that says what to do. -->
+<!-- The search bar comes first, so Tab starts at the search. Under it: the panel its one word
+     opens (Customize: the style, the theme and what this page is), then one sentence that says
+     what this is and one that says what to do. (The address bar holds the link to the map.) -->
 <header class="cartouche">
   <h1 class="sr-only">People World</h1>
   <div class="bar">
@@ -438,7 +481,7 @@
     </div>
   </div>
   <div id="style-box" class="panel" hidden>
-    <h3>Display</h3>
+    <h3 class="sr-only">Display</h3>
     <div class="prow" id="size-row">
       <div class="plabel" id="size-head">Size by</div>
       <div class="pval themes" role="radiogroup" aria-labelledby="size-head">
@@ -452,6 +495,8 @@
       <div class="pval choices" role="radiogroup" aria-labelledby="style-head">
         <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="ink" title="Pen and ink on paper"><span class="swatch ink" aria-hidden="true"></span><span class="nm">ink</span></button>
         <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="realm" title="A painted relief"><span class="swatch realm" aria-hidden="true"></span><span class="nm">realm</span></button>
+        <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="atlas" title="An engraved atlas, coloured by hand"><span class="swatch atlas" aria-hidden="true"></span><span class="nm">atlas</span></button>
+        <button type="button" class="choice" role="radio" aria-checked="false" data-pick-style="dots" title="One dot for every so many people"><span class="swatch dots" aria-hidden="true"></span><span class="nm">dots</span></button>
       </div>
     </div>
     <div class="prow">
@@ -583,7 +628,7 @@ function unpackEdit(text) {
   return {add, a: codeOf(Math.floor(v / 676)), b: codeOf(v % 676)};
 }
 const packable = e => /^[A-Z]{2}$/.test(e.a) && /^[A-Z]{2}$/.test(e.b);
-const STYLES = ['ink', 'realm'], DEFAULT_STYLE = 'ink';
+const STYLES = ['ink', 'realm', 'atlas', 'dots'], DEFAULT_STYLE = 'ink';
 // styles there were once: an old link that names one keeps its world and edits and shows them in ink
 const RETIRED_STYLES = ['kinpeki'];
 const styleSuffix = new RegExp('-(' + STYLES.concat(RETIRED_STYLES).join('|') + ')$');
@@ -1360,7 +1405,7 @@ function showChecks(check, exclaves, ms) {
     `${check.extra} false, sizes within ${pct}%. <a href="#about" data-about>Learn more.</a>`;
   let mark = good => `<span class="${good ? 'ok' : ''}">${good ? '✓' : '✗'}</span>`;
   let which = edits.length ? (showingBefore ? ', before your changes' : `, with your ${edits.length} change${edits.length > 1 ? 's' : ''}`) : '';
-  document.getElementById('about-body').innerHTML = `<p>This map was checked after it was drawn:</p><ul>
+  document.getElementById('about-body').innerHTML = `<div class="report"><p>This map was checked after it was drawn:</p><ul>
       <li>${mark(check.missing === 0)} Neighbours share a border: ${check.pairs - check.missing} of ${check.pairs} pairs do.</li>
       <li>${mark(check.extra === 0)} Countries that are not neighbours never touch: ${check.extra} false borders.</li>
       <li>${mark(check.worst < 0.01)} Each country's area is its share of ${by ? MEASURES[by].whole : measure ? 'all the ' + escapeHtml(measure) : 'the world\'s people'}` +
@@ -1369,8 +1414,16 @@ function showChecks(check, exclaves, ms) {
     ${measure && !by && !ok ? '<p>Not every graph can be drawn by these rules: one with many links to a node, or one node linked to very many, runs out of room.</p>' : ''}
     <p>${exclaves.length} exclaves: no flat map can give every pair of neighbours a border, so ${exclaves.length} borders are made by a detached piece of one country touching the other, like Kaliningrad.</p>
     <p>World ${seed}${which}${ms ? `, drawn in ${(ms / 1000).toFixed(1)} s` : ''}. Each world number draws the same countries differently.` +
-    (edits.length && !showingBefore && edited && edited.scratch ? ' Drawn from scratch: the last change didn’t fit into the map as it was, so countries moved.' : '') + `</p>
-    <p>Keys: <kbd>/</kbd> find · arrows, <kbd>+</kbd> <kbd>−</kbd> and <kbd>0</kbd> move the map · <kbd>Enter</kbd> picks the country in the middle · <kbd>B</kbd> before and after · <kbd>Ctrl</kbd> <kbd>Z</kbd> undo · <kbd>Esc</kbd> close.</p>`;
+    (edits.length && !showingBefore && edited && edited.scratch ? ' Drawn from scratch: the last change didn’t fit into the map as it was, so countries moved.' : '') + `</p></div>
+    <p class="keys-head">Keys</p>
+    <ul class="keys">
+      <li><span>find</span><span class="k"><kbd>/</kbd></span></li>
+      <li><span>move the map</span><span class="k"><kbd>arrows</kbd> <kbd>+</kbd> <kbd>−</kbd> <kbd>0</kbd></span></li>
+      <li><span>pick the country in the middle</span><span class="k"><kbd>Enter</kbd></span></li>
+      <li><span>before and after</span><span class="k"><kbd>B</kbd></span></li>
+      <li><span>undo</span><span class="k"><kbd>Ctrl</kbd> <kbd>Z</kbd></span></li>
+      <li><span>close</span><span class="k"><kbd>Esc</kbd></span></li>
+    </ul>`;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1622,6 +1675,7 @@ function toggleBorder(a, b) {
   picking = null;   // UX
   // UX: a phone folds the country sheet back to its peek, so the map shows while it is redrawn
   if (isPhone()) sheetOpen = false;
+  askedFrom = 'dock';
   location.hash = linkOf(seed, next);
 }
 function nameOfId(id) { let row = doc && doc.nodes.find(r => r[0] === id); return row ? row[1] : id; }
@@ -1649,7 +1703,7 @@ function showEdits() {
     .concat(undoing.map(e => `<li><span><s>${e.add ? 'Added' : 'Removed'} ${escapeHtml(describe(e))}</s> <span class="tag">undoing…</span></span></li>`));
   document.getElementById('edits-list').innerHTML = rows.join('');
   box.querySelectorAll('[data-undo]').forEach(button => {
-    button.onclick = () => { location.hash = linkOf(seed, edits.filter((e, k) => k !== +button.dataset.undo)); };
+    button.onclick = () => { askedFrom = 'dock'; location.hash = linkOf(seed, edits.filter((e, k) => k !== +button.dataset.undo)); };
   });
   document.getElementById('edits-toggle').textContent = `Your changes · ${edits.length}`;
   document.getElementById('clear').hidden = edits.length < 2;
@@ -1997,12 +2051,17 @@ window.addEventListener('hashchange', () => {
     if (!sized(next.graph) && !droppedGraphs.has(next.graph) && !storedGraph(next.graph)) {
       // a dropped graph this tab doesn't have (a link from elsewhere, typed in): the map stays
       history.replaceState(null, '', linkOf(seed, edits));
+      askedFrom = 'header';
+      placeStatus('header');
       if (world) showStatus(LOST_GRAPH, '', {error: true});
       announce(LOST_GRAPH);
       return;
     }
     switchGraph(next.graph);
-  } else if (hashOf(next.seed, next.edits) === hashOf(seed, edits)) return;
+  } else if (hashOf(next.seed, next.edits) === hashOf(seed, edits)) { askedFrom = 'header'; return; }
+  // (the build, and what came of it, are told of next to what asked for them)
+  placeStatus(askedFrom);
+  askedFrom = 'header';
   seed = next.seed;
   edits = next.edits;
   // UX: the panel and the list show the change as being drawn at once
@@ -2059,16 +2118,16 @@ flip.addEventListener('pointerup', () => { if (peek) { endPeek(false); swallowCl
 flip.addEventListener('pointercancel', () => endPeek(true));
 flip.addEventListener('contextmenu', e => e.preventDefault());
 flip.addEventListener('click', () => { if (swallowClick) { swallowClick = false; return; } setBefore(!showingBefore); });
-function undoLast() { if (edits.length) location.hash = linkOf(seed, edits.slice(0, -1)); }
+function undoLast() { if (edits.length) { askedFrom = 'dock'; location.hash = linkOf(seed, edits.slice(0, -1)); } }
 $('undo-last').addEventListener('click', undoLast);
 // Undo all: at once for one change; for more, a question in the panel first
 $('clear').addEventListener('click', () => {
-  if (edits.length < 2) { location.hash = linkOf(seed, []); return; }
+  if (edits.length < 2) { askedFrom = 'dock'; location.hash = linkOf(seed, []); return; }
   $('clear-question').textContent = `Undo all ${edits.length} changes and go back to world ${seed} as first drawn?`;
   $('clear-confirm').hidden = false;
   $('clear-no').focus();
 });
-$('clear-yes').addEventListener('click', () => { $('clear-confirm').hidden = true; location.hash = linkOf(seed, []); });
+$('clear-yes').addEventListener('click', () => { $('clear-confirm').hidden = true; askedFrom = 'dock'; location.hash = linkOf(seed, []); });
 $('clear-no').addEventListener('click', () => { $('clear-confirm').hidden = true; $('clear').focus(); });
 $('edits-toggle').addEventListener('click', () => {
   let t = $('edits-toggle');
@@ -2080,9 +2139,9 @@ if (isPhone()) $('edits-toggle').setAttribute('aria-expanded', 'false');   // a 
 if (window.matchMedia('(pointer: coarse)').matches)
   $('hint').textContent = 'Tap a country to see its neighbours and change its borders. Pinch to zoom.';
 
-
-// The build status in the dock: what is being drawn, a bar, the stage and the time left, and a
-// way to call it off; then what came of it. The first visit's build shows the same in the middle.
+// The build status, in the dock or under the search bar (next to what asked for it: placeStatus):
+// what is being drawn, a bar, the stage and the time left, and a way to call it off; then what
+// came of it. The first visit's build shows the same in the middle.
 const STAGES = [[0, 'Choosing which borders become exclaves'], [0.08, 'Placing the countries'], [0.15, 'Laying out the land'],
   [0.25, 'Growing each country to its size'], [0.55, 'Drawing the borders and coasts'], [0.9, 'Finishing the islands']];
 // the share of a build's time spent before each progress mark; learnt from this machine's builds
@@ -2149,6 +2208,16 @@ function showStatus(text, sub, {error = false, hideAfter = 0} = {}) {
   clearTimeout(statusTimer);
   if (hideAfter) statusTimer = setTimeout(() => { if (!st.contains(document.activeElement)) st.hidden = true; }, hideAfter);
 }
+// Where the slip shows: next to what asked for the build, where the eye is. A change made in the
+// dock (a border, an undo) is told of there; anything asked for at the top (Size by, a file
+// dropped, a link opened, Back) under the search bar. (Told of in the other corner, it went unseen.)
+let askedFrom = 'header';   // where the next build is asked for: the dock's buttons say 'dock'
+function placeStatus(where) {
+  let st = $('status');
+  if (where === 'dock') { if (st.parentNode !== $('dock')) $('dock').prepend(st); }
+  else if (st.previousElementSibling !== $('style-box')) $('style-box').after(st);
+}
+const statusAt = () => $('status').parentNode === $('dock') ? 'dock' : 'header';
 function hideStatus() {
   clearTimeout(statusTimer);
   let st = $('status');
@@ -2161,6 +2230,7 @@ let noteWhenShown = null;   // {text, error}: said once the map asked for is on 
 $('status-cancel').addEventListener('click', () => {
   if (graphKey && !plain) { leaveGraph('Cancelled: the map is as it was.', false); return; }
   noteWhenShown = {text: 'Cancelled: the map is as it was.'};
+  askedFrom = statusAt();   // (said where the build was)
   location.hash = linkOf(plain ? plain.seed : seed, plain && plain.seed === seed ? lastGood : edits);
 });
 // what a build is about, in words
@@ -2360,7 +2430,7 @@ async function openDot(text, name) {
   try { sessionStorage.setItem('peopled-graph-' + key, JSON.stringify({name, text})); }
   catch (e) { /* no storage, or no room in it: the graph lasts until the page is reloaded */ }
   if (key === graphKey) {
-    if (plain && world) showStatus(`${name} is the map on screen.`, '', {hideAfter: 5000});
+    if (plain && world) { placeStatus('header'); showStatus(`${name} is the map on screen.`, '', {hideAfter: 5000}); }
     return key;
   }
   location.hash = linkOf(1, [], key);
@@ -2737,7 +2807,7 @@ async function setStyle(name, how = {}) {
 // within one, Tab between them): the style, and the theme (light, dark, or as the device is set,
 // kept by this browser; the page's and the styles' colours follow data-theme)
 const styleBox = $('style-box'), styleButton = $('style-button');
-const styleTitle = {ink: 'Ink', realm: 'Realm'};
+const styleTitle = {ink: 'Ink', realm: 'Realm', atlas: 'Atlas', dots: 'Dots'};
 const THEMES = ['light', 'dark', 'auto'];
 let themeChoice = html.getAttribute('data-theme') || 'auto';
 function syncPicker(pending) {
@@ -2763,12 +2833,14 @@ function syncPicker(pending) {
   note.hidden = !pending;
   note.textContent = pending ? `Drawing the map in ${styleTitle[pending]}…` : '';
 }
-function openStyles() {
+// (the focus goes into the panel when it was opened from the keyboard; opened with a click, it
+// stays put)
+function openStyles(focusInside = true) {
   styleBox.hidden = false;
   styleBox.scrollTop = 0;
   styleButton.setAttribute('aria-expanded', 'true');
   syncPicker();
-  styleBox.querySelector('[data-pick-style][aria-checked="true"]').focus({preventScroll: true});
+  if (focusInside) styleBox.querySelector('[data-pick-style][aria-checked="true"]').focus({preventScroll: true});
 }
 // "Learn more": the same panel, at what this page is
 document.querySelector('header.cartouche').addEventListener('click', e => {
@@ -2789,11 +2861,11 @@ function closeStyles(refocus = true) {
 }
 // A click (or Enter) on a style picks it and closes the menu once the map is drawn in it (until
 // then the menu says what it is drawing); the arrow keys only move the pick, as in any radio group
-function pickStyle(name, fold) {
+function pickStyle(name, fold, refocus = true) {
   setStyle(name).then(done => {
     if (!done) return;           // another pick came after this one
     if (done.ms) announce(`The map is drawn in ${styleTitle[name]}.`);
-    if (fold && !styleBox.hidden) closeStyles();
+    if (fold && !styleBox.hidden) closeStyles(refocus);
   }, failed);
 }
 function setTheme(name) {
@@ -2805,7 +2877,9 @@ function setTheme(name) {
   syncPicker();
   announce(name === 'auto' ? 'Light or dark as your device is set.' : `The map is ${name}.`);
 }
-styleButton.addEventListener('click', () => { if (styleBox.hidden) openStyles(); else closeStyles(); });
+// (a click from Enter or Space has no presses: detail 0. The focus moves for the keyboard only,
+// opening or closing: moved by a script after a click, the browser rings it as if tabbed to.)
+styleButton.addEventListener('click', e => { if (styleBox.hidden) openStyles(e.detail === 0); else closeStyles(e.detail === 0); });
 // a press anywhere outside the menu and its button closes it
 document.addEventListener('pointerdown', e => {
   if (!styleBox.hidden && !e.target.closest('#style-box, #style-button')) closeStyles(false);
@@ -2821,11 +2895,11 @@ function radioKeys(button, list, attr, pick) {
   });
 }
 styleBox.querySelectorAll('[data-pick-style]').forEach(button => {
-  button.addEventListener('click', () => pickStyle(button.dataset.pickStyle, true));
+  button.addEventListener('click', e => pickStyle(button.dataset.pickStyle, true, e.detail === 0));
   radioKeys(button, STYLES, 'pickStyle', name => pickStyle(name));
 });
 styleBox.querySelectorAll('[data-pick-theme]').forEach(button => {
-  button.addEventListener('click', () => { setTheme(button.dataset.pickTheme); closeStyles(); });
+  button.addEventListener('click', e => { setTheme(button.dataset.pickTheme); closeStyles(e.detail === 0); });
   radioKeys(button, THEMES, 'pickTheme', setTheme);
 });
 // What the countries are sized by: another map of the same world and edits, at an address of its
@@ -2836,7 +2910,7 @@ function setSizeBy(key) {
   announce(`Drawing the countries by ${MEASURES[key].name}.`);
 }
 styleBox.querySelectorAll('[data-pick-size]').forEach(button => {
-  button.addEventListener('click', () => { setSizeBy(button.dataset.pickSize); closeStyles(); });
+  button.addEventListener('click', e => { setSizeBy(button.dataset.pickSize); closeStyles(e.detail === 0); });
   radioKeys(button, Object.keys(MEASURES), 'pickSize', key => { setSizeBy(key); syncPicker(); });
 });
 syncPicker();
@@ -2901,7 +2975,7 @@ window.addEventListener('drop', async e => {
     await openDot(await file.text(), file.name);
   } catch (error) {
     let text = `${file.name} could not be drawn as a map: ${error.message}.`;
-    if (world) showStatus(text, 'The page reads DOT, the language of Graphviz files (.dot, .gv).', {error: true});
+    if (world) { placeStatus('header'); showStatus(text, 'The page reads DOT, the language of Graphviz files (.dot, .gv).', {error: true}); }
     announce(text);
   }
 });
