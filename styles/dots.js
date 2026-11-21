@@ -31,6 +31,9 @@ const SMALL = 2.5, FULL = 8;
 // so as large as the square root of its people), but no wider than a little more than that size,
 // and no larger than a cap: capitals for the countries of more than thirty million, and the rest
 const NAME_REL = 0.2, NAME_OVER = 1.25, NAME_MIN_PX = 9, NAME_PX = 44, SMALL_NAME_PX = 22, BIG = 3e7;
+// the most populous countries are named whenever they have room, at least this large (on a phone
+// the whole world is small, and by size alone only the two largest would be)
+const NAMED_FIRST = 12, NAMED_FIRST_PX = 10;
 
 const WORDS = n => {
   if (n >= 1e9) return (n / 1e9).toLocaleString('en-US') + ' billion';
@@ -149,7 +152,7 @@ function colours() {
 function draw(world, state, selected) {
   if (!canvas || !world || !active()) return;
   let svg = document.getElementById('map');
-  let W = svg.clientWidth, H = svg.clientHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+  let W = svg.clientWidth, H = svg.clientHeight, dpr = Math.min(3, window.devicePixelRatio || 1);
   let theme = html.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'auto-dark' : 'auto-light');
   let key = [state.x, state.y, state.k, W, H, dpr, theme, selected ? selected.index : -1].join(',');
   if (key === drawnKey && world === current) return;
@@ -159,7 +162,9 @@ function draw(world, state, selected) {
   // how many people a dot is. The spacing wanted is closer on a small screen, where the whole world
   // is small. A power of ten (a million, a hundred thousand) whose dots are between a little closer
   // and a little farther apart than that; else the round number (2 or 5 of a power of ten) nearest it
-  let want = Math.max(5.5, Math.min(SPACING_PX, SPACING_PX * Math.sqrt(Math.min(W, H) / 800)));
+  // (in the screen's own pixels: a phone's are small and many, so its dots can be closer in css
+  // pixels and still be as clear as a laptop's)
+  let want = SPACING_PX / Math.sqrt(Math.max(1, dpr)) * Math.min(1, Math.min(W, H) / 800);
   let least = want * MIN_SPACING, most = want * MAX_TIDY;
   let steps = stepsOf(world).map(s => ({...s, px: k * HEX * Math.sqrt(s.n * dots.perPerson)})), best = null;
   let fit = s => Math.abs(Math.log(s.px / want));
@@ -307,7 +312,7 @@ function names(world, state, selected) {
   let k = state.k, svg = document.getElementById('map'), W = svg.clientWidth, H = svg.clientHeight;
   let near = new Set(selected ? world.neighbours[selected.index] : []);
   let order = world.items.slice().sort((p, q) => (q === selected) - (p === selected) || q.country.population - p.country.population);
-  let placed = [];
+  let placed = [], first = new Set(world.items.slice().sort((p, q) => q.country.population - p.country.population).slice(0, NAMED_FIRST));
   for (let item of order) {
     let label = item.label;
     label.classList.toggle('dots-dim', !!selected && item !== selected && !near.has(item.index));
@@ -316,6 +321,7 @@ function names(world, state, selected) {
     let one = Math.min(byPeople, NAME_OVER * size / lay.one.w);
     let two = lay.two ? Math.min(byPeople, NAME_OVER * size / lay.two.w) : 0;
     let pick = two > one * 1.15 ? {f: two, ...lay.two} : {f: one, ...lay.one};
+    if (first.has(item)) pick.f = Math.max(pick.f, NAMED_FIRST_PX);
     if (item === selected) pick.f = Math.max(pick.f, 11);
     let x = state.x + k * item.pole.x, y = state.y - k * item.pole.y;
     let hw = pick.f * pick.w / 2 + 3, hh = pick.f * 0.55 * pick.lines.length + 2;

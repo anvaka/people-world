@@ -195,9 +195,11 @@ room, so one dot for every so many people lies on one even grid over the whole w
 distance apart in every country; a country is where its dots are. The grid is fixed to the map, so
 the dots keep their places as it moves, and how many people a dot stands for follows the zoom: a
 million at whole-world zoom on a laptop, then a hundred thousand, ten thousand, down to one person,
-always a power of ten when one puts the dots a comfortable distance apart (about 6 to 11 pixels on
-a laptop, closer on a phone), and 2 or 5 of one otherwise. On a phone the whole world is smaller, so
-there a dot starts at ten million. The legend at the bottom left says how many. Which country a dot
+always a power of ten when one puts the dots a comfortable distance apart, and 2 or 5 of one
+otherwise. That distance is set in the screen's own pixels (about 6 to 11 css pixels on an ordinary
+laptop screen, 4 to 8 on a sharp one, and on a phone, whose pixels are smaller and whose screen is
+narrow, 2 to 4), so a phone also shows the whole world at a million people a dot. The legend at the
+bottom left says how many. Which country a dot
 falls in is read from an id map: every country in view filled in a colour of its own on a canvas
 off screen; a dot on the very edge of a shape is tested against the shape exactly.
 
@@ -214,8 +216,10 @@ The names are the style's own (it has a render hook, so the page leaves them who
 Bos. & Herz.). Each is as large as a fifth of its country's size on screen (the side of a square as
 large as the country, so as large as the square root of its people), no wider than a little more
 than that size, at most 44 pixels for countries of more than thirty million people (in capitals)
-and 22 for the rest, and on two lines where that lets it be larger. The largest countries are named
-first, and a name that would run into one already placed is left out. There are no rings round the
+and 22 for the rest, and on two lines where that lets it be larger. The twelve most populous
+countries are named at least 10 pixels large wherever they have room (on a phone, by size alone,
+only China and India would be). The largest countries are named first, and a name that would run
+into one already placed is left out. There are no rings round the
 countries too small to see: a country under a dot has none. Only a chosen one keeps its ring.
 Sized by land area or GDP, a dot is so many km² or dollars.
 
