@@ -1,8 +1,8 @@
 /* The dots. Scoped to html[data-style="dots"]. One dot for every so many people, the same distance
    apart all over the world, because this map gives everyone the same room (styles/dots.js draws
-   them on a canvas under the svg). Nothing else of the land is drawn: the svg's countries are
-   only there for the pointer to find, its coasts and borders are not stroked, and the names sit on
-   the dots with a halo of the paper. By day black dots on a warm paper with one red for the chosen
+   them on a canvas under the svg; a border is the gap between two countries' dots). Nothing else of
+   the land is drawn: the svg's countries are only there for the pointer to find, its coasts and
+   borders are not stroked, and the names sit on the dots with a halo of the paper. By day black dots on a warm paper with one red for the chosen
    country; by night pale dots on black. */
 
 /* ---------------------------------------------------------------- tokens: day */
@@ -58,8 +58,10 @@ html[data-style="dots"] .country, html[data-style="dots"] .country.lit, html[dat
 html[data-style="dots"] .coast, html[data-style="dots"] .border, html[data-style="dots"] .border.lit { stroke: none; }
 /* (the border a neighbour's row in the panel points at still shows) */
 html[data-style="dots"] .border.hot { stroke: var(--accent); stroke-width: 3; stroke-dasharray: none; opacity: 1; }
-html[data-style="dots"] .marker { stroke: var(--ink); stroke-opacity: 0.55; stroke-width: 1; }
-html[data-style="dots"] .marker.lit { stroke: var(--accent); stroke-opacity: 1; stroke-width: 1.8; }
+/* no rings round the countries too small to see: here a country under a dot has none. Only the
+   chosen one keeps its ring, to be found */
+html[data-style="dots"] .marker { display: none; }
+html[data-style="dots"] .marker.lit { display: inline; stroke: var(--accent); stroke-opacity: 1; stroke-width: 1.8; }
 
 /* names: a plain sans, capitals for the countries of more than thirty million, on a halo of paper */
 html[data-style="dots"] .label {

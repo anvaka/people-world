@@ -197,14 +197,27 @@ the dots keep their places as it moves, and how many people a dot stands for fol
 million at whole-world zoom on a laptop, then a hundred thousand, ten thousand, down to one person,
 always a power of ten when one puts the dots a comfortable distance apart (about 6 to 11 pixels on
 a laptop, closer on a phone), and 2 or 5 of one otherwise. On a phone the whole world is smaller, so
-there a dot starts at ten million. The legend at the
-bottom left says how many. Which country a dot falls in is read from an id map: every country in
-view filled in a colour of its own on a canvas off screen; a dot on the very edge of a shape is
-tested against the shapes around it exactly. A dot with another country within a third of the
-spacing shrinks to a pinprick, and that is the border. The svg's countries are left unfilled, there
-for the pointer only, its coasts and borders are not stroked, and the page letters the names (the
-style has no render hook), which the style keeps from growing past 46 pixels on screen. Sized by
-land area or GDP, a dot is so many km² or dollars.
+there a dot starts at ten million. The legend at the bottom left says how many. Which country a dot
+falls in is read from an id map: every country in view filled in a colour of its own on a canvas
+off screen; a dot on the very edge of a shape is tested against the shape exactly.
+
+A border is a gap. Within two and a half spacings of a border a dot is moved away from it: by 0.6
+of the spacing right at the border, less and less farther in. No dot is taken away, so every
+country keeps a dot for every so many of its people (world 1 at whole-world zoom: 8,227 dots for
+8,218 million people, each country of twenty dots or more within a few dots of its millions); the
+dots just inside a border are a little closer together instead. A country only a few dots across
+has no room to move its dots: they move less, not at all below two and a half spacings across, and
+its bigger neighbours' dots make the gap. The borders are simplified to a quarter of the spacing
+first, so the dots step back from a border's course and not from every wobble of its line.
+
+The names are the style's own (it has a render hook, so the page leaves them whole: never Switz. or
+Bos. & Herz.). Each is as large as a fifth of its country's size on screen (the side of a square as
+large as the country, so as large as the square root of its people), no wider than a little more
+than that size, at most 44 pixels for countries of more than thirty million people (in capitals)
+and 22 for the rest, and on two lines where that lets it be larger. The largest countries are named
+first, and a name that would run into one already placed is left out. There are no rings round the
+countries too small to see: a country under a dot has none. Only a chosen one keeps its ring.
+Sized by land area or GDP, a dot is so many km² or dollars.
 
 Atlas is drawn by Ink's code in another look. `styles/atlas.js` only imports `ink.js?look=atlas`:
 the address differs, so the browser runs `ink.js` a second time as a module of its own, with its own
