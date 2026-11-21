@@ -21,8 +21,7 @@ const active = () => html && html.dataset.style === 'dots';
 // apart. The step (how many people a dot is) is the one that puts them about SPACING_PX apart.
 const SPACING_PX = 9, MIN_SPACING = 0.62, MAX_TIDY = 1.25;   // the spacing wanted; how much closer or farther may do
 const HEX = Math.sqrt(2 / Math.sqrt(3));
-const RADIUS = 0.27;        // a dot's radius, as a share of the spacing
-const RADIUS_SOFT = 0.24;   // (in a softer colour a dot can be a little smaller)
+const RADIUS = 0.24;        // a dot's radius, as a share of the spacing
 const GAP = 0.6;            // how far from a border the nearest dots step back, as a share of the spacing
 const REACH = 2.5;          // how far from a border dots move at all (less and less), in spacings
 // A country only a few dots across has no room to step back: its dots move less (not at all below
@@ -132,11 +131,6 @@ function bordersNear(world, step, s, view) {
 // to tell which country a dot is in
 let canvas = null, idCanvas = null, legend = null, mountedNow = false;
 let current = null, currentSelected = null, drawnKey = '', clearings = [];
-// Each country's dots are in one of a few muted colours, neighbours never alike, the chosen
-// country's in the ink. (For comparing: ?dots-look=ink, grey or tones in the address draws them
-// all black, all grey, or in four greys.)
-const LOOKS = ['hues', 'ink', 'grey', 'tones'];
-const LOOK = (() => { let q = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('dots-look'); return LOOKS.includes(q) ? q : 'hues'; })();
 const stats = {draws: 0, lastMs: 0, dots: 0, step: 0, counts: {}};
 
 const idColour = id => `rgb(${id & 255},${(id >> 8) & 255},${(id * 97 + 31) & 255})`;
@@ -152,12 +146,10 @@ const idAt = (data, w, x, y) => {
 function colours() {
   let cs = getComputedStyle(html);
   let get = (name, fallback) => cs.getPropertyValue(name).trim() || fallback;
-  let set = LOOK === 'grey' ? [get('--dot-soft', '#7d7972')]
-    : LOOK === 'tones' ? [0, 1, 2, 3].map(i => get('--dot-tone-' + i, '#7d7972'))
-    : LOOK === 'hues' ? [0, 1, 2, 3, 4, 5].map(i => get('--dot-hue-' + i, '#7d7972'))
-    : [get('--dot', '#161514')];
-  // (among colours the chosen country is in the ink; among blacks and greys, in red)
-  return {set, lit: LOOK === 'hues' ? get('--dot', '#161514') : get('--dot-lit', '#e2412b'), faint: +get('--dot-faint-alpha', '0.22')};
+  // each country's dots in one of six muted colours, neighbours never alike; the chosen country's in
+  // the ink, and the others' faint while it is chosen
+  let set = [0, 1, 2, 3, 4, 5].map(i => get('--dot-hue-' + i, '#7d7972'));
+  return {set, lit: get('--dot', '#161514'), faint: +get('--dot-faint-alpha', '0.22')};
 }
 // A colour for each country, neighbours never alike: the country with the most differently
 // coloured neighbours first (DSATUR), each taking the colour its code hashes to if it is free, so
@@ -228,7 +220,7 @@ function draw(world, state, selected) {
   let near = new Set(selected ? world.neighbours[selected.index] : []);
   let paint = colours(), slots = slotsOf(world, paint.set.length), groups = new Map();
   let groupOf = (colour, faint) => { let key = colour + (faint ? '~' : ''); if (!groups.has(key)) groups.set(key, {colour, faint, list: []}); return groups.get(key).list; };
-  let r = Math.max(0.6, (LOOK === 'ink' ? RADIUS : RADIUS_SOFT) * best.px), g = GAP * s, count = 0, counts = {};
+  let r = Math.max(0.6, RADIUS * best.px), g = GAP * s, count = 0, counts = {};
   let cleared = (x, y) => clearings.some(b => x > b[0] - r && x < b[2] + r && y > b[1] - r && y < b[3] + r);
   let {D, buckets} = bordersNear(world, best.n, s, [vx0, vy0, vx1, vy1]);
   let dy = s * Math.sqrt(3) / 2, nearest = new Map();
