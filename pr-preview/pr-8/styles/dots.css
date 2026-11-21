@@ -1,21 +1,19 @@
 /* The dots. Scoped to html[data-style="dots"]. One dot for every so many people, the same distance
    apart all over the world, because this map gives everyone the same room (styles/dots.js draws
-   them on a canvas under the svg; a border is the gap between two countries' dots). Nothing else of
-   the land is drawn: the svg's countries are only there for the pointer to find, its coasts and
-   borders are not stroked, and the names sit on the dots with a halo of the paper. By day black dots on a warm paper with one red for the chosen
-   country; by night pale dots on black. */
+   them on a canvas under the svg; a border is the gap between two countries' dots). Each country's
+   dots are in one of six muted colours, no two neighbours alike, and the chosen country's in the
+   ink. Nothing else of the land is drawn: the svg's countries are only there for the pointer to
+   find, its coasts and borders are not stroked, and the names sit on clear paper (the dots under
+   them are not drawn). By day on a warm paper, by night lighter colours on black. */
 
 /* ---------------------------------------------------------------- tokens: day */
 html[data-style="dots"] {
   --sea: #f3f1ec;              /* the paper: there is no sea, only where the dots are not */
   --ink: #161514;
   --accent: #e2412b;
-  --dot: #161514;              /* a dot */
-  --dot-lit: #e2412b;          /* the chosen country's dots */
-  --dot-faint: rgba(22, 21, 20, 0.2);   /* the dots of countries not lit while one is chosen */
-  --dot-faint-alpha: 0.22;
-  --dot-soft: #8a857d;
-  --dot-tone-0: #4f4b46; --dot-tone-1: #8a857d; --dot-tone-2: #b3ada3; --dot-tone-3: #6d6963;
+  --dot: #161514;              /* the chosen country's dots, and the legend's */
+  --dot-faint-alpha: 0.22;     /* the other countries' while one is chosen */
+  /* six muted colours for the countries' dots, no two neighbours alike */
   --dot-hue-0: #c8705f; --dot-hue-1: #5b88a8; --dot-hue-2: #c9a04a; --dot-hue-3: #78a065; --dot-hue-4: #9479b0; --dot-hue-5: #4f9c98;
   --lit: none;
   /* the page's controls on this paper: panels a shade lighter than it, and its red (a little
@@ -32,11 +30,7 @@ html[data-style="dots"] {
     --ink: #ece6d9;
     --accent: #ff6a4d;
     --dot: #ece6d9;
-    --dot-lit: #ff6a4d;
-    --dot-faint: rgba(236, 230, 217, 0.18);
     --dot-faint-alpha: 0.2;
-    --dot-soft: #9a958b;
-    --dot-tone-0: #d9d3c6; --dot-tone-1: #8d887f; --dot-tone-2: #5f5b55; --dot-tone-3: #b2ada3;
     --dot-hue-0: #e08a79; --dot-hue-1: #7fb0d0; --dot-hue-2: #e0bd68; --dot-hue-3: #97c07c; --dot-hue-4: #b49ad0; --dot-hue-5: #6fc0ba;
     --ui-bg: #1d2024; --ui-soft: #272a2f; --ui-text: #ece6d9; --ui-text-2: rgba(236, 230, 217, 0.6);
     --ui-line: rgba(236, 230, 217, 0.14); --ui-accent: #ff6a4d; --ui-on-accent: #121417;
@@ -48,11 +42,7 @@ html[data-style="dots"][data-theme="dark"] {
   --ink: #ece6d9;
   --accent: #ff6a4d;
   --dot: #ece6d9;
-  --dot-lit: #ff6a4d;
-  --dot-faint: rgba(236, 230, 217, 0.18);
   --dot-faint-alpha: 0.2;
-  --dot-soft: #9a958b;
-  --dot-tone-0: #d9d3c6; --dot-tone-1: #8d887f; --dot-tone-2: #5f5b55; --dot-tone-3: #b2ada3;
   --dot-hue-0: #e08a79; --dot-hue-1: #7fb0d0; --dot-hue-2: #e0bd68; --dot-hue-3: #97c07c; --dot-hue-4: #b49ad0; --dot-hue-5: #6fc0ba;
   --ui-bg: #1d2024; --ui-soft: #272a2f; --ui-text: #ece6d9; --ui-text-2: rgba(236, 230, 217, 0.6);
   --ui-line: rgba(236, 230, 217, 0.14); --ui-accent: #ff6a4d; --ui-on-accent: #121417;
@@ -75,7 +65,7 @@ html[data-style="dots"] .border.hot { stroke: var(--accent); stroke-width: 3; st
 html[data-style="dots"] .marker { display: none; }
 html[data-style="dots"] .marker.lit:not(.hidden) { display: inline; stroke: var(--accent); stroke-opacity: 1; stroke-width: 1.8; }
 
-/* names: a plain sans, capitals for the countries of more than thirty million, on a halo of paper */
+/* names: a plain sans, capitals for the countries of more than thirty million, on clear paper */
 html[data-style="dots"] .label {
   font-family: 'Inter', Helvetica, Arial, sans-serif; font-weight: 600; font-style: normal; letter-spacing: 0.01em;
   fill: var(--ink); stroke: none;   /* (no halo: the dots under a name are not drawn) */

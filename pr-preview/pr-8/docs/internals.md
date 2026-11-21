@@ -216,8 +216,7 @@ Each country's dots are in one of six muted colours (a seventh, the ink, is the 
 no two neighbours alike: the country with the most differently coloured neighbours is coloured
 first, each taking the colour its code hashes to when that one is free, so a country keeps its
 colour through most edits. The dots under a name are counted but not drawn, so every name sits on
-clear paper without a halo. (`?dots-look=ink`, `grey` or `tones` in the address draws them all
-black, all grey or in four greys, for comparing.)
+clear paper without a halo.
 
 The names are the style's own (it has a render hook, so the page leaves them whole: never Switz. or
 Bos. & Herz.). Each is as large as a fifth of its country's size on screen (the side of a square as
