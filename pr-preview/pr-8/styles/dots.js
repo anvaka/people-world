@@ -1,16 +1,18 @@
 // The dots: one dot for every so many people. This map gives every person the same room, so the
 // dots lie on one even grid over the whole world, the same distance apart in every country: a
-// country is where its dots are, and along a border they shrink to pinpricks. Nothing else is
-// drawn: no coasts, no terrain, no tints. Zooming in, a dot stands for fewer people (a million,
-// then a hundred thousand, then ten thousand...), so the dots stay a few pixels apart; the legend
-// says how many a dot is.
+// country is where its dots are. Near a border the dots step back from it, so that a clear gap runs
+// between two countries' dots; none is taken away, so every country keeps one for every so many of
+// its people. Nothing else is drawn: no coasts, no terrain, no tints.
+// Zooming in, a dot stands for fewer people (a million, then a hundred thousand, then ten
+// thousand...), so the dots stay a few pixels apart; the legend says how many a dot is.
 //
 // The page calls these hooks (window.mapStyles.dots) when html has data-style="dots":
 //   ripples   none: there is no sea to draw
-//   markerPx  the radius of the ring round a country too small to see
-//   view      after every redraw: the dots for this view and the chosen country
-//   unmount   the canvas and the legend go
-// The page letters the names itself (this style has no render hook); its stylesheet sets them.
+//   markerPx  the radius of the ring round a country too small to see (shown only when chosen)
+//   render    once per drawn world: the names are this style's to letter (the page then leaves
+//             them whole, never Switz. or Bos. & Herz.)
+//   view      after every redraw: the dots for this view, the chosen country, the names
+//   unmount   the canvas and the legend go, the names are as the page made them
 
 const html = typeof document === 'undefined' ? null : document.documentElement;
 const active = () => html && html.dataset.style === 'dots';
@@ -20,9 +22,15 @@ const active = () => html && html.dataset.style === 'dots';
 const SPACING_PX = 9, MIN_SPACING = 0.62, MAX_TIDY = 1.25;   // the spacing wanted; how much closer or farther may do
 const HEX = Math.sqrt(2 / Math.sqrt(3));
 const RADIUS = 0.27;        // a dot's radius, as a share of the spacing
-const PINPRICK = 0.38;      // a dot by a border, as a share of a dot
-const BORDER = 0.34;        // how near a border a dot shrinks, as a share of the spacing
-const NAME_PX = 46, SMALL_NAME_PX = 22;   // the largest names on screen: capitals, and the rest
+const GAP = 0.6;            // how far from a border the nearest dots step back, as a share of the spacing
+const REACH = 2.5;          // how far from a border dots move at all (less and less), in spacings
+// A country only a few dots across has no room to step back: its dots move less (not at all below
+// SMALL spacings across, fully from FULL), and its bigger neighbours' make the gap
+const SMALL = 2.5, FULL = 8;
+// Names: as large as a share of the country's size on screen (the side of a square as large as it,
+// so as large as the square root of its people), but no wider than a little more than that size,
+// and no larger than a cap: capitals for the countries of more than thirty million, and the rest
+const NAME_REL = 0.2, NAME_OVER = 1.25, NAME_MIN_PX = 9, NAME_PX = 44, SMALL_NAME_PX = 22, BIG = 3e7;
 
 const WORDS = n => {
   if (n >= 1e9) return (n / 1e9).toLocaleString('en-US') + ' billion';
@@ -70,13 +78,57 @@ function prepare(world) {
   return world.dots = {shapes, perPerson: land / Math.max(1, people), people, byIndex: new Map(shapes.map(s => [s.item.index, s]))};
 }
 
+// The borders near the view, as segments in buckets REACH spacings wide (in the svg's units), each
+// border simplified to a quarter of the spacing first: the dots step back from its course, not
+// from every wobble of its line
+function simplify(pts, tol) {
+  if (pts.length < 3) return pts;
+  let keep = new Uint8Array(pts.length), stack = [[0, pts.length - 1]], t2 = tol * tol;
+  keep[0] = keep[pts.length - 1] = 1;
+  while (stack.length) {
+    let [a, b] = stack.pop(), best = -1, at = -1;
+    let ax = pts[a][0], ay = pts[a][1], dx = pts[b][0] - ax, dy = pts[b][1] - ay, L = dx * dx + dy * dy;
+    for (let i = a + 1; i < b; ++i) {
+      let t = L ? Math.max(0, Math.min(1, ((pts[i][0] - ax) * dx + (pts[i][1] - ay) * dy) / L)) : 0;
+      let ex = pts[i][0] - ax - t * dx, ey = pts[i][1] - ay - t * dy, d = ex * ex + ey * ey;
+      if (d > best) { best = d; at = i; }
+    }
+    if (best > t2) { keep[at] = 1; stack.push([a, at], [at, b]); }
+  }
+  return pts.filter((p, i) => keep[i]);
+}
+function bordersNear(world, step, s, view) {
+  let D = REACH * s, buckets = new Map(), [vx0, vy0, vx1, vy1] = view;
+  world.lineItems.forEach((line, li) => {
+    if (line.kind !== 'border') return;
+    let b = line.box;
+    if (b.x1 < vx0 - D || b.x0 > vx1 + D || b.y1 < vy0 - D || b.y0 > vy1 + D) return;
+    if (!line.dotsPts || line.dotsStep !== step) {
+      line.dotsStep = step;
+      line.dotsPts = simplify(line.points.map(([x, y]) => [x, -y]), 0.25 * s);
+    }
+    let p = line.dotsPts;
+    for (let i = 1; i < p.length; ++i) {
+      let ax = p[i - 1][0], ay = p[i - 1][1], bx = p[i][0], by = p[i][1];
+      let seg = [ax, ay, bx, by, li, line.a, line.b];
+      for (let u = Math.floor(Math.min(ax, bx) / D); u <= Math.floor(Math.max(ax, bx) / D); ++u)
+        for (let v = Math.floor(Math.min(ay, by) / D); v <= Math.floor(Math.max(ay, by) / D); ++v) {
+          let key = u * 73856093 ^ v * 19349663, list = buckets.get(key);
+          if (!list) buckets.set(key, list = []);
+          list.push(seg);
+        }
+    }
+  });
+  return {D, buckets};
+}
+
 // ---------------------------------------------------------------------------------------------
 // The layer: a canvas under the svg (the svg keeps the names, the rings round tiny countries and
 // what the pointer finds), and an id map: every country filled in a colour of its own, off screen,
 // to tell which country a dot is in
 let canvas = null, idCanvas = null, legend = null, mountedNow = false;
 let current = null, currentSelected = null, drawnKey = '';
-const stats = {draws: 0, lastMs: 0, dots: 0, step: 0};
+const stats = {draws: 0, lastMs: 0, dots: 0, step: 0, counts: {}};
 
 const idColour = id => `rgb(${id & 255},${(id >> 8) & 255},${(id * 97 + 31) & 255})`;
 const idAt = (data, w, x, y) => {
@@ -127,44 +179,62 @@ function draw(world, state, selected) {
   let inView = dots.shapes.filter(sh => sh.box[2] >= vx0 && sh.box[0] <= vx1 && sh.box[3] >= vy0 && sh.box[1] <= vy1);
   for (let sh of inView) { ic.fillStyle = idColour(sh.id); ic.fill(sh.path, 'evenodd'); }
   let data = ic.getImageData(0, 0, W, H).data;
-  let byId = new Map(inView.map(sh => [sh.id, sh]));
 
-  // the dots: a grid fixed to the map (so they keep their places as it moves), rows s * sqrt(3) / 2 apart
+  // The dots: one grid for the whole world, fixed to the map (so they keep their places as it
+  // moves), a dot at every point of it on land. Within REACH spacings of a border a dot is moved
+  // away from it: by GAP of the spacing right at the border, less and less farther in. So a clear gap
+  // runs along every border, the dots just inside it are a little closer together, and none is
+  // lost: each country keeps a dot for every so many of its people.
   let near = new Set(selected ? world.neighbours[selected.index] : []);
   let groups = {ink: [], lit: [], faint: []};
-  let r = Math.max(0.6, RADIUS * best.px), g = BORDER * best.px, count = 0;
-  let ring = [0, 1, 2, 3, 4, 5].map(a => [Math.cos(a * Math.PI / 3) * g, Math.sin(a * Math.PI / 3) * g]);
-  let dy = s * Math.sqrt(3) / 2;
-  for (let j = Math.floor(vy0 / dy) - 1, jEnd = Math.ceil(vy1 / dy) + 1; j <= jEnd; ++j) {
-    let my = j * dy, off = (j & 1) ? s / 2 : 0, py = oy + k * my;
-    for (let i = Math.floor((vx0 - off) / s) - 1, iEnd = Math.ceil((vx1 - off) / s) + 1; i <= iEnd; ++i) {
-      let px = ox + k * (i * s + off);
-      if (px < -r || py < -r || px > W + r || py > H + r) continue;
-      let xi = Math.round(px), yi = Math.round(py), id = idAt(data, W, xi, yi);
-      if (id === 0) continue;
-      if (id < 0) {
-        // on the very edge of a shape: ask the shapes around it, exactly
-        id = 0;
-        let seen = new Set();
-        for (let ddx = -2; ddx <= 2 && !id; ++ddx) for (let ddy = -2; ddy <= 2 && !id; ++ddy) {
-          let c = idAt(data, W, xi + ddx, yi + ddy);
-          if (c > 0 && !seen.has(c)) { seen.add(c); if (ic.isPointInPath(byId.get(c).path, px, py, 'evenodd')) id = c; }
+  let r = Math.max(0.6, RADIUS * best.px), g = GAP * s, count = 0, counts = {};
+  let {D, buckets} = bordersNear(world, best.n, s, [vx0, vy0, vx1, vy1]);
+  let dy = s * Math.sqrt(3) / 2, nearest = new Map();
+  for (let sh of inView) {
+    let item = sh.item, idx = item.index, id = sh.id;
+    let bx0 = Math.max(sh.box[0], vx0 - D), bx1 = Math.min(sh.box[2], vx1 + D), by0 = Math.max(sh.box[1], vy0 - D), by1 = Math.min(sh.box[3], vy1 + D);
+    let group = !selected ? 'ink' : idx === selected.index ? 'lit' : near.has(idx) ? 'ink' : 'faint', list = groups[group], n = 0;
+    let across = Math.sqrt(Math.max(0, item.area)) / s, gc = g * Math.max(0, Math.min(1, (across - SMALL) / (FULL - SMALL)));
+    for (let j = Math.floor(by0 / dy), jEnd = Math.ceil(by1 / dy); j <= jEnd; ++j) {
+      let my = j * dy, off = (j & 1) ? s / 2 : 0;
+      for (let i = Math.floor((bx0 - off) / s), iEnd = Math.ceil((bx1 - off) / s); i <= iEnd; ++i) {
+        let mx = i * s + off, px = ox + k * mx, py = oy + k * my;
+        // on land of this country: by the id map (off screen, by the shape itself), or exactly
+        // when the point is on the very edge of a shape
+        let on = px >= 0 && py >= 0 && px < W && py < H ? idAt(data, W, Math.round(px), Math.round(py)) : -1;
+        if (on !== id && !(on < 0 && ic.isPointInPath(sh.path, px, py, 'evenodd'))) continue;
+        // away from its borders: from the nearest point of each border within reach
+        nearest.clear();
+        let u0 = Math.floor(mx / D), v0 = Math.floor(my / D);
+        if (gc > 0) for (let u = u0 - 1; u <= u0 + 1; ++u) for (let v = v0 - 1; v <= v0 + 1; ++v) {
+          let segs = buckets.get(u * 73856093 ^ v * 19349663);
+          if (!segs) continue;
+          for (let q of segs) {
+            if (q[5] !== idx && q[6] !== idx) continue;
+            let ex = q[2] - q[0], ey = q[3] - q[1], L = ex * ex + ey * ey;
+            let t = L ? Math.max(0, Math.min(1, ((mx - q[0]) * ex + (my - q[1]) * ey) / L)) : 0;
+            let nx = q[0] + t * ex, ny = q[1] + t * ey, d = Math.hypot(mx - nx, my - ny);
+            let was = nearest.get(q[4]);
+            if (d < D && (!was || d < was[0])) nearest.set(q[4], [d, nx, ny]);
+          }
         }
-        if (!id) continue;
+        // (pushed from several borders at once, a dot moves no farther than from one)
+        let wx = 0, wy = 0;
+        for (let [d, nx, ny] of nearest.values()) {
+          if (d < 1e-9) continue;
+          let f = gc * (1 - d / D) / d;
+          wx += (mx - nx) * f; wy += (my - ny) * f;
+        }
+        let moved = Math.hypot(wx, wy);
+        if (moved > gc) { wx *= gc / moved; wy *= gc / moved; }
+        px = ox + k * (mx + wx); py = oy + k * (my + wy);
+        ++n;
+        if (px < -r || py < -r || px > W + r || py > H + r) continue;
+        list.push(px, py, r);
       }
-      let sh = byId.get(id);
-      if (!sh) continue;
-      // by a border: another country within g pixels
-      let edge = false;
-      for (let [ex, ey] of ring) {
-        let c = idAt(data, W, Math.round(px + ex), Math.round(py + ey));
-        if (c > 0 && c !== id) { edge = true; break; }
-      }
-      let idx = sh.item.index;
-      let group = !selected ? 'ink' : idx === selected.index ? 'lit' : near.has(idx) ? 'ink' : 'faint';
-      groups[group].push(px, py, edge ? r * PINPRICK : r);
-      ++count;
     }
+    count += n;
+    counts[item.country.id] = n;
   }
 
   // drawn in one path per colour
@@ -186,6 +256,7 @@ function draw(world, state, selected) {
   showLegend(best, r);
   stats.draws++;
   stats.dots = count;
+  stats.counts = counts;
   stats.lastMs = performance.now() - t0;
 }
 
@@ -205,15 +276,78 @@ function view(world, state, selected) {
   current = world;
   currentSelected = selected;
   draw(world, state, selected);
-  // the names of the countries not lit when one is chosen step back with their dots; no name grows
-  // past a size on screen (the page sizes them to their country, which zooming in makes huge)
-  let near = new Set(selected ? world.neighbours[selected.index] : []), k = state.k;
-  world.items.forEach(item => {
-    item.label.classList.toggle('dots-dim', !!selected && item !== selected && !near.has(item.index));
-    let px = item.country.population > 3e7 ? NAME_PX : SMALL_NAME_PX;
-    let f = Math.min(item.font, px / k);
-    if (item.dotsFont !== f) { item.dotsFont = f; item.label.setAttribute('font-size', f); }
-  });
+  names(world, state, selected);
+}
+
+// ---------------------------------------------------------------------------------------------
+// Names, whole (never Switz. or Bos. & Herz.), sized by the country: as large as a share of its
+// size on screen, which is as large as the square root of its people, and no wider than a little
+// more than that size; on two lines where that lets a name be larger. The largest countries are
+// named first, and a name that would run into one already placed is left out.
+let measurer = null;
+function layoutOf(item) {
+  if (item.dotsName) return item.dotsName;
+  let big = item.country.population > BIG, name = item.country.name.trim();
+  if (!measurer) measurer = document.createElement('canvas').getContext('2d');
+  measurer.font = `${big ? 700 : 600} 100px Inter, Helvetica, Arial, sans-serif`;
+  let em = t => { let u = big ? t.toUpperCase() : t; return measurer.measureText(u).width / 100 + (big ? 0.05 : 0.01) * u.length; };
+  let out = {big, one: {lines: [name], w: em(name)}, two: null};
+  let words = name.split(' ');
+  if (words.length > 1) {
+    let bestCut = null;
+    for (let i = 1; i < words.length; ++i) {
+      let lines = [words.slice(0, i).join(' '), words.slice(i).join(' ')], w = Math.max(em(lines[0]), em(lines[1]));
+      if (!bestCut || w < bestCut.w) bestCut = {lines, w};
+    }
+    out.two = bestCut;
+  }
+  return item.dotsName = out;
+}
+function names(world, state, selected) {
+  let k = state.k, svg = document.getElementById('map'), W = svg.clientWidth, H = svg.clientHeight;
+  let near = new Set(selected ? world.neighbours[selected.index] : []);
+  let order = world.items.slice().sort((p, q) => (q === selected) - (p === selected) || q.country.population - p.country.population);
+  let placed = [];
+  for (let item of order) {
+    let label = item.label;
+    label.classList.toggle('dots-dim', !!selected && item !== selected && !near.has(item.index));
+    let lay = layoutOf(item), size = Math.sqrt(Math.max(0, item.area)) * k;
+    let cap = lay.big ? NAME_PX : SMALL_NAME_PX, byPeople = Math.min(cap, NAME_REL * size);
+    let one = Math.min(byPeople, NAME_OVER * size / lay.one.w);
+    let two = lay.two ? Math.min(byPeople, NAME_OVER * size / lay.two.w) : 0;
+    let pick = two > one * 1.15 ? {f: two, ...lay.two} : {f: one, ...lay.one};
+    if (item === selected) pick.f = Math.max(pick.f, 11);
+    let x = state.x + k * item.pole.x, y = state.y - k * item.pole.y;
+    let hw = pick.f * pick.w / 2 + 3, hh = pick.f * 0.55 * pick.lines.length + 2;
+    let box = [x - hw, y - hh, x + hw, y + hh];
+    let show = (pick.f >= NAME_MIN_PX || item === selected) && box[2] > 0 && box[0] < W && box[3] > 0 && box[1] < H &&
+      (item === selected || !placed.some(b => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1]));
+    if (!show) { label.classList.add('hidden'); continue; }
+    placed.push(box);
+    label.classList.remove('hidden');
+    let f = pick.f / k;
+    if (item.dotsFont !== f) { item.dotsFont = f; label.setAttribute('font-size', f); }
+    let text = pick.lines.join('\n');
+    if (item.dotsText !== text) {
+      item.dotsText = text;
+      if (pick.lines.length === 1) label.textContent = pick.lines[0];
+      else {
+        label.textContent = '';
+        pick.lines.forEach((line, i) => {
+          let t = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+          t.setAttribute('x', label.getAttribute('x'));
+          t.setAttribute('dy', i ? '1.05em' : '-0.52em');
+          t.textContent = line;
+          label.appendChild(t);
+        });
+      }
+    }
+  }
+}
+
+// once per world: the names are this style's, so the page leaves them whole
+function render(world) {
+  world.items.forEach(item => { delete item.dotsName; delete item.dotsText; delete item.dotsFont; });
 }
 
 // what the svg shows now (for a view set by rewriting the transform, as a test harness does)
@@ -254,6 +388,13 @@ function mount() {
     vpObs.observe(vp, {attributes: true, attributeFilter: ['transform']});
   }
   watchers = [() => mql.removeEventListener('change', redraw), () => themeObs.disconnect(), () => vpObs && vpObs.disconnect()];
+  // (names were measured in the fallback font until Inter arrives: measured again then)
+  if (document.fonts) Promise.all([document.fonts.load('700 10px Inter'), document.fonts.load('600 10px Inter')]).then(() => {
+    if (!active() || !current) return;
+    current.items.forEach(item => { delete item.dotsName; });
+    let v = viewOf();
+    if (v) names(current, v, currentSelected);
+  }, () => {});
 }
 // Leaves the page as if the style had never run
 function unmount() {
@@ -270,6 +411,7 @@ function unmount() {
   if (current) current.items.forEach(item => {
     item.label.classList.remove('dots-dim');
     if (item.dotsFont !== undefined) { item.label.setAttribute('font-size', item.font); delete item.dotsFont; }
+    if (item.dotsText !== undefined) { item.label.textContent = item.country.name; delete item.dotsText; }
   });
   current = null;
   currentSelected = null;
@@ -278,7 +420,7 @@ function unmount() {
 
 if (typeof window !== 'undefined') {
   window.mapStyles = window.mapStyles || {};
-  window.mapStyles.dots = {ripples: [], markerPx: 5, view, unmount, stats};
+  window.mapStyles.dots = {ripples: [], markerPx: 5, render, view, unmount, stats};
 }
 if (active()) {
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
