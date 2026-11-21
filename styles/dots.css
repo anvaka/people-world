@@ -1,0 +1,94 @@
+/* The dots. Scoped to html[data-style="dots"]. One dot for every so many people, the same distance
+   apart all over the world, because this map gives everyone the same room (styles/dots.js draws
+   them on a canvas under the svg; a border is the gap between two countries' dots). Each country's
+   dots are in one of six muted colours, no two neighbours alike, and the chosen country's in the
+   ink. Nothing else of the land is drawn: the svg's countries are only there for the pointer to
+   find, its coasts and borders are not stroked, and the names sit on clear paper (the dots under
+   them are not drawn). By day on a warm paper, by night lighter colours on black. */
+
+/* ---------------------------------------------------------------- tokens: day */
+html[data-style="dots"] {
+  --sea: #f3f1ec;              /* the paper: there is no sea, only where the dots are not */
+  --ink: #161514;
+  --accent: #e2412b;
+  --dot: #161514;              /* the chosen country's dots, and the legend's */
+  --dot-faint-alpha: 0.22;     /* the other countries' while one is chosen */
+  /* six muted colours for the countries' dots, no two neighbours alike */
+  --dot-hue-0: #c8705f; --dot-hue-1: #5b88a8; --dot-hue-2: #c9a04a; --dot-hue-3: #78a065; --dot-hue-4: #9479b0; --dot-hue-5: #4f9c98;
+  --lit: none;
+  /* the page's controls on this paper: panels a shade lighter than it, and its red (a little
+     deeper than the dots', to read as text) for whatever can be pressed */
+  --ui-bg: #fbfaf7; --ui-soft: #efede7; --ui-text: #161514; --ui-text-2: rgba(22, 21, 20, 0.6);
+  --ui-line: rgba(22, 21, 20, 0.12); --ui-accent: #c8331e;
+  --ui-font: 'Inter', Helvetica, Arial, sans-serif;
+  color-scheme: light;
+}
+/* ---------------------------------------------------------------- tokens: night */
+@media (prefers-color-scheme: dark) {
+  html[data-style="dots"]:not([data-theme="light"]) {
+    --sea: #121417;
+    --ink: #ece6d9;
+    --accent: #ff6a4d;
+    --dot: #ece6d9;
+    --dot-faint-alpha: 0.2;
+    --dot-hue-0: #e08a79; --dot-hue-1: #7fb0d0; --dot-hue-2: #e0bd68; --dot-hue-3: #97c07c; --dot-hue-4: #b49ad0; --dot-hue-5: #6fc0ba;
+    --ui-bg: #1d2024; --ui-soft: #272a2f; --ui-text: #ece6d9; --ui-text-2: rgba(236, 230, 217, 0.6);
+    --ui-line: rgba(236, 230, 217, 0.14); --ui-accent: #ff6a4d; --ui-on-accent: #121417;
+    color-scheme: dark;
+  }
+}
+html[data-style="dots"][data-theme="dark"] {
+  --sea: #121417;
+  --ink: #ece6d9;
+  --accent: #ff6a4d;
+  --dot: #ece6d9;
+  --dot-faint-alpha: 0.2;
+  --dot-hue-0: #e08a79; --dot-hue-1: #7fb0d0; --dot-hue-2: #e0bd68; --dot-hue-3: #97c07c; --dot-hue-4: #b49ad0; --dot-hue-5: #6fc0ba;
+  --ui-bg: #1d2024; --ui-soft: #272a2f; --ui-text: #ece6d9; --ui-text-2: rgba(236, 230, 217, 0.6);
+  --ui-line: rgba(236, 230, 217, 0.14); --ui-accent: #ff6a4d; --ui-on-accent: #121417;
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------- the map */
+/* the dots' canvas, under the svg and moved with it */
+html[data-style="dots"] #dots-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+html[data-style="dots"] svg#map { position: relative; }   /* (positioned, so it is laid over the canvas) */
+html:not([data-style="dots"]) #dots-layer, html:not([data-style="dots"]) #dots-scale { display: none; }
+/* the svg draws no land: its countries only answer the pointer, its sea lets the dots through */
+html[data-style="dots"] .sea-fill { fill: transparent; }
+html[data-style="dots"] .country, html[data-style="dots"] .country.lit, html[data-style="dots"] .country.dim { fill: transparent; stroke: none; opacity: 1; filter: none; }
+html[data-style="dots"] .coast, html[data-style="dots"] .border, html[data-style="dots"] .border.lit { stroke: none; }
+/* (the border a neighbour's row in the panel points at still shows) */
+html[data-style="dots"] .border.hot { stroke: var(--accent); stroke-width: 3; stroke-dasharray: none; opacity: 1; }
+/* no rings round the countries too small to see: here a country under a dot has none. Only a lit
+   one too small to see (the chosen country, or a tiny neighbour of it) keeps its ring, to be found */
+html[data-style="dots"] .marker { display: none; }
+html[data-style="dots"] .marker.lit:not(.hidden) { display: inline; stroke: var(--accent); stroke-opacity: 1; stroke-width: 1.8; }
+
+/* names: a plain sans, capitals for the countries of more than thirty million, on clear paper */
+html[data-style="dots"] .label {
+  font-family: 'Inter', Helvetica, Arial, sans-serif; font-weight: 600; font-style: normal; letter-spacing: 0.01em;
+  fill: var(--ink); stroke: none;   /* (no halo: the dots under a name are not drawn) */
+}
+html[data-style="dots"] .label:not(.small) { font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+html[data-style="dots"] .label.small { font-family: 'Inter', Helvetica, Arial, sans-serif; font-style: normal; }
+html[data-style="dots"] .label.dots-dim { fill-opacity: 0.4; }
+
+/* ---------------------------------------------------------------- the legend */
+/* (the page draws its own controls, the same in every style; the legend is dressed as one of them)
+   one dot, as large as on the map, and how many it stands for at this zoom */
+html[data-style="dots"] #dots-scale {
+  position: fixed; left: calc(var(--edge) + env(safe-area-inset-left)); bottom: calc(var(--edge) + 22px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 8px; pointer-events: none;
+  background: var(--ui-bg); color: var(--ui-text); box-shadow: var(--ui-shadow);
+  padding: 6px 10px 6px 8px; font-size: 12px; line-height: 1.35;
+}
+html[data-style="dots"] #dots-scale[hidden] { display: none; }
+html[data-style="dots"] #dots-scale .dot-wrap { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; }
+html[data-style="dots"] #dots-scale .dot { display: block; border-radius: 50%; background: var(--dot); }
+html[data-style="dots"] #dots-scale .cap { color: var(--ui-text-2); }
+
+@media (max-width: 600px) {
+  /* the legend gives way to the bottom sheet */
+  html[data-style="dots"].dock-open #dots-scale { display: none; }
+}
