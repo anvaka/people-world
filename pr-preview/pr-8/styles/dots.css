@@ -58,10 +58,10 @@ html[data-style="dots"] .country, html[data-style="dots"] .country.lit, html[dat
 html[data-style="dots"] .coast, html[data-style="dots"] .border, html[data-style="dots"] .border.lit { stroke: none; }
 /* (the border a neighbour's row in the panel points at still shows) */
 html[data-style="dots"] .border.hot { stroke: var(--accent); stroke-width: 3; stroke-dasharray: none; opacity: 1; }
-/* no rings round the countries too small to see: here a country under a dot has none. Only the
-   chosen one keeps its ring, to be found */
+/* no rings round the countries too small to see: here a country under a dot has none. Only a lit
+   one too small to see (the chosen country, or a tiny neighbour of it) keeps its ring, to be found */
 html[data-style="dots"] .marker { display: none; }
-html[data-style="dots"] .marker.lit { display: inline; stroke: var(--accent); stroke-opacity: 1; stroke-width: 1.8; }
+html[data-style="dots"] .marker.lit:not(.hidden) { display: inline; stroke: var(--accent); stroke-opacity: 1; stroke-width: 1.8; }
 
 /* names: a plain sans, capitals for the countries of more than thirty million, on a halo of paper */
 html[data-style="dots"] .label {
