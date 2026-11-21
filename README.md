@@ -23,7 +23,8 @@ up.
 - Switch between four styles: `ink`, `realm` and `atlas` (an engraved map coloured by hand, after
   the sixteenth-century atlases) draw the same mountains, rivers and climate; `dots` draws only
   people: one dot for every million of them, spaced the same everywhere, because this map gives
-  everyone the same room, and a border is the gap between two countries' dots. Zoom in and a dot
+  everyone the same room, each country's in a colour of its own, and a border is the gap
+  between two countries' dots. Zoom in and a dot
   stands for fewer people.
 - Share a link. The address holds the world and your edits: `#world-1-cut-FR-ES-add-JP-KR` is
   world 1 without the France-Spain border and with a Japan-South Korea one.
