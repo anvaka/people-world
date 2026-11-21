@@ -13,6 +13,10 @@ html[data-style="dots"] {
   --dot: #161514;              /* a dot */
   --dot-lit: #e2412b;          /* the chosen country's dots */
   --dot-faint: rgba(22, 21, 20, 0.2);   /* the dots of countries not lit while one is chosen */
+  --dot-faint-alpha: 0.22;
+  --dot-soft: #8a857d;
+  --dot-tone-0: #4f4b46; --dot-tone-1: #8a857d; --dot-tone-2: #b3ada3; --dot-tone-3: #6d6963;
+  --dot-hue-0: #c8705f; --dot-hue-1: #5b88a8; --dot-hue-2: #c9a04a; --dot-hue-3: #78a065; --dot-hue-4: #9479b0; --dot-hue-5: #4f9c98;
   --lit: none;
   /* the page's controls on this paper: panels a shade lighter than it, and its red (a little
      deeper than the dots', to read as text) for whatever can be pressed */
@@ -30,6 +34,10 @@ html[data-style="dots"] {
     --dot: #ece6d9;
     --dot-lit: #ff6a4d;
     --dot-faint: rgba(236, 230, 217, 0.18);
+    --dot-faint-alpha: 0.2;
+    --dot-soft: #9a958b;
+    --dot-tone-0: #d9d3c6; --dot-tone-1: #8d887f; --dot-tone-2: #5f5b55; --dot-tone-3: #b2ada3;
+    --dot-hue-0: #e08a79; --dot-hue-1: #7fb0d0; --dot-hue-2: #e0bd68; --dot-hue-3: #97c07c; --dot-hue-4: #b49ad0; --dot-hue-5: #6fc0ba;
     --ui-bg: #1d2024; --ui-soft: #272a2f; --ui-text: #ece6d9; --ui-text-2: rgba(236, 230, 217, 0.6);
     --ui-line: rgba(236, 230, 217, 0.14); --ui-accent: #ff6a4d; --ui-on-accent: #121417;
     color-scheme: dark;
@@ -42,6 +50,10 @@ html[data-style="dots"][data-theme="dark"] {
   --dot: #ece6d9;
   --dot-lit: #ff6a4d;
   --dot-faint: rgba(236, 230, 217, 0.18);
+  --dot-faint-alpha: 0.2;
+  --dot-soft: #9a958b;
+  --dot-tone-0: #d9d3c6; --dot-tone-1: #8d887f; --dot-tone-2: #5f5b55; --dot-tone-3: #b2ada3;
+  --dot-hue-0: #e08a79; --dot-hue-1: #7fb0d0; --dot-hue-2: #e0bd68; --dot-hue-3: #97c07c; --dot-hue-4: #b49ad0; --dot-hue-5: #6fc0ba;
   --ui-bg: #1d2024; --ui-soft: #272a2f; --ui-text: #ece6d9; --ui-text-2: rgba(236, 230, 217, 0.6);
   --ui-line: rgba(236, 230, 217, 0.14); --ui-accent: #ff6a4d; --ui-on-accent: #121417;
   color-scheme: dark;
@@ -66,7 +78,7 @@ html[data-style="dots"] .marker.lit:not(.hidden) { display: inline; stroke: var(
 /* names: a plain sans, capitals for the countries of more than thirty million, on a halo of paper */
 html[data-style="dots"] .label {
   font-family: 'Inter', Helvetica, Arial, sans-serif; font-weight: 600; font-style: normal; letter-spacing: 0.01em;
-  fill: var(--ink); stroke: var(--sea); stroke-width: 0.32em; stroke-linejoin: round; paint-order: stroke;
+  fill: var(--ink); stroke: none;   /* (no halo: the dots under a name are not drawn) */
 }
 html[data-style="dots"] .label:not(.small) { font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
 html[data-style="dots"] .label.small { font-family: 'Inter', Helvetica, Arial, sans-serif; font-style: normal; }

@@ -1,6 +1,6 @@
 // The dots: one dot for every so many people. This map gives every person the same room, so the
 // dots lie on one even grid over the whole world, the same distance apart in every country: a
-// country is where its dots are. Near a border the dots step back from it, so that a clear gap runs
+// country is where its dots are, in a colour of its own. Near a border the dots step back from it, so that a clear gap runs
 // between two countries' dots; none is taken away, so every country keeps one for every so many of
 // its people. Nothing else is drawn: no coasts, no terrain, no tints.
 // Zooming in, a dot stands for fewer people (a million, then a hundred thousand, then ten
@@ -22,6 +22,7 @@ const active = () => html && html.dataset.style === 'dots';
 const SPACING_PX = 9, MIN_SPACING = 0.62, MAX_TIDY = 1.25;   // the spacing wanted; how much closer or farther may do
 const HEX = Math.sqrt(2 / Math.sqrt(3));
 const RADIUS = 0.27;        // a dot's radius, as a share of the spacing
+const RADIUS_SOFT = 0.24;   // (in a softer colour a dot can be a little smaller)
 const GAP = 0.6;            // how far from a border the nearest dots step back, as a share of the spacing
 const REACH = 2.5;          // how far from a border dots move at all (less and less), in spacings
 // A country only a few dots across has no room to step back: its dots move less (not at all below
@@ -130,7 +131,12 @@ function bordersNear(world, step, s, view) {
 // what the pointer finds), and an id map: every country filled in a colour of its own, off screen,
 // to tell which country a dot is in
 let canvas = null, idCanvas = null, legend = null, mountedNow = false;
-let current = null, currentSelected = null, drawnKey = '';
+let current = null, currentSelected = null, drawnKey = '', clearings = [];
+// Each country's dots are in one of a few muted colours, neighbours never alike, the chosen
+// country's in the ink. (For comparing: ?dots-look=ink, grey or tones in the address draws them
+// all black, all grey, or in four greys.)
+const LOOKS = ['hues', 'ink', 'grey', 'tones'];
+const LOOK = (() => { let q = typeof location === 'undefined' ? null : new URLSearchParams(location.search).get('dots-look'); return LOOKS.includes(q) ? q : 'hues'; })();
 const stats = {draws: 0, lastMs: 0, dots: 0, step: 0, counts: {}};
 
 const idColour = id => `rgb(${id & 255},${(id >> 8) & 255},${(id * 97 + 31) & 255})`;
@@ -146,7 +152,36 @@ const idAt = (data, w, x, y) => {
 function colours() {
   let cs = getComputedStyle(html);
   let get = (name, fallback) => cs.getPropertyValue(name).trim() || fallback;
-  return {ink: get('--dot', '#161514'), lit: get('--dot-lit', '#e2412b'), faint: get('--dot-faint', 'rgba(22, 21, 20, 0.22)')};
+  let set = LOOK === 'grey' ? [get('--dot-soft', '#7d7972')]
+    : LOOK === 'tones' ? [0, 1, 2, 3].map(i => get('--dot-tone-' + i, '#7d7972'))
+    : LOOK === 'hues' ? [0, 1, 2, 3, 4, 5].map(i => get('--dot-hue-' + i, '#7d7972'))
+    : [get('--dot', '#161514')];
+  // (among colours the chosen country is in the ink; among blacks and greys, in red)
+  return {set, lit: LOOK === 'hues' ? get('--dot', '#161514') : get('--dot-lit', '#e2412b'), faint: +get('--dot-faint-alpha', '0.22')};
+}
+// A colour for each country, neighbours never alike: the country with the most differently
+// coloured neighbours first (DSATUR), each taking the colour its code hashes to if it is free, so
+// that the colours come out evenly and a country keeps its colour through most edits
+function slotsOf(world, n) {
+  let dots = prepare(world);
+  if (dots.slots && dots.slots.n === n) return dots.slots.of;
+  let near = world.neighbours, of = {}, sat = new Map(), left = new Set(world.items.map(it => it.index));
+  let id = i => world.byIndex.get(i).country.id;
+  let pref = i => { let h = 0; for (let ch of id(i)) h = (h * 31 + ch.charCodeAt(0)) >>> 0; return h % n; };
+  while (left.size) {
+    let best = null, bs = -1, bd = -1;
+    for (let i of left) {
+      let sn = sat.has(i) ? sat.get(i).size : 0, d = near[i].length;
+      if (sn > bs || (sn === bs && d > bd) || (sn === bs && d === bd && id(i) < id(best))) { best = i; bs = sn; bd = d; }
+    }
+    left.delete(best);
+    let used = new Set(near[best].map(j => of[j]).filter(v => v !== undefined)), p = pref(best), pick = p;
+    for (let k = 0; k < n; ++k) { let c = (p + k) % n; if (!used.has(c)) { pick = c; break; } }
+    of[best] = pick;
+    near[best].forEach(j => { if (!sat.has(j)) sat.set(j, new Set()); sat.get(j).add(pick); });
+  }
+  dots.slots = {n, of};
+  return of;
 }
 
 function draw(world, state, selected) {
@@ -154,7 +189,7 @@ function draw(world, state, selected) {
   let svg = document.getElementById('map');
   let W = svg.clientWidth, H = svg.clientHeight, dpr = Math.min(3, window.devicePixelRatio || 1);
   let theme = html.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'auto-dark' : 'auto-light');
-  let key = [state.x, state.y, state.k, W, H, dpr, theme, selected ? selected.index : -1].join(',');
+  let key = [state.x, state.y, state.k, W, H, dpr, theme, selected ? selected.index : -1, clearings.map(b => b.map(Math.round).join(' ')).join(';')].join(',');
   if (key === drawnKey && world === current) return;
   let t0 = performance.now();
   drawnKey = key;
@@ -191,14 +226,17 @@ function draw(world, state, selected) {
   // runs along every border, the dots just inside it are a little closer together, and none is
   // lost: each country keeps a dot for every so many of its people.
   let near = new Set(selected ? world.neighbours[selected.index] : []);
-  let groups = {ink: [], lit: [], faint: []};
-  let r = Math.max(0.6, RADIUS * best.px), g = GAP * s, count = 0, counts = {};
+  let paint = colours(), slots = slotsOf(world, paint.set.length), groups = new Map();
+  let groupOf = (colour, faint) => { let key = colour + (faint ? '~' : ''); if (!groups.has(key)) groups.set(key, {colour, faint, list: []}); return groups.get(key).list; };
+  let r = Math.max(0.6, (LOOK === 'ink' ? RADIUS : RADIUS_SOFT) * best.px), g = GAP * s, count = 0, counts = {};
+  let cleared = (x, y) => clearings.some(b => x > b[0] - r && x < b[2] + r && y > b[1] - r && y < b[3] + r);
   let {D, buckets} = bordersNear(world, best.n, s, [vx0, vy0, vx1, vy1]);
   let dy = s * Math.sqrt(3) / 2, nearest = new Map();
   for (let sh of inView) {
     let item = sh.item, idx = item.index, id = sh.id;
     let bx0 = Math.max(sh.box[0], vx0 - D), bx1 = Math.min(sh.box[2], vx1 + D), by0 = Math.max(sh.box[1], vy0 - D), by1 = Math.min(sh.box[3], vy1 + D);
-    let group = !selected ? 'ink' : idx === selected.index ? 'lit' : near.has(idx) ? 'ink' : 'faint', list = groups[group], n = 0;
+    let own = paint.set[slots[idx] % paint.set.length];
+    let list = !selected ? groupOf(own, false) : idx === selected.index ? groupOf(paint.lit, false) : groupOf(own, !near.has(idx)), n = 0;
     let across = Math.sqrt(Math.max(0, item.area)) / s, gc = g * Math.max(0, Math.min(1, (across - SMALL) / (FULL - SMALL)));
     for (let j = Math.floor(by0 / dy), jEnd = Math.ceil(by1 / dy); j <= jEnd; ++j) {
       let my = j * dy, off = (j & 1) ? s / 2 : 0;
@@ -234,7 +272,7 @@ function draw(world, state, selected) {
         if (moved > gc) { wx *= gc / moved; wy *= gc / moved; }
         px = ox + k * (mx + wx); py = oy + k * (my + wy);
         ++n;
-        if (px < -r || py < -r || px > W + r || py > H + r) continue;
+        if (px < -r || py < -r || px > W + r || py > H + r || cleared(px, py)) continue;   // (under a name: counted, not drawn)
         list.push(px, py, r);
       }
     }
@@ -249,15 +287,15 @@ function draw(world, state, selected) {
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.clearRect(0, 0, cw, ch);
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
-  let paint = colours();
-  for (let name of ['faint', 'ink', 'lit']) {
-    let list = groups[name];
+  for (let {colour, faint, list} of [...groups.values()].sort((p, q) => q.faint - p.faint)) {
     if (!list.length) continue;
     c.beginPath();
     for (let q = 0; q < list.length; q += 3) { c.moveTo(list[q] + list[q + 2], list[q + 1]); c.arc(list[q], list[q + 1], list[q + 2], 0, 2 * Math.PI); }
-    c.fillStyle = paint[name];
+    c.globalAlpha = faint ? paint.faint : 1;
+    c.fillStyle = colour;
     c.fill();
   }
+  c.globalAlpha = 1;
   showLegend(best, r);
   stats.draws++;
   stats.dots = count;
@@ -280,8 +318,8 @@ function view(world, state, selected) {
   if (!mountedNow) mount();
   current = world;
   currentSelected = selected;
+  clearings = names(world, state, selected);
   draw(world, state, selected);
-  names(world, state, selected);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -312,7 +350,7 @@ function names(world, state, selected) {
   let k = state.k, svg = document.getElementById('map'), W = svg.clientWidth, H = svg.clientHeight;
   let near = new Set(selected ? world.neighbours[selected.index] : []);
   let order = world.items.slice().sort((p, q) => (q === selected) - (p === selected) || q.country.population - p.country.population);
-  let placed = [], first = new Set(world.items.slice().sort((p, q) => q.country.population - p.country.population).slice(0, NAMED_FIRST));
+  let placed = [], shown = [], first = new Set(world.items.slice().sort((p, q) => q.country.population - p.country.population).slice(0, NAMED_FIRST));
   for (let item of order) {
     let label = item.label;
     label.classList.toggle('dots-dim', !!selected && item !== selected && !near.has(item.index));
@@ -330,6 +368,7 @@ function names(world, state, selected) {
       (item === selected || !placed.some(b => box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1]));
     if (!show) { label.classList.add('hidden'); continue; }
     placed.push(box);
+    shown.push(box);
     label.classList.remove('hidden');
     let f = pick.f / k;
     if (item.dotsFont !== f) { item.dotsFont = f; label.setAttribute('font-size', f); }
@@ -349,6 +388,7 @@ function names(world, state, selected) {
       }
     }
   }
+  return shown;
 }
 
 // once per world: the names are this style's, so the page leaves them whole
@@ -399,7 +439,7 @@ function mount() {
     if (!active() || !current) return;
     current.items.forEach(item => { delete item.dotsName; });
     let v = viewOf();
-    if (v) names(current, v, currentSelected);
+    if (v) { clearings = names(current, v, currentSelected); draw(current, v, currentSelected); }
   }, () => {});
 }
 // Leaves the page as if the style had never run

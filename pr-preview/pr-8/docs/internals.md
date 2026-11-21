@@ -212,6 +212,13 @@ has no room to move its dots: they move less, not at all below two and a half sp
 its bigger neighbours' dots make the gap. The borders are simplified to a quarter of the spacing
 first, so the dots step back from a border's course and not from every wobble of its line.
 
+Each country's dots are in one of six muted colours (a seventh, the ink, is the chosen country's),
+no two neighbours alike: the country with the most differently coloured neighbours is coloured
+first, each taking the colour its code hashes to when that one is free, so a country keeps its
+colour through most edits. The dots under a name are counted but not drawn, so every name sits on
+clear paper without a halo. (`?dots-look=ink`, `grey` or `tones` in the address draws them all
+black, all grey or in four greys, for comparing.)
+
 The names are the style's own (it has a render hook, so the page leaves them whole: never Switz. or
 Bos. & Herz.). Each is as large as a fifth of its country's size on screen (the side of a square as
 large as the country, so as large as the square root of its people), no wider than a little more
