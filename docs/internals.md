@@ -22,8 +22,9 @@ step by step, how a style plugs in, and what each file is for.
   that measure, and an estimated GDP is marked as one.
 - **Customize...** also has the style and the theme: the map as ink (pen and ink on paper: hatched coasts,
   mountains and woods), realm (a painted relief: terrain, shallows and rivers under the
-  countries) or atlas (a plate of a sixteenth-century atlas: an engraved sea, each country
-  coloured by hand along its outline, dotted borders, mountains in dark chains), the theme (light, dark, or auto: as the device is set), and what the page is.
+  countries), atlas (a plate of a sixteenth-century atlas: an engraved sea, each country
+  coloured by hand along its outline, dotted borders, mountains in dark chains) or dots (only
+  people: one dot for every so many, on one even grid over the world), the theme (light, dark, or auto: as the device is set), and what the page is.
   Switching doesn't build the world again, and the panel closes once the map is drawn in the new
   style. The browser remembers both choices.
 - **Share a map.** The address holds the world number and the edits, so a link opens the same
@@ -189,6 +190,45 @@ calls the map ready, and `unmount()` when another style is picked. A style's can
 `#plate` with the map, so a gesture moves them together. The comment above `skin()` in
 `index.html` lists the hooks.
 
+Dots draws no land at all, only people (`styles/dots.js`). This map gives every person the same
+room, so one dot for every so many people lies on one even grid over the whole world, the same
+distance apart in every country; a country is where its dots are. The grid is fixed to the map, so
+the dots keep their places as it moves, and how many people a dot stands for follows the zoom: a
+million at whole-world zoom on a laptop, then a hundred thousand, ten thousand, down to one person,
+always a power of ten when one puts the dots a comfortable distance apart, and 2 or 5 of one
+otherwise. That distance is set in the screen's own pixels (about 6 to 11 css pixels on an ordinary
+laptop screen, 4 to 8 on a sharp one, and on a phone, whose pixels are smaller and whose screen is
+narrow, 2 to 4), so a phone also shows the whole world at a million people a dot. The legend at the
+bottom left says how many. Which country a dot
+falls in is read from an id map: every country in view filled in a colour of its own on a canvas
+off screen; a dot on the very edge of a shape is tested against the shape exactly.
+
+A border is a gap. Within two and a half spacings of a border a dot is moved away from it: by 0.6
+of the spacing right at the border, less and less farther in. No dot is taken away, so every
+country keeps a dot for every so many of its people (world 1 at whole-world zoom: 8,227 dots for
+8,218 million people, each country of twenty dots or more within a few dots of its millions); the
+dots just inside a border are a little closer together instead. A country only a few dots across
+has no room to move its dots: they move less, not at all below two and a half spacings across, and
+its bigger neighbours' dots make the gap. The borders are simplified to a quarter of the spacing
+first, so the dots step back from a border's course and not from every wobble of its line.
+
+Each country's dots are in one of six muted colours (a seventh, the ink, is the chosen country's),
+no two neighbours alike: the country with the most differently coloured neighbours is coloured
+first, each taking the colour its code hashes to when that one is free, so a country keeps its
+colour through most edits. The dots under a name are counted but not drawn, so every name sits on
+clear paper without a halo.
+
+The names are the style's own (it has a render hook, so the page leaves them whole: never Switz. or
+Bos. & Herz.). Each is as large as a fifth of its country's size on screen (the side of a square as
+large as the country, so as large as the square root of its people), no wider than a little more
+than that size, at most 44 pixels for countries of more than thirty million people (in capitals)
+and 22 for the rest, and on two lines where that lets it be larger. The twelve most populous
+countries are named at least 10 pixels large wherever they have room (on a phone, by size alone,
+only China and India would be). The largest countries are named first, and a name that would run
+into one already placed is left out. There are no rings round the
+countries too small to see: a country under a dot has none. Only a chosen one keeps its ring.
+Sized by land area or GDP, a dot is so many km² or dollars.
+
 Atlas is drawn by Ink's code in another look. `styles/atlas.js` only imports `ink.js?look=atlas`:
 the address differs, so the browser runs `ink.js` a second time as a module of its own, with its own
 workers, colours, names and tiles, and it registers `window.mapStyles.atlas`. The look travels to
@@ -249,7 +289,7 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 | file | what it does |
 | --- | --- |
 | `index.html` | the page: drawing, pan and zoom, border editing, the controls |
-| `styles/` | the three styles: `ink`, `realm` and `atlas` (`.css`, `.js`, `.fonts` and helpers; atlas is drawn by ink's code) |
+| `styles/` | the four styles: `ink`, `realm`, `atlas` and `dots` (`.css`, `.js`, `.fonts` and helpers; atlas is drawn by ink's code) |
 | `worker.js` | runs the generator off the main thread |
 | `dot.js` | reads a DOT file into a graph the generator draws; loaded when a file is dropped |
 | `world.js` | the pipeline, `buildWorld(graph, {seed, base, addons})` |
@@ -290,4 +330,4 @@ within 1% of their share of the population. It exits with 1 when a rule fails.
 - [earcut](https://github.com/mapbox/earcut) by Mapbox, ISC license (`vendor/LICENSE-earcut`).
 - Fonts from [Google Fonts](https://fonts.google.com/), SIL Open Font License: Eagle Lake,
   Fondamento and Sorts Mill Goudy (Ink), Alegreya and Alegreya SC (Realm), IM Fell English
-  (Atlas).
+  (Atlas), Inter (Dots).
