@@ -1,0 +1,3093 @@
+{
+ "about": "Every algorithm of People World, one line each, in the order of the explainer steps. Line numbers are at the commit in base; build.mjs follows them to the current commit by matching the line text.",
+ "base": "29c3670445fd50b38c36c3bd0faedce66e8dd32e",
+ "branches": [
+  {
+   "id": "layout",
+   "name": "Layout"
+  },
+  {
+   "id": "exclaves",
+   "name": "Exclaves"
+  },
+  {
+   "id": "mesh",
+   "name": "Mesh"
+  },
+  {
+   "id": "growth",
+   "name": "Growth & annealing"
+  },
+  {
+   "id": "lines",
+   "name": "Boundary lines"
+  },
+  {
+   "id": "islands",
+   "name": "Islands"
+  },
+  {
+   "id": "edits",
+   "name": "Edits"
+  },
+  {
+   "id": "land",
+   "name": "Land grid"
+  },
+  {
+   "id": "terrain",
+   "name": "Terrain & rivers"
+  },
+  {
+   "id": "climate",
+   "name": "Climate"
+  },
+  {
+   "id": "page",
+   "name": "The page"
+  },
+  {
+   "id": "ink",
+   "name": "Ink style"
+  },
+  {
+   "id": "realm",
+   "name": "Realm style"
+  },
+  {
+   "id": "base",
+   "name": "Foundations"
+  }
+ ],
+ "algorithms": [
+  {
+   "branch": "layout",
+   "name": "Floyd–Warshall distances",
+   "where": "layout.js · graphDistances",
+   "what": "All-pairs shortest paths over the border graph, where a link is 0.86 times the two countries' radii added.",
+   "refs": [
+    {
+     "file": "layout.js",
+     "line": 134,
+     "label": "graphDistances"
+    },
+    {
+     "file": "layout.js",
+     "line": 17,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "layout",
+   "name": "Classical MDS",
+   "where": "layout.js · mdsStart",
+   "what": "Starting positions from the leading eigenvectors of the double-centred squared distances, found by power iteration with deflation.",
+   "refs": [
+    {
+     "file": "layout.js",
+     "line": 155,
+     "label": "mdsStart"
+    },
+    {
+     "file": "layout.js",
+     "line": 185,
+     "label": "deflate"
+    },
+    {
+     "file": "layout.js",
+     "line": 23,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "layout",
+   "name": "Stress majorization (SMACOF)",
+   "where": "layout.js · smacof",
+   "what": "Moves the discs until their distances match the graph distances, each pair weighted by 1/d².",
+   "refs": [
+    {
+     "file": "layout.js",
+     "line": 201,
+     "label": "smacof"
+    },
+    {
+     "file": "layout.js",
+     "line": 24,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "layout",
+   "name": "Constraint projection",
+   "where": "layout.js · layoutComponent",
+   "what": "Position-based packing: linked discs overlap a little, unlinked ones are pushed apart, and a weak pull keeps the continent compact.",
+   "refs": [
+    {
+     "file": "layout.js",
+     "line": 68,
+     "label": "relax"
+    },
+    {
+     "file": "layout.js",
+     "line": 93,
+     "label": "the rounds"
+    },
+    {
+     "file": "world.js",
+     "line": 127,
+     "label": "the second pass"
+    }
+   ]
+  },
+  {
+   "branch": "layout",
+   "name": "Neighbour lists with hot discs",
+   "where": "layout.js · layoutComponent",
+   "what": "Skips pairs that cannot touch. Each disc keeps a list of the others within reach, and only discs that have moved far since are checked against everything.",
+   "refs": [
+    {
+     "file": "layout.js",
+     "line": 45,
+     "label": "makeLists"
+    },
+    {
+     "file": "layout.js",
+     "line": 61,
+     "label": "heat"
+    },
+    {
+     "file": "layout.js",
+     "line": 109,
+     "label": "when the lists are remade"
+    }
+   ]
+  },
+  {
+   "branch": "layout",
+   "name": "Link uncrossing sweep",
+   "where": "layout.js · uncross",
+   "what": "Two links drawn as crossing segments can't both be borders, so the cheaper endpoint is pushed back across. Candidate pairs come from a sweep over bounding boxes, merged with a min-heap.",
+   "refs": [
+    {
+     "file": "layout.js",
+     "line": 225,
+     "label": "uncross"
+    },
+    {
+     "file": "layout.js",
+     "line": 242,
+     "label": "fix: the endpoint moved"
+    },
+    {
+     "file": "layout.js",
+     "line": 278,
+     "label": "the sweep along x"
+    }
+   ]
+  },
+  {
+   "branch": "layout",
+   "name": "Link difficulty scores",
+   "where": "layout.js · linkGeometry",
+   "what": "How many other links each link crosses, and how stretched it is. Among equally small sets of exclaves, the solver drops the hardest links and those of the smallest countries.",
+   "refs": [
+    {
+     "file": "layout.js",
+     "line": 362,
+     "label": "linkGeometry"
+    },
+    {
+     "file": "world.js",
+     "line": 95,
+     "label": "hardness"
+    },
+    {
+     "file": "world.js",
+     "line": 97,
+     "label": "the removal cost"
+    }
+   ]
+  },
+  {
+   "branch": "layout",
+   "name": "Continent orientation",
+   "where": "world.js · buildWorld",
+   "what": "The main continent is turned to lie along its long axis and the second stands upright beside it; mirroring varies with the seed.",
+   "refs": [
+    {
+     "file": "world.js",
+     "line": 142,
+     "label": "the long axis"
+    },
+    {
+     "file": "world.js",
+     "line": 144,
+     "label": "the turn"
+    },
+    {
+     "file": "world.js",
+     "line": 192,
+     "label": "the second beside the first"
+    }
+   ]
+  },
+  {
+   "branch": "exclaves",
+   "name": "Left-Right planarity test",
+   "where": "planar.js · lrCore",
+   "what": "Brandes' linear-time test: DFS orientation, lowpoints, nesting depths and conflict pairs, written iteratively over typed arrays.",
+   "refs": [
+    {
+     "file": "planar.js",
+     "line": 109,
+     "label": "lrCore"
+    },
+    {
+     "file": "planar.js",
+     "line": 313,
+     "label": "addConstraints (conflict pairs)"
+    },
+    {
+     "file": "planar.js",
+     "line": 542,
+     "label": "makeTester"
+    }
+   ]
+  },
+  {
+   "branch": "exclaves",
+   "name": "Counting sort of edges",
+   "where": "planar.js · sortOutEdges",
+   "what": "Stable bucket sorts give each vertex's edges in nesting-depth order in linear time.",
+   "refs": [
+    {
+     "file": "planar.js",
+     "line": 89,
+     "label": "sortOutEdges"
+    },
+    {
+     "file": "planar.js",
+     "line": 189,
+     "label": "phase 2 sort"
+    },
+    {
+     "file": "planar.js",
+     "line": 257,
+     "label": "phase 3 sort"
+    }
+   ]
+  },
+  {
+   "branch": "exclaves",
+   "name": "Planar embedding & faces",
+   "where": "planar.js · planarEmbedding, faces",
+   "what": "Builds the rotation system (neighbours in counter-clockwise order) and traces every face. Each component satisfies V − E + F = 2.",
+   "refs": [
+    {
+     "file": "planar.js",
+     "line": 240,
+     "label": "lrCore phase 3: embedding"
+    },
+    {
+     "file": "planar.js",
+     "line": 495,
+     "label": "faces"
+    },
+    {
+     "file": "planar.js",
+     "line": 1258,
+     "label": "the final check"
+    }
+   ]
+  },
+  {
+   "branch": "exclaves",
+   "name": "Biconnected blocks",
+   "where": "planar.js · biconnectedBlocks",
+   "what": "Iterative Hopcroft–Tarjan with an edge stack. Only the blocks that are not planar get any more work.",
+   "refs": [
+    {
+     "file": "planar.js",
+     "line": 692,
+     "label": "biconnectedBlocks"
+    },
+    {
+     "file": "planar.js",
+     "line": 1199,
+     "label": "where it is called"
+    },
+    {
+     "file": "planar.js",
+     "line": 1205,
+     "label": "skip blocks under 9 links"
+    }
+   ]
+  },
+  {
+   "branch": "exclaves",
+   "name": "Kuratowski extraction",
+   "where": "planar.js · extractKuratowski",
+   "what": "Finds an edge-minimal K₅ or K₃,₃ subdivision by group deletion: drop a chunk of edges, keep it dropped if the rest is still non-planar, otherwise split the chunk.",
+   "refs": [
+    {
+     "file": "planar.js",
+     "line": 579,
+     "label": "extractKuratowski"
+    },
+    {
+     "file": "planar.js",
+     "line": 1365,
+     "label": "called from grow"
+    }
+   ]
+  },
+  {
+   "branch": "exclaves",
+   "name": "2-core pruning",
+   "where": "planar.js · extractKuratowski",
+   "what": "Edges of pendant trees never belong to a Kuratowski subgraph, so they are dropped for free after every deletion.",
+   "refs": [
+    {
+     "file": "planar.js",
+     "line": 588,
+     "label": "trim"
+    },
+    {
+     "file": "planar.js",
+     "line": 624,
+     "label": "trim after a drop"
+    }
+   ]
+  },
+  {
+   "branch": "exclaves",
+   "name": "Implicit hitting set",
+   "where": "planar.js · solveUniverse",
+   "what": "Minimum planarizing edge deletion. Every answer removes an edge of each Kuratowski subgraph, so collect them, find a cheapest hitting set, test it, add what it misses, and repeat until it is proven optimal.",
+   "refs": [
+    {
+     "file": "planar.js",
+     "line": 1271,
+     "label": "solveUniverse"
+    },
+    {
+     "file": "planar.js",
+     "line": 1351,
+     "label": "grow"
+    },
+    {
+     "file": "world.js",
+     "line": 97,
+     "label": "where world.js calls it"
+    }
+   ]
+  },
+  {
+   "branch": "exclaves",
+   "name": "Branch and bound",
+   "where": "planar.js · solveHittingComponent",
+   "what": "Searches hitting sets under degree, disjoint-packing and LP-dual weight lower bounds. The count is minimised first, then the weight.",
+   "refs": [
+    {
+     "file": "planar.js",
+     "line": 910,
+     "label": "solveHittingComponent"
+    },
+    {
+     "file": "planar.js",
+     "line": 1019,
+     "label": "search"
+    },
+    {
+     "file": "planar.js",
+     "line": 1003,
+     "label": "dualBound"
+    }
+   ]
+  },
+  {
+   "branch": "exclaves",
+   "name": "Dominance & union-find",
+   "where": "planar.js · hittingSetSearch",
+   "what": "Drops superset constraints and dominated edges, then splits the problem into independent parts with union-find.",
+   "refs": [
+    {
+     "file": "planar.js",
+     "line": 770,
+     "label": "hittingSetSearch"
+    },
+    {
+     "file": "planar.js",
+     "line": 886,
+     "label": "dropSupersets"
+    },
+    {
+     "file": "planar.js",
+     "line": 826,
+     "label": "union-find"
+    }
+   ]
+  },
+  {
+   "branch": "exclaves",
+   "name": "Euler bound",
+   "where": "planar.js · planarSubgraph",
+   "what": "A planar graph has at most 3n − 6 edges (2n − 4 with no triangles), which bounds the number of removals from below.",
+   "refs": [
+    {
+     "file": "planar.js",
+     "line": 1221,
+     "label": "Euler bound per block"
+    },
+    {
+     "file": "planar.js",
+     "line": 1398,
+     "label": "stop when it is met"
+    },
+    {
+     "file": "planar.js",
+     "line": 110,
+     "label": "quick reject in lrCore"
+    }
+   ]
+  },
+  {
+   "branch": "exclaves",
+   "name": "Greedy planarization",
+   "where": "planar.js · greedyPlanarize",
+   "what": "Takes the edges in order and binary-searches the longest planar prefix; the edge that breaks it is dropped and the search goes on.",
+   "refs": [
+    {
+     "file": "planar.js",
+     "line": 1447,
+     "label": "greedyPlanarize"
+    },
+    {
+     "file": "planar.js",
+     "line": 1362,
+     "label": "the timeout fallback in grow"
+    }
+   ]
+  },
+  {
+   "branch": "exclaves",
+   "name": "2-for-1 exchange search",
+   "where": "planar.js · localImprove",
+   "what": "When the time budget runs out: put two removed edges back and remove one other, as long as the graph stays planar.",
+   "refs": [
+    {
+     "file": "planar.js",
+     "line": 1487,
+     "label": "localImprove"
+    },
+    {
+     "file": "planar.js",
+     "line": 1435,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "exclaves",
+   "name": "BFS-local deletion order",
+   "where": "planar.js · solveUniverse",
+   "what": "Edges far from a centre (by BFS distance) are deleted first, so extracted subgraphs stay small and local and make strong constraints.",
+   "refs": [
+    {
+     "file": "planar.js",
+     "line": 1295,
+     "label": "localOrder"
+    },
+    {
+     "file": "planar.js",
+     "line": 1365,
+     "label": "used in grow"
+    }
+   ]
+  },
+  {
+   "branch": "mesh",
+   "name": "Graded jittered quadtree",
+   "where": "mesh.js · buildMesh",
+   "what": "About 50,000 points from a quadtree on a fixed lattice, finer where small countries sit. A grid over the discs answers the sizing queries.",
+   "refs": [
+    {
+     "file": "mesh.js",
+     "line": 8,
+     "label": "buildMesh"
+    },
+    {
+     "file": "mesh.js",
+     "line": 29,
+     "label": "sizing"
+    },
+    {
+     "file": "mesh.js",
+     "line": 54,
+     "label": "the split test"
+    }
+   ]
+  },
+  {
+   "branch": "mesh",
+   "name": "Position-hashed jitter",
+   "where": "mesh.js · buildMesh",
+   "what": "Each point's jitter is a hash of where it is, so wherever the countries are the same, so is the mesh.",
+   "refs": [
+    {
+     "file": "mesh.js",
+     "line": 59,
+     "label": "the jitter"
+    },
+    {
+     "file": "util.js",
+     "line": 29,
+     "label": "hash2"
+    },
+    {
+     "file": "mesh.js",
+     "line": 67,
+     "label": "points numbered by position"
+    }
+   ]
+  },
+  {
+   "branch": "mesh",
+   "name": "Delaunay triangulation",
+   "where": "vendor/delaunator.js",
+   "what": "Mapbox's Delaunator: a sweep-hull Delaunay triangulation of the points.",
+   "refs": [
+    {
+     "file": "vendor/delaunator.js",
+     "line": 47,
+     "label": "update"
+    },
+    {
+     "file": "vendor/delaunator.js",
+     "line": 261,
+     "label": "_legalize (edge flips)"
+    },
+    {
+     "file": "mesh.js",
+     "line": 72,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "mesh",
+   "name": "Robust orient2d",
+   "where": "vendor/orient2d.js",
+   "what": "Shewchuk's adaptive-precision orientation test: a quick floating-point answer when it is provably right, exact arithmetic when it is not. Delaunator uses it for its hull walks; its in-circle test, which decides the flips, is plain floating point.",
+   "refs": [
+    {
+     "file": "vendor/orient2d.js",
+     "line": 171,
+     "label": "orient2d"
+    },
+    {
+     "file": "vendor/orient2d.js",
+     "line": 13,
+     "label": "orient2dadapt"
+    },
+    {
+     "file": "vendor/delaunator.js",
+     "line": 197,
+     "label": "the hull walk"
+    }
+   ]
+  },
+  {
+   "branch": "mesh",
+   "name": "Barycentric dual",
+   "where": "mesh.js · dualOf",
+   "what": "Each cell is the triangle thirds around a point (centroid to midpoint to centroid), which is always a valid planar subdivision.",
+   "refs": [
+    {
+     "file": "mesh.js",
+     "line": 77,
+     "label": "dualOf"
+    },
+    {
+     "file": "mesh.js",
+     "line": 89,
+     "label": "cell area: triangle thirds"
+    },
+    {
+     "file": "mesh.js",
+     "line": 133,
+     "label": "dual edge lengths"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Capped growth from seeds",
+   "where": "label.js · growFromSeeds",
+   "what": "Every country's front advances at a speed set by its size and stops at its target area. Small countries keep a round blob; big ones flow around them.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 910,
+     "label": "growFromSeeds"
+    },
+    {
+     "file": "world.js",
+     "line": 270,
+     "label": "seeds and speeds"
+    },
+    {
+     "file": "world.js",
+     "line": 289,
+     "label": "cell cost"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Power diagram start",
+   "where": "world.js · buildWorld",
+   "what": "An alternative start, off by default: each cell goes to the seed with the least power distance d² − r², clipped to noisy discs.",
+   "refs": [
+    {
+     "file": "world.js",
+     "line": 245,
+     "label": "the power-diagram loop"
+    },
+    {
+     "file": "world.js",
+     "line": 256,
+     "label": "power distance"
+    },
+    {
+     "file": "world.js",
+     "line": 243,
+     "label": "the debug switch"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Potts energy",
+   "where": "label.js · deltaE",
+   "what": "Border length, plus area error, plus distance from the country's centre, plus a coast noise field, plus a spring on borders that are still too short.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 208,
+     "label": "deltaE"
+    },
+    {
+     "file": "label.js",
+     "line": 35,
+     "label": "setTargets"
+    },
+    {
+     "file": "world.js",
+     "line": 229,
+     "label": "the weights"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Metropolis annealing",
+   "where": "label.js · anneal",
+   "what": "Proposes for each boundary cell the label of a random neighbour and accepts it by the Metropolis rule as the temperature falls. A move must pass both the energy test and the hard rules; the cheaper energy test runs first.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 283,
+     "label": "anneal"
+    },
+    {
+     "file": "label.js",
+     "line": 334,
+     "label": "the Metropolis test"
+    },
+    {
+     "file": "world.js",
+     "line": 306,
+     "label": "the main run"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Simple-point test",
+   "where": "label.js · tryMove",
+   "what": "Checks the cell's ring of neighbours, so a country stays in one piece, never gets a hole, and the sea gets no new lake.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 134,
+     "label": "tryMove"
+    },
+    {
+     "file": "label.js",
+     "line": 141,
+     "label": "counting the runs"
+    },
+    {
+     "file": "label.js",
+     "line": 388,
+     "label": "stillConnected"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Position-keyed random order",
+   "where": "label.js · cellKeys",
+   "what": "Cells are visited in hash order and draw their random numbers from (key, sweep), so where the map is the same it anneals the same way.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 262,
+     "label": "cellKeys"
+    },
+    {
+     "file": "label.js",
+     "line": 327,
+     "label": "the keyed draws"
+    },
+    {
+     "file": "label.js",
+     "line": 307,
+     "label": "the salt"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Active frontier set",
+   "where": "label.js · anneal",
+   "what": "Only cells on an edge between labels are visited; a cell inside one country cannot change anything.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 313,
+     "label": "the edge test"
+    },
+    {
+     "file": "label.js",
+     "line": 324,
+     "label": "the skip"
+    },
+    {
+     "file": "label.js",
+     "line": 338,
+     "label": "updating the flags"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Dijkstra on Dial's buckets",
+   "where": "label.js · distanceField",
+   "what": "Cheapest-path distance fields on a bucket queue, with the same result a binary heap would give.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 608,
+     "label": "distanceField"
+    },
+    {
+     "file": "label.js",
+     "line": 597,
+     "label": "bucketPlan"
+    },
+    {
+     "file": "label.js",
+     "line": 664,
+     "label": "bucketQueue"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Binary min-heap",
+   "where": "label.js · Heap",
+   "what": "A heap of (key, cell) pairs over typed arrays, used by growth, bridging, blob growing and channel broadening.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 429,
+     "label": "Heap"
+    },
+    {
+     "file": "label.js",
+     "line": 436,
+     "label": "push"
+    },
+    {
+     "file": "label.js",
+     "line": 447,
+     "label": "pop"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Border bridging",
+   "where": "label.js · bridge",
+   "what": "Two countries that must touch grow arms toward each other along the cheapest legal path; the corridor is then widened by a ring of cells.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 505,
+     "label": "bridge"
+    },
+    {
+     "file": "label.js",
+     "line": 476,
+     "label": "fieldFrom"
+    },
+    {
+     "file": "world.js",
+     "line": 310,
+     "label": "the bridging rounds"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Reinsertion",
+   "where": "label.js · reinsert",
+   "what": "Takes a country that is stretched, or still missing a border, off the map and grows it again where the most neighbours are close and no forbidden country is near. buildWorld keeps the result only if it helps.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 773,
+     "label": "reinsert"
+    },
+    {
+     "file": "label.js",
+     "line": 734,
+     "label": "growBlob"
+    },
+    {
+     "file": "world.js",
+     "line": 337,
+     "label": "the trials for missing borders"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Exclave carving",
+   "where": "label.js · carveExclave",
+   "what": "Cuts a detached piece of one country out of its host: inside it, on the border of two hosts, or in the sea against its coast.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 821,
+     "label": "carveExclave"
+    },
+    {
+     "file": "label.js",
+     "line": 848,
+     "label": "carveWith"
+    },
+    {
+     "file": "world.js",
+     "line": 496,
+     "label": "one piece per missing border"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Arm pruning",
+   "where": "label.js · pruneArms",
+   "what": "Cells farther than k·R from the country's thickest point go to a neighbour that may take them, or to the sea.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 949,
+     "label": "pruneArms"
+    },
+    {
+     "file": "label.js",
+     "line": 683,
+     "label": "edgeDepth"
+    },
+    {
+     "file": "world.js",
+     "line": 395,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Morphological opening",
+   "where": "label.js · pruneThin",
+   "what": "Removes ribbons and necks: keep the cells at least r deep, grow them back by r, and give away whatever is not covered.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 1117,
+     "label": "pruneThin"
+    },
+    {
+     "file": "label.js",
+     "line": 710,
+     "label": "coverFrom"
+    },
+    {
+     "file": "world.js",
+     "line": 396,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Channel broadening",
+   "where": "label.js · broadenChannels",
+   "what": "Long water channels between countries that must not touch become broad seas with noise-shaped shores, and are then frozen.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 1001,
+     "label": "broadenChannels"
+    },
+    {
+     "file": "label.js",
+     "line": 1083,
+     "label": "the carving loop"
+    },
+    {
+     "file": "world.js",
+     "line": 527,
+     "label": "makeSeas"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Inlet filling",
+   "where": "label.js · fillFingers, fillThinWater",
+   "what": "One-cell inlets and narrow creeks are filled from the tip with the land around them, where the rules allow.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 1172,
+     "label": "fillFingers"
+    },
+    {
+     "file": "label.js",
+     "line": 1203,
+     "label": "fillThinWater"
+    },
+    {
+     "file": "world.js",
+     "line": 552,
+     "label": "where they are called"
+    }
+   ]
+  },
+  {
+   "branch": "growth",
+   "name": "Component cleanup",
+   "where": "label.js · enforce",
+   "what": "Keeps one connected piece per country (the one with its seed) and resolves any contact between countries that are not linked.",
+   "refs": [
+    {
+     "file": "label.js",
+     "line": 95,
+     "label": "enforce"
+    },
+    {
+     "file": "label.js",
+     "line": 65,
+     "label": "components"
+    },
+    {
+     "file": "world.js",
+     "line": 292,
+     "label": "strength"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Boundary chain graph",
+   "where": "geom.js · extractBoundary",
+   "what": "The labelled cells become a planar graph of chains between the junctions where three labels meet.",
+   "refs": [
+    {
+     "file": "geom.js",
+     "line": 42,
+     "label": "extractBoundary"
+    },
+    {
+     "file": "world.js",
+     "line": 594,
+     "label": "where it is called"
+    },
+    {
+     "file": "geom.js",
+     "line": 776,
+     "label": "rings"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Uniform segment grid",
+   "where": "geom.js · Geo",
+   "what": "A dense grid of segment lists over the map, kept current as vertices move.",
+   "refs": [
+    {
+     "file": "geom.js",
+     "line": 135,
+     "label": "rebuild"
+    },
+    {
+     "file": "geom.js",
+     "line": 753,
+     "label": "moveQ"
+    },
+    {
+     "file": "geom.js",
+     "line": 238,
+     "label": "near"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Guarded vertex moves",
+   "where": "geom.js · tryMove",
+   "what": "Every move is tested against nearby segments: no crossing, no pinch, no fold to zero width. The topology settled on the mesh survives everything after.",
+   "refs": [
+    {
+     "file": "geom.js",
+     "line": 680,
+     "label": "tryMove"
+    },
+    {
+     "file": "geom.js",
+     "line": 683,
+     "label": "canMoveQ"
+    },
+    {
+     "file": "geom.js",
+     "line": 738,
+     "label": "blocks"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Displacement budgets",
+   "where": "geom.js · budgets",
+   "what": "A vertex may move at most half of the room left between its segments and the nearest boundary it must keep clear of, so no gap closes below its clearance. Blocks of 16 segments with bounding boxes skip the pairs that cannot lower any budget.",
+   "refs": [
+    {
+     "file": "geom.js",
+     "line": 309,
+     "label": "budgets"
+    },
+    {
+     "file": "geom.js",
+     "line": 686,
+     "label": "the check in canMoveQ"
+    },
+    {
+     "file": "world.js",
+     "line": 598,
+     "label": "the clearance"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Incremental gap pushes",
+   "where": "geom.js · gapPushes",
+   "what": "Finds vertices too close to a boundary they must keep clear of, rechecking only where something moved.",
+   "refs": [
+    {
+     "file": "geom.js",
+     "line": 397,
+     "label": "gapPushes"
+    },
+    {
+     "file": "geom.js",
+     "line": 498,
+     "label": "pushAt"
+    },
+    {
+     "file": "geom.js",
+     "line": 555,
+     "label": "markRange"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Neck detection",
+   "where": "geom.js · thickPushes",
+   "what": "Off by default: two sides of one country that are close in space but far apart along its outline are a neck, and are pushed apart.",
+   "refs": [
+    {
+     "file": "geom.js",
+     "line": 569,
+     "label": "thickPushes"
+    },
+    {
+     "file": "geom.js",
+     "line": 646,
+     "label": "the arc-distance test"
+    },
+    {
+     "file": "world.js",
+     "line": 659,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Taubin smoothing",
+   "where": "process.js · smooth",
+   "what": "A shrinking Laplacian step, then an inflating one, so small blobs keep their size.",
+   "refs": [
+    {
+     "file": "process.js",
+     "line": 9,
+     "label": "smooth"
+    },
+    {
+     "file": "process.js",
+     "line": 14,
+     "label": "the alternating factor"
+    },
+    {
+     "file": "world.js",
+     "line": 612,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Segment subdivision",
+   "where": "process.js · subdivide",
+   "what": "Splits every segment longer than a share of its chain's mean segment length (half on coasts, 0.8 on borders), so the roughening has points to bend. The matching simplify, which drops vertices on nearly straight runs, is never called.",
+   "refs": [
+    {
+     "file": "process.js",
+     "line": 56,
+     "label": "subdivide"
+    },
+    {
+     "file": "world.js",
+     "line": 629,
+     "label": "where it is called"
+    },
+    {
+     "file": "process.js",
+     "line": 79,
+     "label": "simplify"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Fractal roughening",
+   "where": "process.js · roughen",
+   "what": "Moves vertices along the normal by fBm noise: coasts get capes and coves, borders a gentle wobble.",
+   "refs": [
+    {
+     "file": "process.js",
+     "line": 100,
+     "label": "roughen"
+    },
+    {
+     "file": "process.js",
+     "line": 132,
+     "label": "the coast noise"
+    },
+    {
+     "file": "util.js",
+     "line": 48,
+     "label": "fbm2"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Exact area fitting",
+   "where": "process.js · fitAreas",
+   "what": "Pushes each chain toward the side with too much area, with a gain per country, until every area is within tolerance. The sea absorbs the difference.",
+   "refs": [
+    {
+     "file": "process.js",
+     "line": 164,
+     "label": "fitAreas"
+    },
+    {
+     "file": "process.js",
+     "line": 224,
+     "label": "the push per country"
+    },
+    {
+     "file": "world.js",
+     "line": 668,
+     "label": "the main fit"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Radial collapse",
+   "where": "process.js · collapse",
+   "what": "Shrinks a tiny country toward a point it is star-shaped from. Its neighbours take the strips, and their borders extend along the rays.",
+   "refs": [
+    {
+     "file": "process.js",
+     "line": 302,
+     "label": "collapse"
+    },
+    {
+     "file": "process.js",
+     "line": 331,
+     "label": "the star-shape score"
+    },
+    {
+     "file": "world.js",
+     "line": 651,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Curve-shortening flow",
+   "where": "world.js · buildWorld",
+   "what": "When a tiny country is not star-shaped, plain Laplacian steps on its own outline (8 at a time, its junctions held) straighten it, and collapse is tried again, up to 8 attempts. Only a country with no junctions, a closed loop inside one neighbour, gets the full flow toward a convex shape.",
+   "refs": [
+    {
+     "file": "world.js",
+     "line": 649,
+     "label": "the smoothing call"
+    },
+    {
+     "file": "process.js",
+     "line": 14,
+     "label": "plain steps when Taubin is off"
+    },
+    {
+     "file": "world.js",
+     "line": 651,
+     "label": "collapse tried again"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Despike & spur cutting",
+   "where": "process.js · despike, cutSpurs",
+   "what": "Hairpin vertices move to their neighbours' midpoint, and hairline loops are cut off with a straight segment.",
+   "refs": [
+    {
+     "file": "process.js",
+     "line": 440,
+     "label": "despike"
+    },
+    {
+     "file": "process.js",
+     "line": 470,
+     "label": "cutSpurs"
+    },
+    {
+     "file": "world.js",
+     "line": 670,
+     "label": "where they are called"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Junction straightening",
+   "where": "process.js · straightenJunctions",
+   "what": "Where a border meets the sea, the coast is pulled onto a chord so it runs straight on instead of dipping into a V.",
+   "refs": [
+    {
+     "file": "process.js",
+     "line": 522,
+     "label": "straightenJunctions"
+    },
+    {
+     "file": "process.js",
+     "line": 566,
+     "label": "the fading weight"
+    },
+    {
+     "file": "world.js",
+     "line": 666,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "lines",
+   "name": "Gap opening",
+   "where": "process.js · openGaps",
+   "what": "Pushes apart the boundaries of countries that must not look as if they touch, until each pair keeps its clearance.",
+   "refs": [
+    {
+     "file": "process.js",
+     "line": 395,
+     "label": "openGaps"
+    },
+    {
+     "file": "process.js",
+     "line": 413,
+     "label": "spreading the pushes"
+    },
+    {
+     "file": "world.js",
+     "line": 659,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "islands",
+   "name": "Exact-area blobs",
+   "where": "islands.js · islandRing",
+   "what": "Low-frequency lobes plus detail, a little elongated, then rotated and scaled to exactly the right area.",
+   "refs": [
+    {
+     "file": "islands.js",
+     "line": 47,
+     "label": "islandRing"
+    },
+    {
+     "file": "islands.js",
+     "line": 64,
+     "label": "the scale to exact area"
+    },
+    {
+     "file": "world.js",
+     "line": 760,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "islands",
+   "name": "Expanding-ring search",
+   "where": "islands.js · placeIslands",
+   "what": "Largest island first, each one searches rings of growing radius around its anchor for the first free spot.",
+   "refs": [
+    {
+     "file": "islands.js",
+     "line": 8,
+     "label": "placeIslands"
+    },
+    {
+     "file": "islands.js",
+     "line": 30,
+     "label": "the growing rings"
+    },
+    {
+     "file": "world.js",
+     "line": 743,
+     "label": "anchorOf"
+    }
+   ]
+  },
+  {
+   "branch": "islands",
+   "name": "Open-water placement",
+   "where": "world.js · buildWorld",
+   "what": "A piece of land of its own (Britain and Ireland) goes to the open water nearest its continent's middle, with a straight way out to sea.",
+   "refs": [
+    {
+     "file": "world.js",
+     "line": 166,
+     "label": "offItsContinent"
+    },
+    {
+     "file": "world.js",
+     "line": 184,
+     "label": "the way out to sea"
+    },
+    {
+     "file": "world.js",
+     "line": 202,
+     "label": "the fallback round the main land"
+    }
+   ]
+  },
+  {
+   "branch": "edits",
+   "name": "Pull-back layout",
+   "where": "layout.js · layoutComponent",
+   "what": "After an edit each country is pulled back toward where it was, so a change fades with distance.",
+   "refs": [
+    {
+     "file": "layout.js",
+     "line": 103,
+     "label": "the pull back"
+    },
+    {
+     "file": "world.js",
+     "line": 128,
+     "label": "the warm-start options"
+    },
+    {
+     "file": "world.js",
+     "line": 60,
+     "label": "warmInit"
+    }
+   ]
+  },
+  {
+   "branch": "edits",
+   "name": "Incremental planarity",
+   "where": "world.js · buildWorld",
+   "what": "The earlier exclaves are kept, and each new link becomes a border if the map stays planar with it.",
+   "refs": [
+    {
+     "file": "world.js",
+     "line": 107,
+     "label": "the warm-start exclaves"
+    },
+    {
+     "file": "world.js",
+     "line": 114,
+     "label": "one test per new link"
+    },
+    {
+     "file": "planar.js",
+     "line": 479,
+     "label": "isPlanar"
+    }
+   ]
+  },
+  {
+   "branch": "edits",
+   "name": "Fresh-build fallback",
+   "where": "index.html",
+   "what": "An edit that breaks a rule or takes too long is drawn again from scratch, and the page says that countries moved.",
+   "refs": [
+    {
+     "file": "index.html",
+     "line": 2583,
+     "label": "the warm start, timed"
+    },
+    {
+     "file": "index.html",
+     "line": 2588,
+     "label": "the rule check"
+    },
+    {
+     "file": "index.html",
+     "line": 1353,
+     "label": "selfCheck"
+    }
+   ]
+  },
+  {
+   "branch": "land",
+   "name": "Scanline rasterization",
+   "where": "land.js · rasterize",
+   "what": "An even-odd fill of every country's rings: which country each cell's middle lies in.",
+   "refs": [
+    {
+     "file": "land.js",
+     "line": 74,
+     "label": "rasterize"
+    },
+    {
+     "file": "land.js",
+     "line": 176,
+     "label": "where landOf calls it"
+    }
+   ]
+  },
+  {
+   "branch": "land",
+   "name": "Pocket filling",
+   "where": "land.js · fillPockets",
+   "what": "A flood fill: pockets of no country inside the land go to the country most round them, so no river ends in a sliver.",
+   "refs": [
+    {
+     "file": "land.js",
+     "line": 105,
+     "label": "fillPockets"
+    },
+    {
+     "file": "land.js",
+     "line": 177,
+     "label": "where landOf calls it"
+    }
+   ]
+  },
+  {
+   "branch": "land",
+   "name": "Euclidean distance transform",
+   "where": "land.js · edt",
+   "what": "Felzenszwalb and Huttenlocher's exact EDT in two one-dimensional passes: how far every cell lies from the sea.",
+   "refs": [
+    {
+     "file": "land.js",
+     "line": 40,
+     "label": "edt"
+    },
+    {
+     "file": "land.js",
+     "line": 29,
+     "label": "edt1, one dimension"
+    },
+    {
+     "file": "land.js",
+     "line": 180,
+     "label": "inland from the sea"
+    }
+   ]
+  },
+  {
+   "branch": "land",
+   "name": "Disc stamping",
+   "where": "land.js · spread",
+   "what": "Distance to nearby sources only, by stamping a disc around each. Cheaper than a transform of the whole grid.",
+   "refs": [
+    {
+     "file": "land.js",
+     "line": 58,
+     "label": "spread"
+    },
+    {
+     "file": "terrain.js",
+     "line": 148,
+     "label": "distance to junctions"
+    },
+    {
+     "file": "terrain.js",
+     "line": 296,
+     "label": "distance to crests"
+    }
+   ]
+  },
+  {
+   "branch": "land",
+   "name": "Line marking & dabs",
+   "where": "land.js · markLine, dab",
+   "what": "Marks the cells a line passes through in steps of a third of a cell, and lays smooth bumps on a field, which keeps the larger of the bump and what it had.",
+   "refs": [
+    {
+     "file": "land.js",
+     "line": 131,
+     "label": "markLine"
+    },
+    {
+     "file": "land.js",
+     "line": 145,
+     "label": "dab"
+    },
+    {
+     "file": "terrain.js",
+     "line": 117,
+     "label": "borders and coasts marked"
+    }
+   ]
+  },
+  {
+   "branch": "land",
+   "name": "Fixed lattice",
+   "where": "land.js · landOf",
+   "what": "Cell sizes come from a series a quarter of a doubling apart, anchored at the origin, so a map that changes a little keeps its cells.",
+   "refs": [
+    {
+     "file": "land.js",
+     "line": 172,
+     "label": "the cell size"
+    },
+    {
+     "file": "land.js",
+     "line": 161,
+     "label": "landOf"
+    },
+    {
+     "file": "land.js",
+     "line": 173,
+     "label": "snapped to the lattice"
+    }
+   ]
+  },
+  {
+   "branch": "terrain",
+   "name": "Rough inland relief",
+   "where": "terrain.js · makeTerrain",
+   "what": "The ground rises with distance inland, roughened by fBm. Every border stands on a low ridge, higher where three meet, so rivers cross borders at saddles.",
+   "refs": [
+    {
+     "file": "terrain.js",
+     "line": 152,
+     "label": "the ground"
+    },
+    {
+     "file": "terrain.js",
+     "line": 113,
+     "label": "distances to borders"
+    },
+    {
+     "file": "terrain.js",
+     "line": 135,
+     "label": "junctions"
+    }
+   ]
+  },
+  {
+   "branch": "terrain",
+   "name": "Border ranges",
+   "where": "terrain.js · makeTerrain",
+   "what": "Some long borders get a range on one side, its crest a little way in, as the Pyrenees follow theirs.",
+   "refs": [
+    {
+     "file": "terrain.js",
+     "line": 173,
+     "label": "ranges along long borders"
+    },
+    {
+     "file": "terrain.js",
+     "line": 187,
+     "label": "which borders"
+    },
+    {
+     "file": "terrain.js",
+     "line": 209,
+     "label": "the tent"
+    }
+   ]
+  },
+  {
+   "branch": "terrain",
+   "name": "Priority-flood",
+   "where": "terrain.js · flood",
+   "what": "Floods from the sea inward with a binary heap, giving every land cell a way down with no pits.",
+   "refs": [
+    {
+     "file": "terrain.js",
+     "line": 77,
+     "label": "flood"
+    },
+    {
+     "file": "terrain.js",
+     "line": 42,
+     "label": "makeHeap"
+    },
+    {
+     "file": "terrain.js",
+     "line": 312,
+     "label": "the second flood"
+    }
+   ]
+  },
+  {
+   "branch": "terrain",
+   "name": "Flow accumulation",
+   "where": "terrain.js · makeTerrain",
+   "what": "Rain is passed down the drainage tree from the highest cells to the lowest, and more of it falls on the heights.",
+   "refs": [
+    {
+     "file": "terrain.js",
+     "line": 310,
+     "label": "rain on the relief"
+    },
+    {
+     "file": "terrain.js",
+     "line": 233,
+     "label": "the first, even rain"
+    }
+   ]
+  },
+  {
+   "branch": "terrain",
+   "name": "Divides into ranges",
+   "where": "terrain.js · makeTerrain",
+   "what": "Mountains stand on the divides between two sizeable basins, on their highest stretches, with each country's share capped.",
+   "refs": [
+    {
+     "file": "terrain.js",
+     "line": 222,
+     "label": "ranges on the divides"
+    },
+    {
+     "file": "terrain.js",
+     "line": 248,
+     "label": "the divides"
+    },
+    {
+     "file": "terrain.js",
+     "line": 259,
+     "label": "each country's share"
+    }
+   ]
+  },
+  {
+   "branch": "terrain",
+   "name": "River extraction",
+   "where": "terrain.js · makeTerrain",
+   "what": "Cells that gather enough flow are rivers, drawn largest first. Where two meet, the larger runs on and the smaller ends on its line.",
+   "refs": [
+    {
+     "file": "terrain.js",
+     "line": 322,
+     "label": "rivers"
+    },
+    {
+     "file": "terrain.js",
+     "line": 360,
+     "label": "tracing each river"
+    },
+    {
+     "file": "terrain.js",
+     "line": 450,
+     "label": "the crossing check"
+    }
+   ]
+  },
+  {
+   "branch": "terrain",
+   "name": "Shared domain warp",
+   "where": "terrain.js · makeTerrain",
+   "what": "Every point is pushed by a slow wave and a quick one, the same push for every river, so courses bend together and keep their junctions. A check afterwards cuts a river at any crossing, so no two cross.",
+   "refs": [
+    {
+     "file": "terrain.js",
+     "line": 348,
+     "label": "pushed"
+    },
+    {
+     "file": "terrain.js",
+     "line": 393,
+     "label": "where courses are pushed"
+    }
+   ]
+  },
+  {
+   "branch": "terrain",
+   "name": "Catmull-Rom splines",
+   "where": "terrain.js · makeTerrain",
+   "what": "A smooth curve through the river's points (cell middles, pushed by the warp and averaged three times), four points to a cell.",
+   "refs": [
+    {
+     "file": "terrain.js",
+     "line": 413,
+     "label": "the spline"
+    },
+    {
+     "file": "terrain.js",
+     "line": 408,
+     "label": "three averaging passes"
+    }
+   ]
+  },
+  {
+   "branch": "terrain",
+   "name": "Chaikin corner cutting",
+   "where": "terrain.js · makeTerrain",
+   "what": "One pass of corner cutting after a small wave along the river's course.",
+   "refs": [
+    {
+     "file": "terrain.js",
+     "line": 436,
+     "label": "Chaikin"
+    },
+    {
+     "file": "terrain.js",
+     "line": 425,
+     "label": "the river's own wave"
+    }
+   ]
+  },
+  {
+   "branch": "terrain",
+   "name": "Range breaching",
+   "where": "terrain.js · makeTerrain",
+   "what": "Where a river passes through a range, the range gets a gap as wide as the valley.",
+   "refs": [
+    {
+     "file": "terrain.js",
+     "line": 480,
+     "label": "the gap"
+    }
+   ]
+  },
+  {
+   "branch": "terrain",
+   "name": "Valleys by flow",
+   "where": "valleys.js · makeValleys",
+   "what": "Soft dabs every half cell along each river, wider and deeper with its flow: the valley it would have cut, without simulating erosion.",
+   "refs": [
+    {
+     "file": "valleys.js",
+     "line": 16,
+     "label": "makeValleys"
+    },
+    {
+     "file": "land.js",
+     "line": 145,
+     "label": "dab"
+    },
+    {
+     "file": "styles/realm-prep.js",
+     "line": 175,
+     "label": "where Realm reads it"
+    }
+   ]
+  },
+  {
+   "branch": "climate",
+   "name": "Wandering wind belts",
+   "where": "climate.js · makeClimate",
+   "what": "Trades, westerlies and polar easterlies, with still calms between them that wander north and south. Half the worlds spin the other way.",
+   "refs": [
+    {
+     "file": "climate.js",
+     "line": 98,
+     "label": "the winds"
+    },
+    {
+     "file": "climate.js",
+     "line": 106,
+     "label": "westerly"
+    },
+    {
+     "file": "climate.js",
+     "line": 111,
+     "label": "wander and direction"
+    }
+   ]
+  },
+  {
+   "branch": "climate",
+   "name": "Upwind moisture trace",
+   "where": "climate.js · makeClimate",
+   "what": "From each land cell the air is followed back upwind to the sea, then forward again: it fills over water and rains out over land.",
+   "refs": [
+    {
+     "file": "climate.js",
+     "line": 126,
+     "label": "follow"
+    },
+    {
+     "file": "climate.js",
+     "line": 151,
+     "label": "every other cell"
+    },
+    {
+     "file": "climate.js",
+     "line": 72,
+     "label": "STEP, REACH, FETCH, RAIN"
+    }
+   ]
+  },
+  {
+   "branch": "climate",
+   "name": "Orographic rain shadow",
+   "where": "climate.js · makeClimate",
+   "what": "Air that climbs rising ground drops more rain; the lee of a range stays dry.",
+   "refs": [
+    {
+     "file": "climate.js",
+     "line": 142,
+     "label": "rise along the trace"
+    },
+    {
+     "file": "climate.js",
+     "line": 173,
+     "label": "lift at the cell"
+    },
+    {
+     "file": "climate.js",
+     "line": 90,
+     "label": "height"
+    }
+   ]
+  },
+  {
+   "branch": "climate",
+   "name": "Temperature with height",
+   "where": "climate.js · makeClimate",
+   "what": "Warm in the south, cold in the north and colder with height; the isotherms bend with the sea air.",
+   "refs": [
+    {
+     "file": "climate.js",
+     "line": 194,
+     "label": "warmth"
+    },
+    {
+     "file": "climate.js",
+     "line": 92,
+     "label": "latitude"
+    },
+    {
+     "file": "climate.js",
+     "line": 71,
+     "label": "LAPSE"
+    }
+   ]
+  },
+  {
+   "branch": "climate",
+   "name": "Whittaker biome table",
+   "where": "climate.js · BIOMES",
+   "what": "Warmth and moisture pick what grows (tundra, taiga, steppe, grassland, forest, scrub, desert, savanna, jungle) and how much of the ground is under trees.",
+   "refs": [
+    {
+     "file": "climate.js",
+     "line": 50,
+     "label": "KINDS"
+    },
+    {
+     "file": "climate.js",
+     "line": 65,
+     "label": "coverAt"
+    },
+    {
+     "file": "climate.js",
+     "line": 216,
+     "label": "biome lookup"
+    }
+   ]
+  },
+  {
+   "branch": "climate",
+   "name": "Equalized woodland noise",
+   "where": "climate.js · makeClimate",
+   "what": "Patch noise squashed so it spreads close to evenly over 0 to 1, so a threshold of cover puts about that share of the ground under trees.",
+   "refs": [
+    {
+     "file": "climate.js",
+     "line": 214,
+     "label": "patch"
+    },
+    {
+     "file": "climate.js",
+     "line": 215,
+     "label": "woods"
+    },
+    {
+     "file": "climate.js",
+     "line": 45,
+     "label": "WOODED"
+    }
+   ]
+  },
+  {
+   "branch": "climate",
+   "name": "Marsh detection",
+   "where": "climate.js · makeClimate",
+   "what": "Low, wet, flat ground near the sea or at a river's mouth.",
+   "refs": [
+    {
+     "file": "climate.js",
+     "line": 219,
+     "label": "the marsh test"
+    },
+    {
+     "file": "climate.js",
+     "line": 177,
+     "label": "riverside"
+    },
+    {
+     "file": "styles/ink-survey.js",
+     "line": 105,
+     "label": "where ink reads it"
+    }
+   ]
+  },
+  {
+   "branch": "climate",
+   "name": "Repeated box blur",
+   "where": "climate.js · blurLand",
+   "what": "A box blur over land only, run twice: a tent-shaped filter that smooths the traced moisture.",
+   "refs": [
+    {
+     "file": "climate.js",
+     "line": 234,
+     "label": "blurLand"
+    },
+    {
+     "file": "climate.js",
+     "line": 156,
+     "label": "the one call"
+    }
+   ]
+  },
+  {
+   "branch": "climate",
+   "name": "Seaward extrapolation",
+   "where": "climate.js · seaward",
+   "what": "Each ring of sea cells takes the mean of its neighbours that already have a value, so fields read at the coast stay the land's.",
+   "refs": [
+    {
+     "file": "climate.js",
+     "line": 261,
+     "label": "seaward"
+    },
+    {
+     "file": "climate.js",
+     "line": 226,
+     "label": "the call"
+    },
+    {
+     "file": "land.js",
+     "line": 190,
+     "label": "valueAt"
+    }
+   ]
+  },
+  {
+   "branch": "climate",
+   "name": "Per-world question hash",
+   "where": "climate.js · chance",
+   "what": "A MurmurHash3-style mix of the world number and a question, so neighbouring world numbers get different climates.",
+   "refs": [
+    {
+     "file": "climate.js",
+     "line": 43,
+     "label": "chance"
+    },
+    {
+     "file": "climate.js",
+     "line": 102,
+     "label": "spin, calms, front"
+    }
+   ]
+  },
+  {
+   "branch": "page",
+   "name": "Pole of inaccessibility",
+   "where": "index.html · poleOf",
+   "what": "The largest empty circle inside a country, where its name goes. Grid refinement, inside tests from crossings sorted per row, and a tree of boxes that gives up on a point once it cannot win.",
+   "refs": [
+    {
+     "file": "index.html",
+     "line": 792,
+     "label": "poleOf"
+    },
+    {
+     "file": "index.html",
+     "line": 1166,
+     "label": "called in prepOf"
+    }
+   ]
+  },
+  {
+   "branch": "page",
+   "name": "Ranked Douglas–Peucker",
+   "where": "index.html · simplified",
+   "what": "Every point is ranked once for all tolerances, so a new zoom level only filters instead of simplifying again.",
+   "refs": [
+    {
+     "file": "index.html",
+     "line": 925,
+     "label": "simplified"
+    },
+    {
+     "file": "index.html",
+     "line": 988,
+     "label": "lineD"
+    }
+   ]
+  },
+  {
+   "branch": "page",
+   "name": "Greedy colouring",
+   "where": "index.html · colour",
+   "what": "Countries with the most neighbours go first, each taking the first of seven colours its coloured neighbours lack. After an edit a country keeps its old colour unless a neighbour coloured before it already has it.",
+   "refs": [
+    {
+     "file": "index.html",
+     "line": 765,
+     "label": "colour"
+    },
+    {
+     "file": "index.html",
+     "line": 1229,
+     "label": "called in render"
+    }
+   ]
+  },
+  {
+   "branch": "page",
+   "name": "Level of detail & culling",
+   "where": "index.html · updateDetail",
+   "what": "Lines stay within 0.4 px of the full outline at the current zoom, and only lines on screen get new detail.",
+   "refs": [
+    {
+     "file": "index.html",
+     "line": 1007,
+     "label": "setLevel"
+    },
+    {
+     "file": "index.html",
+     "line": 985,
+     "label": "levelOf"
+    },
+    {
+     "file": "index.html",
+     "line": 1049,
+     "label": "updateDetail"
+    }
+   ]
+  },
+  {
+   "branch": "page",
+   "name": "Marker decluttering",
+   "where": "index.html · updateDetail",
+   "what": "Where the rings for tiny countries crowd, only the biggest country of a cluster keeps its ring.",
+   "refs": [
+    {
+     "file": "index.html",
+     "line": 1060,
+     "label": "the ring pass in updateDetail"
+    },
+    {
+     "file": "index.html",
+     "line": 1259,
+     "label": "bySize"
+    }
+   ]
+  },
+  {
+   "branch": "page",
+   "name": "Time slicing",
+   "where": "index.html · nextTask",
+   "what": "Long jobs run in slices of about 12 ms, yielding through a MessageChannel, which background tabs do not slow down.",
+   "refs": [
+    {
+     "file": "index.html",
+     "line": 1132,
+     "label": "nextTask"
+    },
+    {
+     "file": "index.html",
+     "line": 1221,
+     "label": "pause in render"
+    }
+   ]
+  },
+  {
+   "branch": "page",
+   "name": "Bitmap gesture preview",
+   "where": "index.html · previewView",
+   "what": "During a pan or pinch the drawn picture moves as one image; the paths are drawn again when the gesture rests.",
+   "refs": [
+    {
+     "file": "index.html",
+     "line": 973,
+     "label": "previewView"
+    },
+    {
+     "file": "index.html",
+     "line": 960,
+     "label": "applyView"
+    },
+    {
+     "file": "index.html",
+     "line": 1791,
+     "label": "pointermove"
+    }
+   ]
+  },
+  {
+   "branch": "page",
+   "name": "Hit testing",
+   "where": "index.html · itemAt",
+   "what": "The land under the pointer, or else the nearest marker within reach.",
+   "refs": [
+    {
+     "file": "index.html",
+     "line": 1834,
+     "label": "itemAt"
+    },
+    {
+     "file": "index.html",
+     "line": 1848,
+     "label": "tap"
+    }
+   ]
+  },
+  {
+   "branch": "page",
+   "name": "Search ranking",
+   "where": "index.html",
+   "what": "Two rankers, accents and case folded. Enter takes an exact name, then a beginning or a part only one country has, then a two-letter code. The suggestions list beginnings, then word beginnings, then from three letters any part, with a matching code on top.",
+   "refs": [
+    {
+     "file": "index.html",
+     "line": 1631,
+     "label": "findCountry"
+    },
+    {
+     "file": "index.html",
+     "line": 1927,
+     "label": "suggestMatches"
+    },
+    {
+     "file": "index.html",
+     "line": 1918,
+     "label": "folded"
+    }
+   ]
+  },
+  {
+   "branch": "page",
+   "name": "Base-62 edit codes",
+   "where": "index.html · packEdit",
+   "what": "Each border edit packs into four base-62 characters (two country codes and add or cut), so a long session fits in a link.",
+   "refs": [
+    {
+     "file": "index.html",
+     "line": 613,
+     "label": "packEdit"
+    },
+    {
+     "file": "index.html",
+     "line": 618,
+     "label": "unpackEdit"
+    },
+    {
+     "file": "index.html",
+     "line": 653,
+     "label": "hashOf"
+    }
+   ]
+  },
+  {
+   "branch": "page",
+   "name": "FNV-1a text key",
+   "where": "index.html · keyOfText",
+   "what": "A dropped DOT file is named in the address by a 32-bit FNV-1a hash of its text.",
+   "refs": [
+    {
+     "file": "index.html",
+     "line": 2415,
+     "label": "keyOfText"
+    },
+    {
+     "file": "index.html",
+     "line": 2421,
+     "label": "openDot"
+    }
+   ]
+  },
+  {
+   "branch": "page",
+   "name": "Learned progress estimate",
+   "where": "index.html",
+   "what": "The share of build time before each progress mark starts from built-in figures and is replaced by the last finished build's own timings for the rest of the visit. It paces the bar between marks and gives the time left.",
+   "refs": [
+    {
+     "file": "index.html",
+     "line": 2143,
+     "label": "timeShare"
+    },
+    {
+     "file": "index.html",
+     "line": 2171,
+     "label": "drawJob"
+    },
+    {
+     "file": "index.html",
+     "line": 2186,
+     "label": "endJob"
+    }
+   ]
+  },
+  {
+   "branch": "ink",
+   "name": "Zoom-band tile pyramid",
+   "where": "styles/ink-engine.js · createEngine",
+   "what": "Square tiles anchored to the world, one set per doubling of zoom, shown at 0.71 to 1.41 times their scale. Tiles drawn apart meet without a seam.",
+   "refs": [
+    {
+     "file": "styles/ink-engine.js",
+     "line": 23,
+     "label": "bandOf"
+    },
+    {
+     "file": "styles/ink.js",
+     "line": 325,
+     "label": "tiles"
+    },
+    {
+     "file": "styles/ink-engine.js",
+     "line": 235,
+     "label": "tile"
+    }
+   ]
+  },
+  {
+   "branch": "ink",
+   "name": "Worker pool & LRU cache",
+   "where": "styles/ink.js · engine; styles/ink-worker.js · keep",
+   "what": "One or two workers draw tiles on OffscreenCanvas, and each keeps its last 100 tiles as PNGs.",
+   "refs": [
+    {
+     "file": "styles/ink-worker.js",
+     "line": 22,
+     "label": "keep"
+    },
+    {
+     "file": "styles/ink.js",
+     "line": 113,
+     "label": "engine"
+    },
+    {
+     "file": "styles/ink.js",
+     "line": 137,
+     "label": "send"
+    }
+   ]
+  },
+  {
+   "branch": "ink",
+   "name": "Colour-coded raster survey",
+   "where": "styles/ink-raster.js · drawIds; styles/ink-survey.js · survey",
+   "what": "Each country is drawn in a colour that spells its index; an EDT then gives every cell its distance to the sea, the land and the nearest border.",
+   "refs": [
+    {
+     "file": "styles/ink-raster.js",
+     "line": 3,
+     "label": "drawIds"
+    },
+    {
+     "file": "styles/ink-survey.js",
+     "line": 69,
+     "label": "survey"
+    },
+    {
+     "file": "styles/ink-survey.js",
+     "line": 13,
+     "label": "edt1d"
+    }
+   ]
+  },
+  {
+   "branch": "ink",
+   "name": "Per-realm quotas",
+   "where": "styles/ink-survey.js · thresholds",
+   "what": "Each realm gets thresholds of its own, so no more than a share of it lies under hills or woods.",
+   "refs": [
+    {
+     "file": "styles/ink-survey.js",
+     "line": 119,
+     "label": "thresholds"
+    },
+    {
+     "file": "styles/ink-engine.js",
+     "line": 452,
+     "label": "read in markTile"
+    }
+   ]
+  },
+  {
+   "branch": "ink",
+   "name": "Widest open water",
+   "where": "styles/ink-survey.js · seaSpots",
+   "what": "Finds the widest stretches of sea, with room to each side, for the compass rose, the ship, the serpent and the sea names.",
+   "refs": [
+    {
+     "file": "styles/ink-survey.js",
+     "line": 157,
+     "label": "seaSpots"
+    },
+    {
+     "file": "styles/ink.js",
+     "line": 545,
+     "label": "placeFurniture"
+    },
+    {
+     "file": "styles/ink.js",
+     "line": 650,
+     "label": "chooseSeaNames"
+    }
+   ]
+  },
+  {
+   "branch": "ink",
+   "name": "Perlin noise",
+   "where": "styles/ink-noise.js · makeNoise",
+   "what": "Seeded gradient noise and its fractal sums, for the style's own downs and forest stands.",
+   "refs": [
+    {
+     "file": "styles/ink-noise.js",
+     "line": 18,
+     "label": "makeNoise"
+    },
+    {
+     "file": "styles/ink-noise.js",
+     "line": 55,
+     "label": "makeTerrain"
+    },
+    {
+     "file": "styles/ink-engine.js",
+     "line": 1107,
+     "label": "grainTile"
+    }
+   ]
+  },
+  {
+   "branch": "ink",
+   "name": "Maximin colours in CIELAB",
+   "where": "styles/ink.js · colourSlots",
+   "what": "The most constrained realm first takes the paper farthest from its neighbours' (lightness counted double), then two passes improve the worst pairs.",
+   "refs": [
+    {
+     "file": "styles/ink.js",
+     "line": 73,
+     "label": "colourSlots"
+    },
+    {
+     "file": "styles/ink.js",
+     "line": 65,
+     "label": "labOf"
+    },
+    {
+     "file": "styles/ink.js",
+     "line": 190,
+     "label": "called in render"
+    }
+   ]
+  },
+  {
+   "branch": "ink",
+   "name": "Principal-axis name fit",
+   "where": "styles/ink.js · axisOf, fitFont",
+   "what": "Second moments of the outline give its long axis, and the largest font that fits along it is found.",
+   "refs": [
+    {
+     "file": "styles/ink.js",
+     "line": 772,
+     "label": "axisOf"
+    },
+    {
+     "file": "styles/ink.js",
+     "line": 786,
+     "label": "fitFont"
+    },
+    {
+     "file": "styles/ink.js",
+     "line": 800,
+     "label": "placeName"
+    }
+   ]
+  },
+  {
+   "branch": "ink",
+   "name": "Parabolic baselines",
+   "where": "styles/ink.js · bend",
+   "what": "A parabola fitted to the middles of the crossings bends a name along its land; a great realm's name is arched a little.",
+   "refs": [
+    {
+     "file": "styles/ink.js",
+     "line": 865,
+     "label": "bend"
+    },
+    {
+     "file": "styles/ink.js",
+     "line": 849,
+     "label": "middle"
+    },
+    {
+     "file": "styles/ink.js",
+     "line": 916,
+     "label": "letter"
+    }
+   ]
+  },
+  {
+   "branch": "ink",
+   "name": "Back-to-front woods",
+   "where": "styles/ink-engine.js · tree",
+   "what": "Woods are drawn in bands from the back, so the trees in front hide the feet of those behind: the painter's algorithm.",
+   "refs": [
+    {
+     "file": "styles/ink-engine.js",
+     "line": 523,
+     "label": "the sort in marks"
+    },
+    {
+     "file": "styles/ink-engine.js",
+     "line": 541,
+     "label": "flushTrees"
+    },
+    {
+     "file": "styles/ink-engine.js",
+     "line": 903,
+     "label": "tree"
+    }
+   ]
+  },
+  {
+   "branch": "ink",
+   "name": "Simplify & segment grid",
+   "where": "styles/ink-engine.js · simplify, segmentGrid",
+   "what": "Douglas–Peucker outlines and lines at 0.3 px of each band's zoom, and a uniform grid of segments that says whether a border or coast is near: it keeps marks off borders and coasts, and stops a river being drawn along a border.",
+   "refs": [
+    {
+     "file": "styles/ink-engine.js",
+     "line": 87,
+     "label": "simplify"
+    },
+    {
+     "file": "styles/ink-engine.js",
+     "line": 114,
+     "label": "segmentGrid"
+    },
+    {
+     "file": "styles/ink-engine.js",
+     "line": 479,
+     "label": "used in markTile"
+    }
+   ]
+  },
+  {
+   "branch": "ink",
+   "name": "Banded point-in-polygon",
+   "where": "styles/ink-engine.js · inCountry",
+   "what": "A country's edges sorted into horizontal bands, for fast inside tests.",
+   "refs": [
+    {
+     "file": "styles/ink-engine.js",
+     "line": 169,
+     "label": "inCountry"
+    },
+    {
+     "file": "styles/ink-engine.js",
+     "line": 499,
+     "label": "countryNear"
+    }
+   ]
+  },
+  {
+   "branch": "realm",
+   "name": "Country-ID pass",
+   "where": "styles/realm-terrain.js · createTerrain",
+   "what": "The GPU first draws which country each pixel belongs to, exact to the pixel.",
+   "refs": [
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 41,
+     "label": "ID_FS"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 886,
+     "label": "the ID draw in renderInto"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 642,
+     "label": "setCodes"
+    }
+   ]
+  },
+  {
+   "branch": "realm",
+   "name": "Segment distance fields",
+   "where": "styles/realm-terrain.js · shaders",
+   "what": "A quad around each border segment gives the exact distance in every pixel, and MAX blending joins them into one field with round joins.",
+   "refs": [
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 63,
+     "label": "SEG_FS"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 47,
+     "label": "SEG_VS (the quad)"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 895,
+     "label": "MAX blending in renderInto"
+    }
+   ]
+  },
+  {
+   "branch": "realm",
+   "name": "Derivative-damped fBm",
+   "where": "styles/realm-terrain.js · shaders",
+   "what": "Inigo Quilez's erosion-like noise: the ridged octaves are damped by the slope built so far. The octaves follow the zoom and fade in and out.",
+   "refs": [
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 287,
+     "label": "the octave loop"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 302,
+     "label": "the damping"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 958,
+     "label": "choosing the octaves"
+    }
+   ]
+  },
+  {
+   "branch": "realm",
+   "name": "Value noise with gradients",
+   "where": "styles/realm-terrain.js · shaders",
+   "what": "Quintic value noise that also returns its analytic derivative, carried through as dual numbers.",
+   "refs": [
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 127,
+     "label": "noised"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 119,
+     "label": "hsh"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 156,
+     "label": "dmul and dsmooth"
+    }
+   ]
+  },
+  {
+   "branch": "realm",
+   "name": "Bicubic B-spline sampling",
+   "where": "styles/realm-terrain.js · shaders",
+   "what": "Four bilinear texture reads make one bicubic B-spline sample, so the fields stay smooth at any zoom.",
+   "refs": [
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 144,
+     "label": "cubic"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 268,
+     "label": "the slope samples"
+    }
+   ]
+  },
+  {
+   "branch": "realm",
+   "name": "Imhof-style shading",
+   "where": "styles/realm-terrain.js · shaders",
+   "what": "Light from the northwest with warm lit slopes and cool shadows, plus snow, rock, beaches and cliffs.",
+   "refs": [
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 405,
+     "label": "warm light, cool shade"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 339,
+     "label": "the designed slopes"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 363,
+     "label": "snow and rock"
+    }
+   ]
+  },
+  {
+   "branch": "realm",
+   "name": "Whittaker colour lookup",
+   "where": "styles/realm-terrain.js · biomeTable",
+   "what": "A 32 × 32 table of ground colour and forest cover by warmth and moisture.",
+   "refs": [
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 502,
+     "label": "biomeTable"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 494,
+     "label": "BIOMES"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 360,
+     "label": "the lookup"
+    }
+   ]
+  },
+  {
+   "branch": "realm",
+   "name": "Hashed crowns & lights",
+   "where": "styles/realm-terrain.js · shaders",
+   "what": "Tree crowns and lights sit in hashed grid cells per zoom level and fade between levels, so a zoom spreads them and never shuffles them.",
+   "refs": [
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 179,
+     "label": "crowns"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 203,
+     "label": "lights"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 995,
+     "label": "the levels in renderInto"
+    }
+   ]
+  },
+  {
+   "branch": "realm",
+   "name": "Strip repaint on pan",
+   "where": "styles/realm-terrain.js · createTerrain",
+   "what": "A pan shifts the last frame by whole pixels and paints only the new strips.",
+   "refs": [
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 828,
+     "label": "the pan test in draw"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 810,
+     "label": "draw"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 1029,
+     "label": "painting only the strips"
+    }
+   ]
+  },
+  {
+   "branch": "realm",
+   "name": "Ear-clipping triangulation",
+   "where": "vendor/earcut.js",
+   "what": "Mapbox's earcut, with z-order hashing, triangulates every country for the GPU.",
+   "refs": [
+    {
+     "file": "vendor/earcut.js",
+     "line": 3,
+     "label": "earcut"
+    },
+    {
+     "file": "vendor/earcut.js",
+     "line": 161,
+     "label": "isEarHashed (z-order)"
+    },
+    {
+     "file": "styles/realm-prep.js",
+     "line": 219,
+     "label": "where each country is triangulated"
+    }
+   ]
+  },
+  {
+   "branch": "realm",
+   "name": "Shelf & distance fields",
+   "where": "styles/realm-prep.js · prepareWorld",
+   "what": "A scanline raster, an EDT for distance inland and out to sea, and three box blurs (close to a Gaussian) for the shallows.",
+   "refs": [
+    {
+     "file": "styles/realm-prep.js",
+     "line": 22,
+     "label": "edt1"
+    },
+    {
+     "file": "styles/realm-prep.js",
+     "line": 48,
+     "label": "blur"
+    },
+    {
+     "file": "styles/realm-prep.js",
+     "line": 74,
+     "label": "rasterize"
+    }
+   ]
+  },
+  {
+   "branch": "realm",
+   "name": "DSATUR colouring",
+   "where": "styles/realm.js · slotsFor",
+   "what": "The most constrained country is coloured first, each preferring the slot its code hashes to, so colours survive most edits.",
+   "refs": [
+    {
+     "file": "styles/realm.js",
+     "line": 34,
+     "label": "slotsFor"
+    },
+    {
+     "file": "styles/realm.js",
+     "line": 413,
+     "label": "where render calls it"
+    },
+    {
+     "file": "styles/realm-terrain.js",
+     "line": 650,
+     "label": "into the code texture"
+    }
+   ]
+  },
+  {
+   "branch": "base",
+   "name": "Mulberry32 PRNG",
+   "where": "util.js · mulberry32",
+   "what": "Seeded random numbers: the same world number always gives the same map.",
+   "refs": [
+    {
+     "file": "util.js",
+     "line": 3,
+     "label": "mulberry32"
+    },
+    {
+     "file": "world.js",
+     "line": 23,
+     "label": "the world's generator"
+    },
+    {
+     "file": "layout.js",
+     "line": 168,
+     "label": "MDS start vector"
+    }
+   ]
+  },
+  {
+   "branch": "base",
+   "name": "Integer hash",
+   "where": "util.js · hash2",
+   "what": "A number in [0, 1) from three integers, behind every choice that is keyed to a position.",
+   "refs": [
+    {
+     "file": "util.js",
+     "line": 29,
+     "label": "hash2"
+    },
+    {
+     "file": "label.js",
+     "line": 269,
+     "label": "cell keys"
+    },
+    {
+     "file": "mesh.js",
+     "line": 60,
+     "label": "point jitter"
+    }
+   ]
+  },
+  {
+   "branch": "base",
+   "name": "Value noise & fBm",
+   "where": "util.js · noise2, fbm2",
+   "what": "Smooth lattice noise, summed over octaves.",
+   "refs": [
+    {
+     "file": "util.js",
+     "line": 37,
+     "label": "noise2"
+    },
+    {
+     "file": "util.js",
+     "line": 48,
+     "label": "fbm2"
+    },
+    {
+     "file": "world.js",
+     "line": 237,
+     "label": "coast noise"
+    }
+   ]
+  },
+  {
+   "branch": "base",
+   "name": "Bit-exact hypot",
+   "where": "util.js · hypot",
+   "what": "Math.hypot as V8 computes it (scaled by the larger, Kahan-summed): the same bits in every browser, and faster than the builtin.",
+   "refs": [
+    {
+     "file": "util.js",
+     "line": 16,
+     "label": "hypot"
+    },
+    {
+     "file": "layout.js",
+     "line": 211,
+     "label": "a caller in smacof"
+    }
+   ]
+  },
+  {
+   "branch": "base",
+   "name": "Segment predicates",
+   "where": "util.js · orient, segmentsIntersect, segSegDist2",
+   "what": "Orientation, proper crossing and segment-to-segment distance, used to keep boundary lines from crossing or pinching when their vertices move.",
+   "refs": [
+    {
+     "file": "util.js",
+     "line": 72,
+     "label": "segmentsIntersect"
+    },
+    {
+     "file": "util.js",
+     "line": 88,
+     "label": "segSegDist2"
+    },
+    {
+     "file": "geom.js",
+     "line": 738,
+     "label": "Geo.blocks"
+    }
+   ]
+  },
+  {
+   "branch": "base",
+   "name": "Shoelace area",
+   "where": "util.js · ringArea",
+   "what": "The signed area of a polygon ring.",
+   "refs": [
+    {
+     "file": "util.js",
+     "line": 61,
+     "label": "ringArea"
+    },
+    {
+     "file": "islands.js",
+     "line": 63,
+     "label": "islandRing's area fit"
+    },
+    {
+     "file": "geom.js",
+     "line": 834,
+     "label": "labelAreasInto"
+    }
+   ]
+  },
+  {
+   "branch": "base",
+   "name": "DOT tokenizer & parser",
+   "where": "dot.js · tokens, parseDot",
+   "what": "A hand-written parser for Graphviz files: chains, subgraphs, scoped defaults, ports and HTML ids.",
+   "refs": [
+    {
+     "file": "dot.js",
+     "line": 10,
+     "label": "tokens"
+    },
+    {
+     "file": "dot.js",
+     "line": 79,
+     "label": "parseDot"
+    },
+    {
+     "file": "dot.js",
+     "line": 152,
+     "label": "statements"
+    }
+   ]
+  },
+  {
+   "branch": "base",
+   "name": "PageRank",
+   "where": "dot.js · pageRank",
+   "what": "Power iteration (damping 0.85, 100 rounds) with links read both ways sizes the nodes that carry no size of their own.",
+   "refs": [
+    {
+     "file": "dot.js",
+     "line": 224,
+     "label": "pageRank"
+    },
+    {
+     "file": "dot.js",
+     "line": 282,
+     "label": "where it is called"
+    }
+   ]
+  },
+  {
+   "branch": "base",
+   "name": "Size attribute detection",
+   "where": "dot.js · sizesFromAttributes",
+   "what": "Picks the first size attribute that most nodes carry as a positive number and that tells them apart.",
+   "refs": [
+    {
+     "file": "dot.js",
+     "line": 201,
+     "label": "sizesFromAttributes"
+    },
+    {
+     "file": "dot.js",
+     "line": 200,
+     "label": "SIZE_ATTRIBUTES"
+    },
+    {
+     "file": "dot.js",
+     "line": 284,
+     "label": "the smallest for the rest"
+    }
+   ]
+  },
+  {
+   "branch": "base",
+   "name": "Measure scaling",
+   "where": "measures.js · measureDoc; tools/gdp.mjs",
+   "what": "Scales land area or GDP so the sizes add up to the world's people. A GDP that neither the World Bank nor tools/gdp-others.json has is the population times the median GDP per person.",
+   "refs": [
+    {
+     "file": "measures.js",
+     "line": 17,
+     "label": "measureDoc"
+    },
+    {
+     "file": "measures.js",
+     "line": 29,
+     "label": "the scaling"
+    },
+    {
+     "file": "tools/gdp.mjs",
+     "line": 32,
+     "label": "median GDP per person"
+    }
+   ]
+  },
+  {
+   "branch": "base",
+   "name": "Rule checker",
+   "where": "tools/check.mjs",
+   "what": "Builds worlds in Node and checks the three rules, with every area within 1% of its share.",
+   "refs": [
+    {
+     "file": "tools/check.mjs",
+     "line": 58,
+     "label": "check"
+    },
+    {
+     "file": "tools/check.mjs",
+     "line": 81,
+     "label": "run"
+    },
+    {
+     "file": "tools/check.mjs",
+     "line": 76,
+     "label": "the 1% test"
+    }
+   ]
+  }
+ ]
+}
