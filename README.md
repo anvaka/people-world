@@ -53,7 +53,9 @@ Here is what happens when a world is made:
 An edited map starts from the world as it was, so countries that the edit doesn't touch stay
 roughly where they were.
 
-There is a longer description of every step, the styles and the files in
+[People World, step by step](https://anvaka.github.io/people-world/how-it-works/) follows world 1
+through all of this with pictures from a real build, and lists every algorithm with links to its
+code. There is a longer description of every step, the styles and the files in
 [docs/internals.md](docs/internals.md).
 
 ## Local development
@@ -69,6 +71,9 @@ and open http://localhost:8080. To build a few worlds in Node and check the thre
 ```
 node tools/check.mjs
 ```
+
+The step-by-step page in `how-it-works/` is generated; [tools/how-it-works](tools/how-it-works/README.md)
+says how to rebuild it after the code changes.
 
 ## Limitations
 
